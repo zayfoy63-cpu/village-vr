@@ -3,6 +3,7 @@ import { useGame, type Speed } from '../store/gameStore';
 
 const SPEEDS: { value: Speed; label: string; title: string }[] = [
   { value: 0, label: '⏸', title: 'Pause (Espace)' },
+  { value: 0.5, label: '🐢 x0,5', title: 'Ralenti : pour gérer les moments chauds' },
   { value: 1, label: '▶ x1', title: 'Vitesse normale' },
   { value: 2, label: '⏩ x2', title: 'Vitesse double' },
 ];

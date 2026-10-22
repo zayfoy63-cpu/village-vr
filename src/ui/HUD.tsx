@@ -11,7 +11,7 @@ import {
 } from '../game/config';
 import type { Resources } from '../game/types';
 import { severity } from '../game/events';
-import { computeNet, hasModifier, housingCapacity, jobsCapacity, moraleFactor } from '../game/rules';
+import { computeNet, hasModifier, injuredCount, housingCapacity, jobsCapacity, moraleFactor } from '../game/rules';
 import { useGame } from '../store/gameStore';
 
 const MODIFIER_LABELS = [
@@ -20,6 +20,7 @@ const MODIFIER_LABELS = [
   { id: 'goodHarvest', label: '🌻 Bonne récolte' },
   { id: 'quarantine', label: '😷 Quarantaine' },
   { id: 'blight', label: '🥀 Récoltes malades' },
+  { id: 'sheltered', label: '🏠 Villageois à l\'abri' },
 ] as const;
 
 function moraleLook(m: number): { emoji: string; cls: string; label: string } {
@@ -86,6 +87,7 @@ export function HUD() {
     })),
   );
   const game = useGame.getState().game;
+  const injured = useGame((s) => injuredCount(s.game));
   const progress = useGame((s) => Math.floor(s.game.dayProgress * 50) / 50);
   const net = computeNet(game);
   const season = seasonOf(data.day);
@@ -107,6 +109,12 @@ export function HUD() {
             {data.population}/{capacity}
           </span>
         </div>
+        {injured > 0 && (
+          <div className="hud-item injured" title="Villageois blessés : ils ne travaillent pas pendant quelques jours">
+            <span className="hud-icon">🤕</span>
+            <span className="hud-value">{injured}</span>
+          </div>
+        )}
         <MoraleGauge />
         <div className="hud-item" title="Travailleurs occupés / postes">
           <span className="hud-icon">👷</span>

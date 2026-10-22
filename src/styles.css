@@ -1144,3 +1144,133 @@ button.primary:hover {
   z-index: 50;
   pointer-events: auto;
 }
+
+/* ---------- Événements en temps réel ---------- */
+.crisis-banner .crisis-actions,
+.crisis-banner button {
+  pointer-events: auto;
+}
+
+.crisis.storm {
+  background: rgba(45, 50, 75, 0.94);
+  border-radius: 14px;
+  animation: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.crisis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.crisis-actions button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.crisis.flood {
+  border-radius: 14px;
+}
+
+.crisis-sub {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.choice-realtime {
+  font-size: 11.5px;
+  color: #ffb4a8;
+  font-weight: 600;
+}
+
+.bandit-markers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.bandit-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 14px solid #ff3b30;
+  filter: drop-shadow(0 0 4px rgba(255, 40, 30, 0.9));
+  animation: marker-blink 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes marker-blink {
+  to {
+    opacity: 0.45;
+  }
+}
+
+.event-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  animation: event-flash ease-out forwards;
+}
+
+.event-flash.raid {
+  box-shadow: inset 0 0 90px rgba(255, 40, 30, 0.6);
+}
+
+.event-flash.storm {
+  box-shadow: inset 0 0 120px rgba(210, 225, 255, 0.55);
+  background: rgba(220, 230, 255, 0.08);
+}
+
+.event-flash.flood {
+  box-shadow: inset 0 0 90px rgba(40, 130, 230, 0.6);
+}
+
+.event-flash.fire {
+  box-shadow: inset 0 0 90px rgba(255, 130, 20, 0.55);
+}
+
+@keyframes event-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.toast {
+  position: absolute;
+  bottom: 150px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 20, 15, 0.92);
+  border: 1px solid rgba(255, 210, 120, 0.4);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  pointer-events: none;
+  animation: toast-in 0.2s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.hud-item.injured .hud-value {
+  color: #ff9a8a;
+}

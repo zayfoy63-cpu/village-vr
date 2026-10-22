@@ -5,7 +5,7 @@ import { loadSettings, saveSettings, type Settings } from './settings';
 import { DAY_DURATION_SEC } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
-import { extinguishFire, fightBandit } from '../game/hazards';
+import { extinguishFire, protectCrops, reinforceBuilding, sendGuard, shelterVillagers } from '../game/hazards';
 import {
   attackCamp as attackCampSim,
   buyParcel as buyParcelSim,
@@ -20,7 +20,7 @@ import {
 } from '../game/simulation';
 import type { BuildingTypeId, GameState } from '../game/types';
 
-export type Speed = 0 | 1 | 2;
+export type Speed = 0 | 0.5 | 1 | 2;
 
 interface GameStore {
   game: GameState;
@@ -54,13 +54,20 @@ interface GameStore {
   extinguish: (buildingId: number) => boolean;
   repair: (buildingId: number) => boolean;
   togglePause: (buildingId: number) => boolean;
-  fight: (banditIndex: number) => boolean;
+  /** Clic sur un bandit : un garde part l'intercepter */
+  chase: (banditId: number) => boolean;
+  reinforce: (buildingId: number) => boolean;
+  shelter: () => boolean;
+  protectCrops: () => boolean;
+  /** Petit message éphémère (action impossible, etc.) */
+  toast: { text: string; at: number } | null;
+  showToast: (text: string) => void;
   newGame: (seed?: number) => void;
 }
 
 /** Identifiants des cartes à choix encore sans réponse */
 export function openChoiceIds(game: GameState): number[] {
-  return game.notices.filter((n) => n.choice && !n.choice.resolved).map((n) => n.id);
+  return game.notices.filter((n) => n.choice && !n.choice.resolved && !n.choice.realtime).map((n) => n.id);
 }
 
 function hasNewChoice(before: GameState, after: GameState): boolean {
@@ -171,7 +178,23 @@ export const useGame = create<GameStore>((set, get) => {
     extinguish: (buildingId) => apply(extinguishFire(get().game, buildingId)),
     repair: (buildingId) => apply(repairBuilding(get().game, buildingId)),
     togglePause: (buildingId) => apply(togglePauseSim(get().game, buildingId)),
-    fight: (banditIndex) => apply(fightBandit(get().game, banditIndex)),
+    chase: (banditId) => {
+      const res = sendGuard(get().game, banditId);
+      if (!res.state) {
+        if (res.reason) get().showToast(res.reason);
+        return false;
+      }
+      return apply(res.state);
+    },
+    reinforce: (buildingId) => {
+      const ok = apply(reinforceBuilding(get().game, buildingId));
+      if (!ok) get().showToast('Impossible de renforcer : pas assez de bois ?');
+      return ok;
+    },
+    shelter: () => apply(shelterVillagers(get().game)),
+    protectCrops: () => apply(protectCrops(get().game)),
+    toast: null,
+    showToast: (text) => set({ toast: { text, at: Date.now() } }),
 
     newGame: (seed) => {
       clearSave();

@@ -84,6 +84,9 @@ export function createInitialState(seed: number): GameState {
     nextPendingId: 1,
     raid: null,
     floodUntil: 0,
+    storm: null,
+    flood: null,
+    injuries: [],
     parcels: { owned: [...PARCELS.start], bought: 0 },
     features: generateFeatures(map, seed),
     discovered: ['food', 'wood', 'stone', 'gold'],
@@ -426,6 +429,8 @@ export function advanceDay(state: GameState): GameState {
   s.dayProgress = 0;
   const now = s.day;
   s.modifiers = s.modifiers.filter((m) => m.untilDay >= s.day);
+  // Les blessés guérissent
+  s.injuries = s.injuries.filter((i) => i.untilDay >= s.day);
   if ((s.day - 1) % DAYS_PER_SEASON === 0) {
     const season = seasonOf(s.day);
     pushNotice(s, {

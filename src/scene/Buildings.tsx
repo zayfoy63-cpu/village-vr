@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import type * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, GameMap } from '../game/types';
+import { reinforceCost } from '../game/hazards';
 import { useGame } from '../store/gameStore';
 import { Fields } from './Fields';
 import { UpgradeBurst } from './UpgradeBurst';
@@ -67,16 +68,23 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
             key={b.id}
             position={pos}
             onPointerOver={() => {
-              if (b.fire && b.fire.extinguishEnd === undefined) document.body.style.cursor = 'pointer';
+              if ((b.fire && b.fire.extinguishEnd === undefined) || reinforceCost(useGame.getState().game, b.id))
+                document.body.style.cursor = 'pointer';
             }}
             onPointerOut={() => (document.body.style.cursor = '')}
             onClick={(e) => {
               if (e.delta > 6) return;
               const state = useGame.getState();
-              // Priorité : éteindre un incendie ; sinon, sans construction en cours, ouvrir le panneau
+              // Priorité : éteindre un incendie, puis renforcer ; sinon, sans construction en cours, ouvrir le panneau
               if (b.fire && b.fire.extinguishEnd === undefined) {
                 e.stopPropagation();
                 state.extinguish(b.id);
+                return;
+              }
+              // Orage ou crue en approche : un clic renforce le bâtiment (contre du bois)
+              if (reinforceCost(state.game, b.id)) {
+                e.stopPropagation();
+                state.reinforce(b.id);
                 return;
               }
               if (state.selected) return;

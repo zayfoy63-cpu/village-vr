@@ -32,6 +32,13 @@ export function SettingsButton() {
                   </em>
                 </span>
               </label>
+              <label className="setting-row">
+                <input type="checkbox" checked={settings.sound} onChange={(e) => setSettings({ sound: e.target.checked })} />
+                <span>
+                  <strong>Son d'alerte</strong>
+                  <em>Un petit signal sonore quand des bandits, un orage, une crue ou un incendie commencent.</em>
+                </span>
+              </label>
               <button className="primary" onClick={() => setOpen(false)}>
                 Fermer
               </button>

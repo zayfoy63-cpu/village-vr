@@ -8,3 +8,6 @@ export interface ScreenPoint {
 }
 
 export const parcelScreen = new Map<number, ScreenPoint>();
+
+/** Positions à l'écran des bandits actifs (marqueurs rouges au bord quand ils sont hors champ) */
+export const banditScreen = new Map<number, ScreenPoint>();

@@ -2,11 +2,14 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf } from '../game/config';
+import { BUILDING_BY_ID } from '../game/buildings';
 import { tileAt } from '../game/mapgen';
+import { TUNING } from '../game/events';
+import { floodLevel, stormCenter } from '../game/realtime';
 import { hasModifier } from '../game/rules';
 import type { GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
-import { GEO, tileToWorld } from './shared';
+import { GEO, TILE, tileToWorld } from './shared';
 
 const floodMat = new THREE.MeshStandardMaterial({
   color: '#3f8fd0',
@@ -17,18 +20,20 @@ const floodMat = new THREE.MeshStandardMaterial({
   depthWrite: false,
 });
 
-/** Crue : l'eau monte sur les cases qui bordent la rivière, puis redescend (1 draw call) */
+/** Crue : l'eau monte progressivement sur les cases qui bordent la rivière, puis redescend (1 draw call) */
 export function Flood({ map }: { map: GameMap }) {
-  const until = useGame((s) => s.game.floodUntil);
+  const active = useGame((s) => !!s.game.flood);
   const ref = useRef<THREE.InstancedMesh>(null);
   const tiles = useMemo(() => {
-    const out: [number, number, number][] = [];
+    const out: { p: [number, number, number]; ring: number }[] = [];
     for (let z = 0; z < map.height; z++)
       for (let x = 0; x < map.width; x++) {
         if (tileAt(map, x, z) === 'water') continue;
-        let wet = false;
-        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (tileAt(map, x + dx, z + dz) === 'water') wet = true;
-        if (wet) out.push(tileToWorld(x, z, map.width, map.height));
+        // Distance à l'eau (1 = au bord, 2 = deuxième rangée) : l'eau gagne d'abord le bord
+        let ring = 0;
+        for (let r = 1; r <= 2 && !ring; r++)
+          for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) if (tileAt(map, x + dx, z + dz) === 'water') ring = r;
+        if (ring) out.push({ p: tileToWorld(x, z, map.width, map.height), ring });
       }
     return out;
   }, [map]);
@@ -36,22 +41,181 @@ export function Flood({ map }: { map: GameMap }) {
 
   useFrame(({ clock }) => {
     const mesh = ref.current;
-    if (!mesh) return;
     const g = useGame.getState().game;
-    const k = Math.max(0, Math.min(1, (until - (g.day + g.dayProgress)) / 1));
-    // Monte vite, redescend lentement, avec une petite houle
-    const level = Math.sin(Math.min(1, (1 - k) * 4) * Math.PI * 0.5) * k * 0.14;
-    tiles.forEach(([x, , z], i) => {
-      const wave = Math.sin(clock.elapsedTime * 2 + x + z) * 0.01;
-      mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(x, level / 2 + wave, z), tmp.q, tmp.s.set(1.001, Math.max(0.001, level), 1.001)));
-    });
-    mesh.count = level > 0.002 ? tiles.length : 0;
+    if (!mesh || !g.flood) return;
+    const k = floodLevel(g.flood, g.day + g.dayProgress) * (g.flood.protected ? 0.5 : 1);
+    let n = 0;
+    for (const { p, ring } of tiles) {
+      // Le bord est inondé dès le début, la deuxième rangée seulement près du pic
+      const level = Math.max(0, Math.min(1, k * 2.2 - (ring - 1) * 1.2)) * 0.14;
+      if (level < 0.002) continue;
+      const wave = Math.sin(clock.elapsedTime * 2 + p[0] + p[2]) * 0.01;
+      mesh.setMatrixAt(n++, tmp.m.compose(tmp.p.set(p[0], level / 2 + wave, p[2]), tmp.q, tmp.s.set(1.001, level, 1.001)));
+    }
+    mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
   });
 
-  const now = useGame.getState().game;
-  if (until <= now.day + now.dayProgress - 0.01) return null;
+  if (!active) return null;
   return <instancedMesh ref={ref} args={[GEO.box, floodMat, Math.max(1, tiles.length)]} frustumCulled={false} />;
+}
+
+const cloudMat = new THREE.MeshStandardMaterial({
+  color: '#5d6478',
+  emissive: new THREE.Color('#1c2233'),
+  flatShading: true,
+  roughness: 1,
+});
+const shadowMat = new THREE.MeshBasicMaterial({ color: '#0b0d18', transparent: true, opacity: 0.32, depthWrite: false });
+const rainMat = new THREE.MeshBasicMaterial({ color: '#a9c4e8', transparent: true, opacity: 0.55, depthWrite: false });
+const boltMat = new THREE.MeshBasicMaterial({ color: '#fff6b0' });
+const shadowGeo = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
+const MAX_RAIN = 220;
+const CLOUD_PUFFS = 11;
+/** Durée d'affichage d'un éclair (jours de jeu) */
+const BOLT = 0.012;
+
+/** Orage : gros nuage sombre qui traverse la carte, ombre au sol (zone touchée), pluie et éclairs */
+export function Storm({ map }: { map: GameMap }) {
+  const active = useGame((s) => !!s.game.storm);
+  const cloud = useRef<THREE.Group>(null);
+  const shadow = useRef<THREE.Mesh>(null);
+  const rain = useRef<THREE.InstancedMesh>(null);
+  const bolts = useRef<THREE.InstancedMesh>(null);
+  const flash = useRef<THREE.PointLight>(null);
+  const puffs = useMemo(
+    () =>
+      Array.from({ length: CLOUD_PUFFS }, (_, i) => {
+        const a = i * 2.39996;
+        const r = i === 0 ? 0 : 0.35 + ((i * 37) % 10) / 16;
+        return { x: Math.cos(a) * r, z: Math.sin(a) * r, y: ((i * 13) % 5) / 12, s: 1.1 - r * 0.35 };
+      }),
+    [],
+  );
+  const drops = useMemo(
+    () =>
+      Array.from({ length: MAX_RAIN }, (_, i) => ({
+        a: ((i * 2654435761) % 1000) / 1000 * Math.PI * 2,
+        r: Math.sqrt(((i * 7919) % 1000) / 1000),
+        phase: ((i * 3571) % 1000) / 1000,
+      })),
+    [],
+  );
+  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3() }), []);
+
+  useFrame(({ clock }) => {
+    const g = useGame.getState().game;
+    const storm = g.storm;
+    if (!storm || !cloud.current || !shadow.current || !rain.current || !bolts.current || !flash.current) return;
+    const t = g.day + g.dayProgress;
+    const c = stormCenter(storm, t);
+    const x = (c.x - map.width / 2) * TILE;
+    const z = (c.z - map.height / 2) * TILE;
+    const R = storm.radius * TILE;
+    cloud.current.position.set(x, 3.4 + Math.sin(clock.elapsedTime * 0.7) * 0.1, z);
+    // Le nuage grossit pendant qu'il se forme au bord de la carte
+    const form = Math.min(1, 0.35 + 0.65 * Math.max(0, 1 - (storm.startT - t) / TUNING.storm.warningTime) * 1.5);
+    cloud.current.scale.setScalar(R * form);
+    shadow.current.position.set(x, 0.035, z);
+    shadow.current.scale.setScalar(R * form);
+    // Pluie légère : traits obliques sous le nuage
+    const H = 3.2;
+    const time = clock.elapsedTime;
+    for (let i = 0; i < MAX_RAIN; i++) {
+      const d = drops[i];
+      const y = H - ((time * 9 + d.phase * H) % H);
+      tmp.q.setFromAxisAngle(tmp.p.set(storm.dir.z, 0, -storm.dir.x), 0.25);
+      tmp.m.compose(tmp.p.set(x + Math.cos(d.a) * d.r * R * 0.95, y, z + Math.sin(d.a) * d.r * R * 0.95), tmp.q, tmp.s.set(0.015, 0.3, 0.015));
+      rain.current.setMatrixAt(i, tmp.m);
+    }
+    rain.current.instanceMatrix.needsUpdate = true;
+    // Éclairs récents : colonne lumineuse en zigzag + flash
+    let n = 0;
+    let lit = 0;
+    for (const s of storm.strikes) {
+      const age = t - s.t;
+      if (age < 0 || age > BOLT) continue;
+      const bx = (s.x - map.width / 2) * TILE;
+      const bz = (s.z - map.height / 2) * TILE;
+      for (let k = 0; k < 4; k++) {
+        const jx = ((k * 37 + s.t * 1000) % 7) / 20 - 0.15;
+        tmp.q.setFromAxisAngle(tmp.p.set(0, 0, 1), jx);
+        tmp.m.compose(tmp.p.set(bx + jx, 0.5 + k * 1, bz), tmp.q, tmp.s.set(0.06, 1.05, 0.06));
+        bolts.current.setMatrixAt(n++, tmp.m);
+      }
+      lit = Math.max(lit, 1 - age / BOLT);
+      flash.current.position.set(bx, 3, bz);
+    }
+    bolts.current.count = n;
+    bolts.current.instanceMatrix.needsUpdate = true;
+    flash.current.intensity = lit * 80;
+  });
+
+  if (!active) return null;
+  return (
+    <group>
+      <group ref={cloud}>
+        {puffs.map((p, i) => (
+          <mesh key={i} geometry={GEO.ball} material={cloudMat} position={[p.x, p.y, p.z]} scale={[p.s * 1.1, p.s * 0.55, p.s * 1.1]} />
+        ))}
+      </group>
+      <mesh ref={shadow} geometry={shadowGeo} material={shadowMat} renderOrder={1} />
+      <instancedMesh ref={rain} args={[GEO.box, rainMat, MAX_RAIN]} frustumCulled={false} />
+      <instancedMesh ref={bolts} args={[GEO.box, boltMat, 24]} frustumCulled={false} />
+      <pointLight ref={flash} intensity={0} color="#dfe8ff" distance={14} />
+    </group>
+  );
+}
+
+const plankMat = new THREE.MeshStandardMaterial({ color: '#8a5a33', flatShading: true });
+const ringMat = new THREE.MeshBasicMaterial({ color: '#5fb4ff', transparent: true, opacity: 0.7, depthWrite: false });
+const ringGeo = new THREE.RingGeometry(0.42, 0.5, 20).rotateX(-Math.PI / 2);
+
+/**
+ * Bâtiments renforcés (planches / sacs de sable aux coins) et bâtiments menacés par la crue
+ * (anneau bleu pulsant tant qu'ils ne sont pas protégés).
+ */
+export function Reinforcements({ map }: { map: GameMap }) {
+  const show = useGame((s) => !!s.game.storm || !!s.game.flood);
+  const planks = useRef<THREE.InstancedMesh>(null);
+  const rings = useRef<THREE.InstancedMesh>(null);
+  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3() }), []);
+
+  useFrame(({ clock }) => {
+    const g = useGame.getState().game;
+    if (!planks.current || !rings.current) return;
+    let n = 0;
+    let r = 0;
+    const threatened = g.flood && !g.flood.resolved && !g.flood.protected ? g.flood.threatened : [];
+    for (const b of g.buildings) {
+      const size = BUILDING_BY_ID[b.type].size;
+      const [x, , z] = tileToWorld(b.x, b.z, map.width, map.height, size);
+      const h = size * 0.5;
+      if (b.reinforced && n < 400) {
+        for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          tmp.q.setFromAxisAngle(tmp.p.set(sz, 0, -sx).normalize(), 0.35);
+          tmp.m.compose(tmp.p.set(x + sx * h * 0.92, 0.18, z + sz * h * 0.92), tmp.q, tmp.s.set(0.08, 0.4, 0.22));
+          planks.current.setMatrixAt(n++, tmp.m);
+        }
+      } else if (threatened.includes(b.id) && r < 100) {
+        const k = 1 + Math.sin(clock.elapsedTime * 5) * 0.08;
+        tmp.m.compose(tmp.p.set(x, 0.06, z), tmp.q.identity(), tmp.s.set(size * 1.4 * k, 1, size * 1.4 * k));
+        rings.current.setMatrixAt(r++, tmp.m);
+      }
+    }
+    planks.current.count = n;
+    rings.current.count = r;
+    planks.current.instanceMatrix.needsUpdate = true;
+    rings.current.instanceMatrix.needsUpdate = true;
+  });
+
+  if (!show) return null;
+  return (
+    <group>
+      <instancedMesh ref={planks} args={[GEO.box, plankMat, 400]} castShadow frustumCulled={false} />
+      <instancedMesh ref={rings} args={[ringGeo, ringMat, 100]} frustumCulled={false} renderOrder={1} />
+    </group>
+  );
 }
 
 const snowMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });

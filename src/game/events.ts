@@ -11,6 +11,7 @@ import { BUILDING_BY_ID, CHAINS } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
 import { neighbors8, tileAt } from './mapgen';
 import { PARCELS, activeCamps } from './parcels';
+import { raidTurnBack, startFlood, startRaid, startStorm } from './realtime';
 import type { Rng } from './rng';
 import { canAfford, defensePower, housingCapacity, storageCapacity } from './rules';
 import { clamp, pushNotice } from './stateUtils';
@@ -55,25 +56,81 @@ export const TUNING = {
     crew: 2,
   },
 
+  /**
+   * Bandits en temps réel. Vitesses en cases par jour de jeu (à x1, un jour = 20 s :
+   * 16 cases/jour ≈ 0,8 case/s). Les durées sont en jours de jeu.
+   */
   raid: {
     /** Taille de la bande : base + parSévérité × sévérité + population / popDiviseur */
     base: 2,
     perSeverity: 1.6,
     popDivisor: 10,
-    /** Durées (jours de jeu) : approche jusqu'au château, puis fuite */
-    approach: 0.4,
-    leave: 0.35,
-    /** Une tour de défense 1 abat un bandit tous les X jours (défense 2 = deux fois plus vite) */
-    towerKillInterval: 0.2,
-    /** Part de chaque ressource volée par bandit arrivé au château */
-    stealPerBandit: 0.07,
-    maxSteal: 0.8,
-    /** Clic sur un bandit : risque de perdre un villageois (réduit par la défense) */
-    clickDeathChance: 0.12,
+    /** Vitesse de course (+ par point de sévérité au-delà de 1) */
+    speed: 16,
+    speedPerSeverity: 3,
+    /** Distance hors de la carte où ils apparaissent : c'est le temps de réaction avant qu'ils n'entrent */
+    spawnDistance: 3,
+    /** Écart entre les départs de deux bandits */
+    stagger: 0.025,
+    /** Durée du vol sur place */
+    stealTime: 0.15,
+    /** Part de chaque ressource visée volée par bandit (plafonnée par bandit) */
+    stealPerBandit: 0.08,
+    maxStealPerBandit: 40,
+    /** Gardes : vitesse, nombre par niveau de tour (tour avec au moins un travailleur), portée de sortie automatique */
+    guardSpeed: 26,
+    guardsPerTowerLevel: 1,
+    autoGuardRange: 3.5,
+    /** Sans garde libre, des villageois partent du château : plus lents, risquent d'être blessés */
+    villagerSpeed: 18,
+    injuryChance: 0.35,
+    injuryDays: 3,
+    /** Récompense en or par bandit attrapé : base + par point de sévérité */
+    rewardGold: 2,
+    rewardPerSeverity: 1,
+    /** Intervalle des vérifications (gardes automatiques) */
+    checkEvery: 0.02,
     /** Rançon : base + par bandit (or) */
     ransomBase: 4,
     ransomPerBandit: 2.5,
   },
+
+  /** Orage qui traverse la carte (vitesses en cases / jour, rayon en cases) */
+  storm: {
+    radius: 3,
+    speed: 26,
+    /**
+     * Temps de réaction (jours de jeu ; 1 jour = 20 s à x1) : le nuage se forme au bord de la carte
+     * et y reste ce temps-là avant de la traverser
+     */
+    warningTime: 0.4,
+    /** Chance qu'un bâtiment non renforcé sous le nuage soit endommagé (+ par point de sévérité) */
+    hitChance: 0.3,
+    hitPerSeverity: 0.06,
+    /** Intervalle entre deux éclairs (min, max) et chance qu'un éclair mette le feu */
+    lightningEvery: [0.05, 0.11] as [number, number],
+    lightningFireChance: 0.5,
+    /** Actions rapides */
+    reinforceCost: { wood: 4 } as Partial<Resources>,
+    cropsCostPerField: { wood: 1 } as Partial<Resources>,
+    /** Villageois à l'abri : production du jour multipliée par ce facteur */
+    shelterProduction: 0.6,
+    /** Sans abri, un bâtiment habité endommagé peut blesser un villageois */
+    injureChance: 0.3,
+    checkEvery: 0.02,
+  },
+
+  /** Crue : l'eau monte jusqu'au pic (dégâts), reste, puis redescend */
+  flood: {
+    riseTime: 0.45,
+    holdTime: 0.2,
+    recedeTime: 0.6,
+    /** Sacs de sable sur un bâtiment menacé (clic pendant la montée) */
+    sandbagCost: { wood: 3 } as Partial<Resources>,
+  },
+
+  /** Effet discret au début d'un événement en temps réel */
+  alert: { flashMs: 600 },
 
   /** Variations instantanées du moral */
   morale: {
@@ -128,6 +185,8 @@ export interface EventContext {
 export interface ChoiceSpec {
   options: ChoiceOption[];
   defaultId: string;
+  /** Événement en temps réel : la carte ne met pas le jeu en pause */
+  realtime?: boolean;
   /** Délai de réponse en jours (défaut : TUNING.choiceTimeout) */
   timeout?: number;
 }
@@ -246,30 +305,6 @@ export function raidSize(state: GameState, sev: number, mult = 1): number {
   return Math.max(2, Math.round((r.base + r.perSeverity * sev + state.population / r.popDivisor) * mult));
 }
 
-/** Lance une attaque de bandits visible en 3D depuis un bord de la carte */
-export function startRaid(state: GameState, count: number, edge: number, now: number, rng: Rng) {
-  const { width: w, height: h } = state.map;
-  const castle = state.buildings.find((b) => b.type === 'castle');
-  const to = castle ? { x: castle.x + 1, z: castle.z + 1 } : { x: w / 2, z: h / 2 };
-  const along = rng.range(0.2, 0.8);
-  const from = [
-    { x: along * w, z: -1 },
-    { x: w + 1, z: along * h },
-    { x: along * w, z: h + 1 },
-    { x: -1, z: along * h },
-  ][edge % 4];
-  const d = defensePower(state);
-  state.raid = {
-    startT: now,
-    arriveT: now + TUNING.raid.approach,
-    leaveT: now + TUNING.raid.approach + TUNING.raid.leave,
-    from,
-    to,
-    killedAt: new Array(Math.min(count, 40)).fill(-1),
-    nextTowerKill: d > 0 ? now + TUNING.raid.towerKillInterval / d : 1e9,
-    arrived: false,
-  };
-}
 
 /** Fait planifier un événement annoncé (compte à rebours + carte menace) */
 export function scheduleEvent(state: GameState, ev: EventDef, days: number, params: EventParams, rng: Rng, now: number) {
@@ -296,79 +331,82 @@ export function scheduleEvent(state: GameState, ev: EventDef, days: number, para
 
 const fx = (icon: string, text: string, tone: ChoiceEffect['tone'] = 'neutral'): ChoiceEffect => ({ icon, text, tone });
 
-/** Choix commun aux bandits et à l'invasion, avec estimation chiffrée des conséquences */
+/**
+ * Carte en temps réel des bandits (ne met pas le jeu en pause) : ils courent déjà vers leurs cibles.
+ * Par défaut, c'est au joueur de cliquer sur eux pour envoyer les gardes.
+ */
 function banditChoice(state: GameState, count: number, ransom: number): ChoiceSpec {
   const defense = defensePower(state);
   const power = defense * 2 + Math.min(state.population, 40) * 0.12;
   // Victoire si power >= count × roll, roll uniforme dans [0,6 ; 1,1]
   const win = clamp((power / count - 0.6) / 0.5, 0, 1);
   const lossIfLost = Math.max(1, Math.round((count * 0.85 - power) * 0.5));
-  const towerKills = Math.min(count, Math.floor((TUNING.raid.approach * defense) / TUNING.raid.towerKillInterval));
-  const pillage = Math.round(Math.min(TUNING.raid.maxSteal, (count - towerKills) * TUNING.raid.stealPerBandit) * 100);
+  const towers = state.buildings.filter((b) => b.type === 'tower' && b.workers > 0);
+  const guards = towers.reduce((n, b) => n + b.level * TUNING.raid.guardsPerTowerLevel, 0);
   return {
-    defaultId: 'let',
+    defaultId: 'none',
+    realtime: true,
+    timeout: 3,
     options: [
       {
-        id: 'ransom',
-        label: 'Payer la rançon',
-        detail: 'Ils repartent sans combattre. Le village se sent humilié.',
-        cost: { gold: ransom },
-        effects: [fx('🪙', `-${ransom}`, 'bad'), fx('😟', `moral ${TUNING.morale.ransom}`, 'bad'), fx('🛡️', 'aucune perte', 'good')],
-      },
-      {
-        id: 'fight',
-        label: 'Combattre',
-        detail: `Affrontement immédiat contre ${count} bandits (votre force : ${power.toFixed(1)}).`,
+        id: 'none',
+        label: 'Les intercepter',
+        detail: 'Cliquez sur un bandit : un garde sort d\'une tour pour l\'attraper (sinon des villageois, qui peuvent être blessés).',
         effects: [
-          fx('🎲', `victoire ~${Math.round(win * 100)} %`, win >= 0.6 ? 'good' : win >= 0.3 ? 'neutral' : 'bad'),
-          fx('💀', `si défaite : ~${lossIfLost} morts, -${Math.round(Math.min(TUNING.raid.maxSteal, count * TUNING.raid.stealPerBandit) * 50)} % stocks`, 'bad'),
-          fx('😄', `si victoire : moral +${TUNING.morale.fightWon}`, 'good'),
+          fx('🛡️', guards ? `${guards} garde(s) disponible(s)` : 'aucune tour : villageois', guards ? 'good' : 'bad'),
+          fx('🪙', `+${Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state.day) - 1))} par bandit attrapé`, 'good'),
         ],
       },
       {
-        id: 'let',
-        label: 'Les laisser venir',
-        detail: 'Ils marchent sur le château : vos tours tirent, cliquez sur eux pour les arrêter.',
+        id: 'ransom',
+        label: 'Payer la rançon',
+        detail: 'Ils font demi-tour sans rien voler de plus.',
+        cost: { gold: ransom },
+        effects: [fx('🪙', `-${ransom}`, 'bad'), fx('😟', `moral ${TUNING.morale.ransom}`, 'bad')],
+      },
+      {
+        id: 'fight',
+        label: 'Charger en masse',
+        detail: `Tout le village attaque les ${count} bandits d'un coup (force : ${power.toFixed(1)}).`,
         effects: [
-          fx('🗼', defense > 0 ? `tours : ~${towerKills} abattus` : 'aucune tour !', defense > 0 ? 'good' : 'bad'),
-          fx('💰', `pillage jusqu'à ~${pillage} % des stocks`, pillage > 30 ? 'bad' : 'neutral'),
-          fx('🖱️', 'clic = 1 bandit en moins', 'neutral'),
+          fx('🎲', `victoire ~${Math.round(win * 100)} %`, win >= 0.6 ? 'good' : win >= 0.3 ? 'neutral' : 'bad'),
+          fx('💀', `si défaite : ~${lossIfLost} morts et ils s'enfuient`, 'bad'),
         ],
       },
     ],
   };
 }
 
-function resolveBandits({ state, rng, now }: EventContext, optionId: string, params: EventParams): EventOutcome {
-  const count = params.count;
+function resolveBandits({ state, rng, now }: EventContext, optionId: string): EventOutcome {
+  const raid = state.raid;
+  const active = raid ? raid.bandits.filter((b) => b.status === 'active') : [];
+  if (!raid || !active.length) return { text: 'Les bandits sont déjà partis.', kind: 'info' };
   if (optionId === 'ransom') {
+    raidTurnBack(state, now);
     addMorale(state, TUNING.morale.ransom);
-    return { text: 'Les bandits empochent la rançon et disparaissent.', kind: 'info' };
+    return { text: 'Les bandits empochent la rançon et font demi-tour.', kind: 'info' };
   }
   if (optionId === 'fight') {
+    const count = active.length;
     const defense = defensePower(state) * 2 + Math.min(state.population, 40) * 0.12;
-    wearWeapons(state);
     const roll = rng.range(0.6, 1.1);
     if (defense >= count * roll) {
+      for (const b of active) {
+        b.status = 'caught';
+        b.endT = now;
+        for (const k of RESOURCE_KEYS) state.resources[k] += b.loot[k] ?? 0;
+      }
+      raid.report.caught += count;
+      state.stats.banditsKilled += count;
       const lost = loseVillagers(state, rng.chance(0.4) ? 1 : 0, 1);
       addMorale(state, TUNING.morale.fightWon);
-      state.stats.banditsKilled += count;
-      return { text: `Victoire ! Les bandits sont mis en déroute${lost ? ', 1 villageois tombé au combat' : ' sans pertes'}.`, kind: 'good' };
+      return { text: `Victoire ! ${count} bandits capturés${lost ? ', 1 villageois tombé au combat' : ' sans pertes'}.`, kind: 'good' };
     }
     const deaths = loseVillagers(state, Math.max(1, Math.round((count * roll - defense) * 0.5)), 1);
-    const ratio = Math.min(TUNING.raid.maxSteal, count * TUNING.raid.stealPerBandit) * 0.5;
-    const stolen: Partial<Resources> = {};
-    for (const k of RESOURCE_KEYS) stolen[k] = loseResource(state, k, ratio);
-    const targets = playerBuildings(state);
-    const dmg = targets.length ? damageBuilding(state, rng.pick(targets)) : null;
     addMorale(state, TUNING.morale.fightLost);
-    return {
-      text: `Défaite : ${deaths} ${plural(deaths, 'mort', 'morts')}, volé : ${formatResources(stolen)}${dmg ? `, ${dmg}` : ''}.`,
-      kind: 'bad',
-    };
+    return { text: `Défaite : ${deaths} ${plural(deaths, 'mort', 'morts')}. Les bandits continuent leur pillage !`, kind: 'bad' };
   }
-  startRaid(state, count, params.edge ?? 0, now, rng);
-  return { text: `${count} bandits marchent sur le château ! Cliquez sur eux pour les arrêter.`, kind: 'bad' };
+  return { text: 'Cliquez sur les bandits pour envoyer les gardes.', kind: 'info' };
 }
 
 /** Bâtiments au bord de l'eau (aperçu des dégâts d'une crue) */
@@ -421,62 +459,32 @@ export const EVENTS: EventDef[] = [
       days: [1, 2],
       text: (p, d) => `Environ ${p.count} bandits aperçus ${DIRECTIONS[p.edge]} – arrivée dans ${d} ${plural(d, 'jour', 'jours')}. Tours de garde et or seront utiles.`,
     },
-    trigger: ({ state }, p) => {
+    trigger: ({ state, rng, now }, p) => {
       const ransom = fmt(TUNING.raid.ransomBase + p.count * TUNING.raid.ransomPerBandit + state.population * 0.2);
-      return { text: `${p.count} bandits sont aux portes. Que faire ?`, choice: banditChoice(state, p.count, ransom) };
+      startRaid(state, p.count, p.edge ?? 0, now, rng);
+      return {
+        text: `${p.count} bandits surgissent ${DIRECTIONS[p.edge ?? 0]} ! Cliquez sur eux pour envoyer les gardes.`,
+        choice: banditChoice(state, p.count, ransom),
+      };
     },
     resolve: resolveBandits,
   },
   {
     id: 'storm',
-    title: 'Tempête',
+    title: 'Orage',
     icon: '⛈️',
     kind: 'bad',
     weight: (s) => (playerBuildings(s).length >= 2 ? 2 : 0),
-    roll: ({ rng, severity: sev }) => ({ hits: Math.min(5, 1 + Math.floor(sev / 1.4)), lightning: rng.chance(0.35) ? 1 : 0 }),
+    roll: ({ rng }) => ({ edge: rng.int(0, 3) }),
     announce: {
       days: [1, 1],
-      text: (p) => `Tempête en approche : environ ${p.hits} ${plural(p.hits, 'bâtiment menacé', 'bâtiments menacés')} demain. Réparez ce qui est abîmé !`,
-      prepare: (_ctx, p) => ({
-        defaultId: 'none',
-        options: [
-          {
-            id: 'reinforce',
-            label: 'Renforcer les toits',
-            detail: 'Moitié moins de dégâts, pas de foudre.',
-            cost: { wood: 6 + 3 * p.hits },
-            effects: [fx('🪵', `-${6 + 3 * p.hits}`, 'bad'), fx('🏚️', `${Math.floor(p.hits / 2)} bâtiment(s) touché(s)`, 'good')],
-          },
-          {
-            id: 'none',
-            label: 'Ne rien faire',
-            detail: 'Croiser les doigts.',
-            effects: [fx('🏚️', `${p.hits} bâtiment(s) touché(s)`, 'bad'), ...(p.lightning ? [fx('⚡', 'risque d\'incendie', 'bad')] : [])],
-          },
-        ],
-      }),
-      onPrepare: (_ctx, id, p) => {
-        if (id === 'reinforce') p.reinforced = 1;
-        return id === 'reinforce' ? 'Les toits sont renforcés.' : 'Le village attend la tempête.';
-      },
+      text: (p) => `Un orage se forme ${DIRECTIONS[p.edge]} : il traversera le village demain. Réparez ce qui est abîmé et gardez du bois pour renforcer.`,
     },
     trigger: ({ state, rng, now }, p) => {
-      const hits = p.reinforced ? Math.floor(p.hits / 2) : p.hits;
-      const results: string[] = [];
-      for (let i = 0; i < hits; i++) {
-        const targets = playerBuildings(state);
-        if (!targets.length) break;
-        results.push(damageBuilding(state, rng.pick(targets)));
-      }
-      if (p.lightning && !p.reinforced) {
-        const targets = playerBuildings(state).filter((b) => !b.fire);
-        if (targets.length) {
-          const b = rng.pick(targets);
-          startFire(state, b, now);
-          results.push(`la foudre enflamme : ${BUILDING_BY_ID[b.type].name}`);
-        }
-      }
-      return { text: results.length ? `${results.join(', ')}.` : 'Les toits ont tenu, aucun dégât !', kind: results.length ? 'bad' : 'good' };
+      startStorm(state, p.edge ?? 0, now, rng);
+      return {
+        text: `Le nuage arrive ${DIRECTIONS[p.edge ?? 0]} ! Son ombre montre la zone touchée : cliquez sur les bâtiments pour les renforcer, abritez les villageois, bâchez les récoltes.`,
+      };
     },
   },
   {
@@ -517,19 +525,14 @@ export const EVENTS: EventDef[] = [
       },
     },
     trigger: ({ state, now }, p) => {
-      state.floodUntil = now + 1;
-      if (p.protected) return { text: 'La rivière déborde… mais les berges tiennent bon !', kind: 'good' };
-      const lost: string[] = [];
-      for (const b of [...state.buildings]) {
-        const wet = neighbors8(b.x, b.z).some(([x, z]) => tileAt(state.map, x, z) === 'water');
-        if (!wet || !BUILDING_BY_ID[b.type].buildable) continue;
-        if (b.type === 'field') {
-          state.buildings = state.buildings.filter((x) => x.id !== b.id);
-          addMorale(state, TUNING.morale.buildingLost / 2);
-          lost.push('Champ détruit');
-        } else lost.push(damageBuilding(state, b));
-      }
-      return { text: lost.length ? `La rivière déborde : ${lost.join(', ')}.` : 'La rivière déborde sans rien toucher.' };
+      const flood = startFlood(state, now, !!p.protected);
+      if (p.protected) return { text: 'La rivière monte… mais les berges renforcées devraient tenir.', kind: 'info' };
+      const n = flood.threatened.length;
+      return {
+        text: n
+          ? `L'eau monte ! ${n} ${plural(n, 'bâtiment menacé', 'bâtiments menacés')} au bord de l'eau : cliquez dessus pour poser des sacs de sable (${formatResources(TUNING.flood.sandbagCost)}).`
+          : 'L\'eau monte, mais aucun bâtiment n\'est au bord de la rivière.',
+      };
     },
   },
   {
@@ -786,9 +789,13 @@ export const EVENTS: EventDef[] = [
       days: [3, 3],
       text: (p, d) => `Une armée de ${p.count} pillards approche ${DIRECTIONS[p.edge]} – arrivée dans ${d} jours ! Tours, or et réserves seront décisifs.`,
     },
-    trigger: ({ state }, p) => {
+    trigger: ({ state, rng, now }, p) => {
       const ransom = fmt((TUNING.raid.ransomBase + p.count * TUNING.raid.ransomPerBandit + state.population * 0.2) * 1.5);
-      return { text: `L'armée de ${p.count} pillards est là.`, choice: banditChoice(state, p.count, ransom) };
+      startRaid(state, p.count, p.edge ?? 0, now, rng);
+      return {
+        text: `L'armée de ${p.count} pillards déferle ${DIRECTIONS[p.edge ?? 0]} ! Cliquez sur eux pour envoyer les gardes.`,
+        choice: banditChoice(state, p.count, ransom),
+      };
     },
     resolve: resolveBandits,
   },
@@ -863,7 +870,12 @@ export function pickEvent(state: GameState, rng: Rng): EventDef | undefined {
   const g = TUNING.goodShare;
   const wantGood = rng.chance(Math.max(g.min, g.start + g.perSeason * season));
   const busy = new Set(state.pending.map((p) => p.eventId));
-  if (state.raid) busy.add('bandits');
+  if (state.raid) {
+    busy.add('bandits');
+    busy.add('invasion');
+  }
+  if (state.storm) busy.add('storm');
+  if (state.flood) busy.add('flood');
   const pool = EVENTS.filter((e) => !e.major && !e.scheduled && !busy.has(e.id));
   const side = pool.filter((e) => (e.kind !== 'bad') === wantGood);
   return rng.weighted(side, (e) => e.weight(state)) ?? rng.weighted(pool, (e) => e.weight(state));
@@ -909,9 +921,12 @@ function showOutcome(state: GameState, ev: EventDef, out: EventOutcome, params: 
           expiresT: now + (out.choice.timeout ?? TUNING.choiceTimeout),
           params,
           resolved: false,
+          realtime: out.choice.realtime,
         }
       : undefined,
   });
+  // La carte des bandits se ferme d'elle-même à la fin de l'attaque
+  if (out.choice?.realtime && state.raid && state.raid.noticeId === undefined) state.raid.noticeId = state.nextNoticeId - 1;
 }
 
 /** Applique une option d'une carte à choix (mutation). `auto` = délai écoulé. */

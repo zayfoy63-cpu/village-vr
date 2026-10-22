@@ -3,10 +3,12 @@
 export interface Settings {
   /** Met le jeu en pause quand une carte d'événement à choix apparaît */
   autoPause: boolean;
+  /** Petit son au début d'un événement en temps réel (bandits, orage, crue, incendie) */
+  sound: boolean;
 }
 
 const KEY = 'village-vr-settings';
-export const DEFAULT_SETTINGS: Settings = { autoPause: true };
+export const DEFAULT_SETTINGS: Settings = { autoPause: true, sound: true };
 
 export function loadSettings(): Settings {
   try {

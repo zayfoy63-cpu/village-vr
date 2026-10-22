@@ -2,7 +2,9 @@ import { Scene } from './scene/Scene';
 import { useGame } from './store/gameStore';
 import { BuildBar } from './ui/BuildBar';
 import { BuildingPanel } from './ui/BuildingPanel';
+import { BanditMarkers } from './ui/BanditMarkers';
 import { CrisisBanner } from './ui/CrisisBanner';
+import { EventFlash, Toast } from './ui/EventFlash';
 import { FeaturePanel, ParcelPanel } from './ui/LandPanel';
 import { ParcelBadges } from './ui/ParcelBadges';
 import { SettingsButton } from './ui/Settings';
@@ -38,6 +40,8 @@ export function App() {
     <div className="app">
       <Scene />
       <ParcelBadges />
+      <BanditMarkers />
+      <EventFlash />
       <div className="ui-layer">
         <div className="top-row">
           <SeedPanel />
@@ -46,12 +50,13 @@ export function App() {
         </div>
         <ThreatList />
         <CrisisBanner />
+        <Toast />
         <EventCards key={seed} />
         <BuildBar />
         <BuildingPanel />
         <ParcelPanel />
         <FeaturePanel />
-        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause</div>
+        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause · Clic sur un bandit : envoyer les gardes</div>
         <GameOver />
       </div>
     </div>

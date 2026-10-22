@@ -15,7 +15,7 @@ import { StatusAlerts } from './StatusAlerts';
 import { Table } from './Table';
 import { Terrain } from './Terrain';
 import { Villagers } from './Villagers';
-import { Flood, Snowfall } from './Weather';
+import { Flood, Reinforcements, Snowfall, Storm } from './Weather';
 import { VR_WORLD_SCALE, xrStore } from './xr';
 
 const BG = '#2a1e17';
@@ -67,6 +67,8 @@ function World() {
       <StatusAlerts buildings={buildings} map={map} />
       <Bandits map={map} />
       <Flood map={map} />
+      <Storm map={map} />
+      <Reinforcements map={map} />
       <Snowfall map={map} />
       <Ghost />
       <Selection />

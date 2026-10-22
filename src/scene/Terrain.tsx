@@ -6,6 +6,7 @@ import { hash2 } from '../game/rng';
 import { featureAt, ownsParcel, parcelOf } from '../game/parcels';
 import { buildingAt, hasModifier } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
+import { reinforceCost } from '../game/hazards';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
 
@@ -107,6 +108,10 @@ export function Terrain({ map }: { map: GameMap }) {
         // Les champs (instanciés) s'éteignent en cliquant sur leur case
         if (here?.fire && here.fire.extinguishEnd === undefined) {
           state.extinguish(here.id);
+          return;
+        }
+        if (here && reinforceCost(state.game, here.id)) {
+          state.reinforce(here.id);
           return;
         }
         if (state.selected) build(t.x, t.z);

@@ -1,37 +1,15 @@
-// Dangers en temps réel (au fil de la journée) : incendies, attaques de bandits, délais des choix.
+// Dangers en temps réel (au fil de la journée) : incendies, délais des choix, et actions du joueur
+// pendant les événements en temps réel (bandits, orage, crue : voir realtime.ts).
 // Toutes les durées sont en temps de jeu (jours), réglables dans TUNING (events.ts).
 
 import { BUILDING_BY_ID } from './buildings';
 import { RESOURCE_KEYS } from './config';
-import { TUNING, addMorale, applyChoice, formatResources, loseVillagers, wearWeapons } from './events';
+import { TUNING, addMorale, applyChoice, loseVillagers } from './events';
+import { dispatchGuard, realtimeDue, updateRealtime } from './realtime';
 import { Rng } from './rng';
-import { assignWorkers, defensePower } from './rules';
+import { assignWorkers, canAfford } from './rules';
 import { cloneState, gameTime, pushNotice } from './stateUtils';
-import type { Building, GameState, Raid, Resources } from './types';
-
-/** Position d'un bandit (coordonnées de cases, continues) au temps t — partagé avec le rendu */
-export function banditPosition(raid: Raid, index: number, t: number): { x: number; z: number; leaving: boolean } {
-  const n = raid.killedAt.length;
-  // Petit décalage latéral et temporel par bandit pour former une colonne
-  const lateral = (index - (n - 1) / 2) * 0.35;
-  const lag = index * 0.012;
-  const dx = raid.to.x - raid.from.x;
-  const dz = raid.to.z - raid.from.z;
-  const len = Math.hypot(dx, dz) || 1;
-  const px = -dz / len;
-  const pz = dx / len;
-  let k: number;
-  let leaving = false;
-  if (t < raid.arriveT) {
-    k = Math.min(1, Math.max(0, (t - raid.startT - lag) / (raid.arriveT - raid.startT)));
-  } else {
-    leaving = true;
-    k = 1 - Math.min(1, Math.max(0, (t - raid.arriveT - lag) / (raid.leaveT - raid.arriveT)));
-  }
-  // Ils s'arrêtent un peu avant le centre du château
-  k *= 0.92;
-  return { x: raid.from.x + dx * k + px * lateral, z: raid.from.z + dz * k + pz * lateral, leaving };
-}
+import type { Building, GameState, Resources } from './types';
 
 function burning(state: GameState): Building[] {
   return state.buildings.filter((b) => b.fire);
@@ -44,8 +22,7 @@ export function hazardsDue(state: GameState, t: number): boolean {
     if (!f) continue;
     if (f.extinguishEnd !== undefined ? t >= f.extinguishEnd : t >= f.nextSpread || t >= f.destroyAt) return true;
   }
-  const r = state.raid;
-  if (r && (t >= r.nextTowerKill || (!r.arrived && t >= r.arriveT) || t >= r.leaveT)) return true;
+  if (realtimeDue(state, t)) return true;
   for (const n of state.notices) if (n.choice && !n.choice.resolved && t >= n.choice.expiresT) return true;
   return false;
 }
@@ -56,7 +33,7 @@ export function updateHazards(state: GameState, t: number): GameState {
   const s = cloneState(state);
   const rng = new Rng(s.rngState);
   updateFires(s, t, rng);
-  updateRaid(s, t, rng);
+  updateRealtime(s, t, rng);
   for (const n of s.notices) {
     if (n.choice && !n.choice.resolved && t >= n.choice.expiresT) applyChoice(s, n, n.choice.defaultId, rng, t, true);
   }
@@ -125,79 +102,6 @@ function updateFires(s: GameState, t: number, rng: Rng) {
   }
 }
 
-function aliveIndexes(raid: Raid): number[] {
-  return raid.killedAt.map((k, i) => (k < 0 ? i : -1)).filter((i) => i >= 0);
-}
-
-/** Tue un bandit ; s'il fuyait avec du butin, le butin est récupéré */
-export function killBandit(s: GameState, index: number, at: number) {
-  const raid = s.raid;
-  if (!raid || raid.killedAt[index] >= 0) return;
-  raid.killedAt[index] = at;
-  s.stats.banditsKilled++;
-  if (raid.arrived && raid.lootEach) {
-    for (const k of RESOURCE_KEYS) s.resources[k] += raid.lootEach[k] ?? 0;
-  }
-}
-
-/** Termine l'attaque si tous les bandits sont tombés. Renvoie vrai si c'est le cas. */
-function endRaidIfDefeated(s: GameState): boolean {
-  const raid = s.raid;
-  if (!raid || aliveIndexes(raid).length) return false;
-  s.raid = null;
-  if (!raid.arrived) {
-    addMorale(s, TUNING.morale.repelled);
-    pushNotice(s, { kind: 'good', icon: '🛡️', title: 'Bandits repoussés', text: `Les ${raid.killedAt.length} bandits ont été abattus avant d'atteindre le château !` });
-  } else {
-    pushNotice(s, { kind: 'good', icon: '🛡️', title: 'Butin récupéré', text: 'Tous les pillards ont été rattrapés.' });
-  }
-  return true;
-}
-
-function updateRaid(s: GameState, t: number, rng: Rng) {
-  const raid = s.raid;
-  if (!raid) return;
-  const R = TUNING.raid;
-
-  // Tirs des tours (avant et après le pillage)
-  const end = Math.min(t, raid.leaveT);
-  while (raid.nextTowerKill <= end) {
-    const alive = aliveIndexes(raid);
-    if (!alive.length) break;
-    killBandit(s, rng.pick(alive), raid.nextTowerKill);
-    const d = defensePower(s);
-    raid.nextTowerKill = d > 0 ? raid.nextTowerKill + R.towerKillInterval / d : 1e9;
-  }
-
-  if (endRaidIfDefeated(s)) return;
-
-  if (!raid.arrived && t >= raid.arriveT) {
-    raid.arrived = true;
-    const alive = aliveIndexes(raid).length;
-    const ratio = Math.min(R.maxSteal, alive * R.stealPerBandit);
-    const stolen: Partial<Resources> = {};
-    const each: Partial<Resources> = {};
-    for (const k of RESOURCE_KEYS) {
-      stolen[k] = Math.floor(s.resources[k] * ratio);
-      s.resources[k] -= stolen[k]!;
-      each[k] = stolen[k]! / alive;
-    }
-    raid.lootEach = each;
-    wearWeapons(s);
-    addMorale(s, TUNING.morale.pillage * Math.min(1, alive / 4));
-    pushNotice(s, {
-      kind: 'bad',
-      icon: '💰',
-      title: 'Pillage !',
-      text: `${alive} bandits pillent le château : ${formatResources(stolen)}. Abattez-les avant qu'ils ne s'enfuient pour récupérer le butin !`,
-    });
-  }
-
-  if (t >= raid.leaveT) {
-    s.raid = null;
-  }
-}
-
 /** Action joueur : envoyer des villageois éteindre un incendie */
 export function extinguishFire(state: GameState, buildingId: number): GameState | null {
   const b = state.buildings.find((x) => x.id === buildingId);
@@ -215,21 +119,59 @@ export function extinguishFire(state: GameState, buildingId: number): GameState 
   return s;
 }
 
-/** Action joueur : attaquer un bandit (risque de perdre un villageois) */
-export function fightBandit(state: GameState, index: number): GameState | null {
-  const raid = state.raid;
-  if (!raid || raid.killedAt[index] === undefined || raid.killedAt[index] >= 0 || state.gameOver) return null;
+/** Action joueur : clic sur un bandit → un garde (ou des villageois) part l'intercepter */
+export function sendGuard(state: GameState, banditId: number): { state: GameState | null; reason?: string } {
+  if (!state.raid || state.gameOver) return { state: null, reason: 'Aucune attaque en cours' };
   const s = cloneState(state);
-  const rng = new Rng(s.rngState);
-  const t = gameTime(s);
-  killBandit(s, index, t);
-  const risk = TUNING.raid.clickDeathChance * Math.max(0.2, 1 - defensePower(s) * 0.15);
-  if (rng.chance(risk)) {
-    const lost = loseVillagers(s, 1, 1);
-    if (lost) pushNotice(s, { kind: 'bad', icon: '⚔️', title: 'Mort au combat', text: 'Un villageois est tombé en affrontant un bandit.' });
-  }
-  s.rngState = rng.state;
-  endRaidIfDefeated(s);
-  if (s.population <= 0) s.gameOver = true;
+  const res = dispatchGuard(s, banditId, gameTime(s));
+  if (!res.ok) return { state: null, reason: res.reason };
+  return { state: s };
+}
+
+/** Action joueur : renforcer un bâtiment pendant un orage (bois) ou contre la crue (sacs de sable) */
+/** Coût pour renforcer ce bâtiment maintenant (null = rien à renforcer : pas d'orage ni de crue qui le menace) */
+export function reinforceCost(state: GameState, buildingId: number): Partial<Resources> | null {
+  const b = state.buildings.find((x) => x.id === buildingId);
+  if (!b || b.reinforced || state.gameOver) return null;
+  const floodThreat = state.flood && !state.flood.resolved && state.flood.threatened.includes(b.id);
+  if (floodThreat) return TUNING.flood.sandbagCost;
+  const stormActive = state.storm && gameTime(state) < state.storm.endT && BUILDING_BY_ID[b.type].buildable;
+  return stormActive ? TUNING.storm.reinforceCost : null;
+}
+
+export function reinforceBuilding(state: GameState, buildingId: number): GameState | null {
+  const cost = reinforceCost(state, buildingId);
+  if (!cost || !canAfford(state.resources, cost)) return null;
+  const s = cloneState(state);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
+  s.buildings.find((x) => x.id === buildingId)!.reinforced = true;
+  return s;
+}
+
+/** Action joueur : mettre les villageois à l'abri pendant l'orage (production du jour réduite, pas de blessés) */
+export function shelterVillagers(state: GameState): GameState | null {
+  if (!state.storm || state.storm.shelter || state.gameOver) return null;
+  const s = cloneState(state);
+  s.storm!.shelter = true;
+  s.modifiers = s.modifiers.filter((m) => m.id !== 'sheltered');
+  s.modifiers.push({ id: 'sheltered', untilDay: s.day });
+  return s;
+}
+
+export function cropsProtectionCost(state: GameState): Partial<Resources> {
+  const fields = state.buildings.filter((b) => b.type === 'field').length;
+  const out: Partial<Resources> = {};
+  for (const k of RESOURCE_KEYS) if (TUNING.storm.cropsCostPerField[k]) out[k] = Math.max(1, fields * TUNING.storm.cropsCostPerField[k]!);
+  return out;
+}
+
+/** Action joueur : bâcher les récoltes (les champs sous l'orage ne sont pas abîmés) */
+export function protectCrops(state: GameState): GameState | null {
+  if (!state.storm || state.storm.cropsProtected || state.gameOver) return null;
+  const cost = cropsProtectionCost(state);
+  if (!canAfford(state.resources, cost)) return null;
+  const s = cloneState(state);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
+  s.storm!.cropsProtected = true;
   return s;
 }

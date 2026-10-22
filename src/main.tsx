@@ -8,9 +8,10 @@ import './styles.css';
 if (import.meta.env.DEV) {
   const w = window as unknown as Record<string, unknown>;
   w.__game = useGame;
-  void Promise.all([import('./game/events'), import('./game/stateUtils')]).then(([events, utils]) => {
+  void Promise.all([import('./game/events'), import('./game/stateUtils'), import('./game/realtime')]).then(([events, utils, realtime]) => {
     w.__events = events;
     w.__utils = utils;
+    w.__realtime = realtime;
   });
 }
 

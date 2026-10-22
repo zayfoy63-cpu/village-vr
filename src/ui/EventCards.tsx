@@ -91,7 +91,10 @@ export function EventCards() {
             <div className="event-text">{n.text}</div>
             {c && (
               <div className="event-choice">
-                {!isPrepare && (
+                {c.realtime && (
+                  <div className="choice-realtime">⚡ En temps réel : le jeu continue. Cliquez sur les bandits pour les intercepter !</div>
+                )}
+                {!isPrepare && !c.realtime && (
                   <div className="choice-timer" title="Sans réponse, l'option par défaut s'applique">
                     <div
                       className="choice-timer-fill"

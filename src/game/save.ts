@@ -24,6 +24,7 @@ export function saveGame(state: GameState): void {
  * v2 → v3 : moral, événements annoncés, raids, incendies ; les anciennes offres de marchand sont closes.
  * v3 → v4 : parcelles (les anciennes parties possèdent toute la carte).
  * v4 → v5 : chaînes de production (farine, pain, planches, minerai, outils, armes).
+ * v5 → v6 : bandits / orage / crue en temps réel, blessés.
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -47,7 +48,11 @@ export function migrate(data: GameState): GameState | null {
   s.morale = typeof data.morale === 'number' ? data.morale : MORALE.start;
   s.pending = Array.isArray(data.pending) ? data.pending : [];
   s.nextPendingId = Number(data.nextPendingId) || 1;
-  s.raid = data.raid ?? null;
+  // v5 → v6 : bandits, orage et crue en temps réel (l'ancien format d'attaque est abandonné)
+  s.raid = data.raid && Array.isArray((data.raid as { bandits?: unknown }).bandits) ? data.raid : null;
+  s.storm = data.storm ?? null;
+  s.flood = data.flood ?? null;
+  s.injuries = Array.isArray(data.injuries) ? data.injuries : [];
   s.floodUntil = Number(data.floodUntil) || 0;
   // v3 → v4 : parcelles. Une ancienne partie garde toute sa carte (tout est déjà possédé), sans danger.
   if (!data.parcels || !Array.isArray(data.parcels.owned)) {

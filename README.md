@@ -22,7 +22,9 @@ npm run build     # vérification TypeScript + build de production dans dist/
 | Détails / amélioration | clic sur un bâtiment existant |
 | Construire | clic sur une case (aperçu vert = possible, rouge = impossible) |
 | Annuler la sélection | clic droit ou Échap |
-| Pause / reprise | Espace, ou boutons ⏸ / x1 / x2 |
+| Pause / reprise | Espace, ou boutons ⏸ / x0,5 / x1 / x2 |
+| Intercepter un bandit | clic sur le bandit (les gardes sortent des tours) |
+| Renforcer un bâtiment | clic dessus pendant un orage ou une crue (coût en bois) |
 
 ## Architecture
 
@@ -36,7 +38,8 @@ src/
 │  ├─ mapgen.ts       Génération de carte à partir d'une seed
 │  ├─ rules.ts        Placement, travailleurs, production, score
 │  ├─ simulation.ts   Temps qui passe, journée, construction, choix, réparations
-│  ├─ hazards.ts      Dangers en temps réel : incendies, bandits, délais de choix
+│  ├─ hazards.ts      Actions du joueur sur les dangers (éteindre, gardes, renforts) + délais de choix
+│  ├─ realtime.ts     Bandits, gardes, orage et crue en temps réel (trajets déterministes)
 │  ├─ parcels.ts      ⭐ Parcelles : découpage, prix, contenu, camps de bandits et ruines
 │  ├─ rng.ts          PRNG déterministe (état sauvegardé)
 │  └─ save.ts         Sauvegarde localStorage (try/catch)
@@ -88,7 +91,7 @@ Débloquées progressivement (onglet **Artisanat**, visible au premier déblocag
 ### Sauvegardes
 `game/save.ts` migre les anciennes sauvegardes (`migrate`) : la v1 reçoit les niveaux (1), les déblocages
 correspondant à la situation actuelle et les nouveaux compteurs ; la v3 reçoit les parcelles (toute la carte possédée,
-sans danger). Une sauvegarde illisible est ignorée sans planter.
+sans danger) ; la v5 abandonne l'ancien format d'attaque et reçoit orage, crue et blessés vides. Une sauvegarde illisible est ignorée sans planter.
 
 ### Ajouter un bâtiment
 1. Ajouter l'id dans `BuildingTypeId` (`game/types.ts`).
@@ -99,13 +102,24 @@ sans danger). Une sauvegarde illisible est ignorée sans planter.
 ### Imprévus (`game/events.ts`)
 Tous les réglages sont dans l'objet `TUNING` en tête de fichier (fréquence, sévérité par saison, délais,
 incendies, bandits, variations de moral, révolte, hiver rude, grands événements de fin d'année).
-- **Annoncés avec compte à rebours** : bandits (1-2 j), tempête (1 j, renforcer les toits), crue (2 j, renforcer
-  les berges), hiver rude (3 j), et chaque fin d'année (j40, j80…) un grand événement : invasion, grande famine
-  ou grande épidémie (3 j).
-- **À choix** (délai de 10 s à x1, sinon option par défaut) : bandits (rançon / combattre / les laisser venir),
-  épidémie (quarantaine / médecin / ignorer → seconde vague), réfugiés (accueillir / refuser), marchand.
-- **En temps réel, en 3D** : incendie (clic sur le bâtiment pour l'éteindre, sinon propagation puis destruction),
-  bandits (marchent sur le château, les tours tirent, clic pour les abattre et récupérer le butin), crue, neige.
+- **Annoncés avec compte à rebours** : bandits (1-2 j), orage (1 j), crue (2 j, renforcer les berges), hiver rude (3 j),
+  et chaque fin d'année (j40, j80…) un grand événement : invasion, grande famine ou grande épidémie (3 j).
+- **À choix** (délai de 10 s à x1, sinon option par défaut) : épidémie (quarantaine / médecin / ignorer → seconde
+  vague), réfugiés (accueillir / refuser), marchand.
+- **En temps réel, en 3D** (ne mettent pas le jeu en pause ; flash discret + petit son au début, son désactivable) :
+  - **Bandits** (`TUNING.raid`) : apparaissent au bord de la carte (flèche rouge au bord de l'écran s'ils sont hors
+    champ), courent vers un grenier, un marché, la maison la plus riche ou le château (trajet en pointillés rouges),
+    volent quelques secondes puis repartent avec un sac. Clic sur un bandit : le garde libre de la tour la plus
+    rapide court l'intercepter (sans tour : des villageois, qui peuvent être blessés). Les tours envoient aussi
+    leurs gardes seules sur les bandits à portée. Attrapé : butin rendu + or ; enfui : ressources perdues.
+    Nombre et vitesse augmentent avec la sévérité. La carte « Bandits » propose aussi rançon ou charge générale.
+  - **Orage** (`TUNING.storm`) : un nuage sombre se forme au bord (`warningTime`), puis traverse la carte avec son
+    ombre au sol. Pendant l'approche : renforcer un bâtiment (clic, 4 🪵), rentrer les villageois (pas de blessés,
+    production réduite), protéger les récoltes. Sous le nuage : pluie, éclairs (incendies), dégâts sur ce qui
+    n'est pas renforcé.
+  - **Crue** (`TUNING.flood`) : l'eau monte progressivement le long de la rivière ; les bâtiments menacés sont
+    entourés d'un cercle bleu jusqu'au pic (sacs de sable : clic, 3 🪵) ; un champ non protégé est détruit.
+  - **Incendie** : clic sur le bâtiment pour l'éteindre, sinon propagation puis destruction. Neige en hiver.
 - **Autres** : rats (dévorent la nourriture hors des greniers), sécheresse, bonne récolte, nouveaux arrivants.
 - **Bâtiments endommagés** : production x0,5 tant qu'ils ne sont pas réparés (panneau du bâtiment) ; un second
   dégât les détruit.
@@ -116,7 +130,9 @@ Pour ajouter un événement : une entrée dans `EVENTS` avec `weight`, `roll` (p
 
 ### Logique en temps réel
 `simulation.ts` → `advanceTime(state, dt)` fait avancer le temps de jeu continu (jour + avancement) ;
-`hazards.ts` gère incendies, attaques et délais des choix, de façon déterministe (le PRNG est dans l'état).
+`hazards.ts` gère incendies et délais des choix ; `realtime.ts` calcule à l'avance le trajet de chaque bandit, garde
+et nuage (position = fonction du temps), puis traite vols, captures, fuites et dégâts dans l'ordre chronologique,
+de façon déterministe (le PRNG est dans l'état). Le rendu ne fait que lire ces positions à chaque image.
 
 ## Passage en VR (Meta Quest 3)
 - `@react-three/xr` est déjà branché : le `<Canvas>` est enveloppé dans `<XR store={xrStore}>`.

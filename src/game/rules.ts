@@ -12,6 +12,7 @@ import {
   type UnlockCondition,
 } from './buildings';
 import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META, seasonOf } from './config';
+import { TUNING } from './events';
 import { neighbors8, tileAt } from './mapgen';
 import { featureAt, ownsTile } from './parcels';
 import type {
@@ -151,7 +152,13 @@ export function canUpgrade(state: GameState, b: Building): UpgradeCheck {
 
 /** Villageois mobilisés pour éteindre des incendies (ne travaillent pas) */
 export function busyCrew(state: GameState): number {
-  return state.buildings.reduce((sum, b) => sum + (b.fire?.crew ?? 0), 0);
+  const crews = state.buildings.reduce((sum, b) => sum + (b.fire?.crew ?? 0), 0);
+  return crews + injuredCount(state);
+}
+
+/** Villageois blessés (ne travaillent pas en attendant de guérir) */
+export function injuredCount(state: GameState): number {
+  return (state.injuries ?? []).reduce((n, i) => n + (i.untilDay >= state.day ? i.count : 0), 0);
 }
 
 /** Facteur d'état d'un bâtiment : endommagé ou en feu = production réduite */
@@ -169,7 +176,11 @@ export function moraleFactor(state: GameState): number {
 
 /** Facteur global de production : moral et quarantaine */
 export function globalProductionFactor(state: GameState): number {
-  return moraleFactor(state) * (hasModifier(state, 'quarantine') ? 0.6 : 1);
+  return (
+    moraleFactor(state) *
+    (hasModifier(state, 'quarantine') ? 0.6 : 1) *
+    (hasModifier(state, 'sheltered') ? TUNING.storm.shelterProduction : 1)
+  );
 }
 
 export function storageCapacity(state: GameState): number {

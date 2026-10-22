@@ -57,6 +57,8 @@ export interface Building {
   damaged?: boolean;
   /** Mis à l'arrêt par le joueur (libère ses travailleurs) */
   paused?: boolean;
+  /** Renforcé contre l'orage / la crue en cours */
+  reinforced?: boolean;
   /** Incendie en cours */
   fire?: Fire;
 }
@@ -73,24 +75,104 @@ export interface Fire {
   crew?: number;
 }
 
-export interface Raid {
-  /** Début de l'approche */
-  startT: number;
-  /** Arrivée sur le château */
-  arriveT: number;
-  /** Fin du départ (les bandits quittent la carte) */
-  leaveT: number;
-  from: { x: number; z: number };
-  to: { x: number; z: number };
-  /** Moment de la mort de chaque bandit (-1 = vivant) */
-  killedAt: number[];
-  nextTowerKill: number;
-  /** Butin emporté par chaque bandit encore vivant (après l'arrivée) */
-  lootEach?: Partial<Resources>;
-  arrived: boolean;
+export interface Point {
+  x: number;
+  z: number;
 }
 
-export type ModifierId = 'drought' | 'harshWinter' | 'goodHarvest' | 'quarantine' | 'blight';
+/**
+ * Bandit en mouvement. Son trajet est entièrement déterminé à l'avance (bord → cible → bord),
+ * ce qui permet de calculer sa position à tout instant sans simulation image par image.
+ */
+export interface Bandit {
+  id: number;
+  from: Point;
+  target: Point;
+  exit: Point;
+  /** Bâtiment visé (-1 = château) */
+  targetId: number;
+  startT: number;
+  arriveT: number;
+  stealEndT: number;
+  escapeT: number;
+  /** Butin emporté (rempli à la fin du vol) */
+  loot: Partial<Resources>;
+  looted: boolean;
+  status: 'active' | 'caught' | 'escaped';
+  /** Moment de la capture ou de la fuite */
+  endT?: number;
+  /** Garde (ou villageois) lancé à sa poursuite */
+  chasedBy?: number;
+}
+
+/** Garde (ou villageois) qui court intercepter un bandit, puis revient */
+export interface Guard {
+  id: number;
+  banditId: number;
+  /** Villageois sans tour : plus lent, peut être blessé */
+  villager: boolean;
+  towerId: number;
+  from: Point;
+  meet: Point;
+  startT: number;
+  meetT: number;
+  backT: number;
+  done: boolean;
+}
+
+export interface Raid {
+  bandits: Bandit[];
+  guards: Guard[];
+  nextGuardId: number;
+  /** Prochaine vérification des gardes automatiques des tours */
+  nextCheckT: number;
+  /** Carte ransom / combat associée (temps réel, ne met pas en pause) */
+  noticeId?: number;
+  report: { caught: number; escaped: number; lost: Partial<Resources>; recovered: Partial<Resources>; reward: number; injured: number };
+}
+
+/** Orage qui traverse la carte */
+export interface Storm {
+  /** Début de la traversée (avant : le nuage se forme au bord de la carte) */
+  startT: number;
+  /** Centre au début, direction (unitaire), vitesse (cases / jour), rayon (cases) */
+  from: Point;
+  dir: Point;
+  speed: number;
+  radius: number;
+  endT: number;
+  /** Moment où le nuage atteint la carte (fin de la préparation) */
+  arriveT: number;
+  /** Bâtiments déjà touchés (dégâts tirés une seule fois) */
+  rolled: number[];
+  nextCheckT: number;
+  nextLightningT: number;
+  /** Éclairs récents (pour l'affichage) */
+  strikes: { x: number; z: number; t: number }[];
+  /** Dégâts causés (bilan affiché à la fin) */
+  hits: string[];
+  shelter: boolean;
+  cropsProtected: boolean;
+}
+
+/** Crue : l'eau monte jusqu'au pic, puis redescend */
+export interface Flood {
+  startT: number;
+  peakT: number;
+  endT: number;
+  protected: boolean;
+  /** Bâtiments menacés (au bord de l'eau) */
+  threatened: number[];
+  resolved: boolean;
+}
+
+/** Villageois blessés : ne travaillent pas jusqu'au jour indiqué */
+export interface Injury {
+  count: number;
+  untilDay: number;
+}
+
+export type ModifierId = 'drought' | 'harshWinter' | 'goodHarvest' | 'quarantine' | 'blight' | 'sheltered';
 
 export interface Modifier {
   id: ModifierId;
@@ -130,6 +212,8 @@ export interface NoticeChoice {
   params: EventParams;
   resolved: boolean;
   picked?: string;
+  /** Événement en temps réel : ne déclenche pas la pause automatique */
+  realtime?: boolean;
 }
 
 /** Événement annoncé à l'avance (compte à rebours) */
@@ -207,6 +291,9 @@ export interface GameState {
   raid: Raid | null;
   /** Crue en cours (affichage) jusqu'à ce temps de jeu */
   floodUntil: number;
+  storm: Storm | null;
+  flood: Flood | null;
+  injuries: Injury[];
   /** Parcelles possédées (ids, voir parcels.ts) et nombre d'achats effectués */
   parcels: { owned: number[]; bought: number };
   /** Dangers des parcelles (camps de bandits, ruines) */

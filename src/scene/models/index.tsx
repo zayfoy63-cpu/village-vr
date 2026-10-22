@@ -11,6 +11,7 @@ import { Market } from './Market';
 import { Mill } from './Mill';
 import { Quarry } from './Quarry';
 import { Tower } from './Tower';
+import { Cemetery, Dike, Herbalist, Palisade, Sheepfold, Torches, Well } from './Hidden';
 
 export interface ModelProps {
   id: number;
@@ -38,4 +39,11 @@ export const MODELS: Record<BuildingTypeId, FC<ModelProps> | null> = {
   sawmill: Sawmill,
   mine: Mine,
   forge: Forge,
+  dike: Dike,
+  well: Well,
+  sheepfold: Sheepfold,
+  herbalist: Herbalist,
+  palisade: Palisade,
+  torch: Torches,
+  cemetery: Cemetery,
 };

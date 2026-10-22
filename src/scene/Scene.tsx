@@ -1,7 +1,9 @@
 import { OrbitControls } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { XR, useXR } from '@react-three/xr';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
+import * as THREE from 'three';
+import { nightLevel } from '../game/seasons';
 import { useGame } from '../store/gameStore';
 import { Bandits } from './Bandits';
 import { Buildings } from './Buildings';
@@ -15,7 +17,8 @@ import { StatusAlerts } from './StatusAlerts';
 import { Table } from './Table';
 import { Terrain } from './Terrain';
 import { Villagers } from './Villagers';
-import { Flood, Reinforcements, Snowfall, Storm } from './Weather';
+import { Hints } from './Hints';
+import { Flood, Rain, Reinforcements, Snowfall, Storm } from './Weather';
 import { VR_WORLD_SCALE, xrStore } from './xr';
 
 const BG = '#2a1e17';
@@ -70,6 +73,8 @@ function World() {
       <Storm map={map} />
       <Reinforcements map={map} />
       <Snowfall map={map} />
+      <Rain map={map} />
+      <Hints map={map} />
       <Ghost />
       <Selection />
     </group>
@@ -90,30 +95,58 @@ export function Scene() {
       <fog attach="fog" args={[BG, 45, 110]} />
       <XR store={xrStore}>
         <GameClock />
-        <hemisphereLight args={['#ffe6c2', '#5a3d26', 0.9]} />
-        <ambientLight intensity={0.15} color="#ffd9a8" />
-        <directionalLight
-          position={[10, 18, 9]}
-          intensity={2.4}
-          color="#ffd39b"
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-bias={-0.0004}
-          shadow-normalBias={0.02}
-          shadow-radius={4}
-          shadow-camera-left={-15}
-          shadow-camera-right={15}
-          shadow-camera-top={13}
-          shadow-camera-bottom={-13}
-          shadow-camera-near={1}
-          shadow-camera-far={60}
-        />
-        <pointLight position={[-14, 8, -10]} intensity={60} color="#ff9a52" distance={40} />
+        <Lights />
         <WorldRoot>
           <World />
         </WorldRoot>
         <PcControls />
       </XR>
     </Canvas>
+  );
+}
+
+const SUN = new THREE.Color('#ffd39b');
+const MOON = new THREE.Color('#8fa6d8');
+const GRAY_SKY = new THREE.Color('#c9cfd6');
+
+/** Lumières : soleil qui baisse et bleuit la nuit (plus tôt en hiver), ciel voilé les jours de pluie */
+function Lights() {
+  const sun = useRef<THREE.DirectionalLight>(null);
+  const sky = useRef<THREE.HemisphereLight>(null);
+  const warm = useRef<THREE.PointLight>(null);
+  useFrame(() => {
+    const g = useGame.getState().game;
+    const night = nightLevel(g.day, g.dayProgress);
+    const grey = g.mech.rain || g.storm ? 1 : 0;
+    if (sun.current) {
+      sun.current.intensity = 2.4 * (1 - 0.75 * night) * (1 - 0.35 * grey);
+      sun.current.color.copy(SUN).lerp(MOON, night).lerp(GRAY_SKY, grey * 0.4 * (1 - night));
+    }
+    if (sky.current) sky.current.intensity = 0.9 * (1 - 0.55 * night);
+    if (warm.current) warm.current.intensity = 60 * (1 - 0.7 * night);
+  });
+  return (
+    <>
+      <hemisphereLight ref={sky} args={['#ffe6c2', '#5a3d26', 0.9]} />
+      <ambientLight intensity={0.15} color="#ffd9a8" />
+      <directionalLight
+        ref={sun}
+        position={[10, 18, 9]}
+        intensity={2.4}
+        color="#ffd39b"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-radius={4}
+        shadow-camera-left={-15}
+        shadow-camera-right={15}
+        shadow-camera-top={13}
+        shadow-camera-bottom={-13}
+        shadow-camera-near={1}
+        shadow-camera-far={60}
+      />
+      <pointLight ref={warm} position={[-14, 8, -10]} intensity={60} color="#ff9a52" distance={40} />
+    </>
   );
 }

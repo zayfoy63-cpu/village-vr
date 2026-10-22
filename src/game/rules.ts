@@ -11,9 +11,15 @@ import {
   type LevelDef,
   type UnlockCondition,
 } from './buildings';
-import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META, seasonOf } from './config';
+import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META } from './config';
 import { TUNING } from './events';
 import { neighbors8, tileAt } from './mapgen';
+import { heatingNeed } from './mechanics/cold';
+import { isForest, lumberForestFactor } from './mechanics/deforestation';
+import { diseaseFactor } from './mechanics/disease';
+import { riversideFactor } from './mechanics/flood';
+import { soilFactor } from './mechanics/soil';
+import { seasonFactor } from './seasons';
 import { featureAt, ownsTile } from './parcels';
 import type {
   Building,
@@ -120,12 +126,13 @@ export function canPlace(state: GameState, type: BuildingTypeId, x: number, z: n
     }
   }
   if (def.requiresAdjacent) {
-    const touches = neighbors8(x, z).some(([nx, nz]) => tileAt(state.map, nx, nz) === def.requiresAdjacent);
+    // Une forêt rasée (souches) ne compte plus
+    const touches = neighbors8(x, z).some(([nx, nz]) =>
+      def.requiresAdjacent === 'forest' ? isForest(state, nx, nz) : tileAt(state.map, nx, nz) === def.requiresAdjacent,
+    );
     if (!touches) {
-      return {
-        ok: false,
-        reason: def.requiresAdjacent === 'forest' ? 'Doit toucher une forêt' : 'Doit toucher des rochers',
-      };
+      const what = { forest: 'une forêt', rock: 'des rochers', water: 'l\'eau' } as Partial<Record<string, string>>;
+      return { ok: false, reason: `Doit toucher ${what[def.requiresAdjacent] ?? 'le bon terrain'}` };
     }
   }
   if (!canAfford(state.resources, buildCost(type))) return { ok: false, reason: 'Ressources insuffisantes' };
@@ -178,6 +185,7 @@ export function moraleFactor(state: GameState): number {
 export function globalProductionFactor(state: GameState): number {
   return (
     moraleFactor(state) *
+    diseaseFactor(state) *
     (hasModifier(state, 'quarantine') ? 0.6 : 1) *
     (hasModifier(state, 'sheltered') ? TUNING.storm.shelterProduction : 1)
   );
@@ -261,7 +269,6 @@ export function simulateProduction(state: GameState): ProductionReport {
   const consumed = emptyResources();
   const status = new Map<number, BuildingRun>();
   const stock: Resources = { ...emptyResources(), ...state.resources };
-  const winter = seasonOf(state.day).id === 'winter';
   const drought = hasModifier(state, 'drought');
   const harvest = hasModifier(state, 'goodHarvest');
   const blight = hasModifier(state, 'blight');
@@ -282,7 +289,10 @@ export function simulateProduction(state: GameState): ProductionReport {
     if (!stats.workers) return 0;
     let f = (b.workers / stats.workers) * conditionFactor(b) * global;
     if (def.fertileBonus && tileAt(state.map, b.x, b.z) === 'fertile') f *= def.fertileBonus;
-    if (def.seasonal && winter) f = 0;
+    // Saisons (cultures, extraction), sol épuisé, bord de l'eau, forêt abattue : effets cachés
+    f *= seasonFactor(state, b, !!def.seasonal);
+    if (b.type === 'field') f *= soilFactor(b) * riversideFactor(state, b);
+    if (b.type === 'lumber') f *= lumberForestFactor(state, b);
     if (def.seasonal && drought) f *= 0.5;
     if (def.seasonal && harvest) f *= 1.5;
     if (def.seasonal && blight) f *= 0.4;
@@ -382,6 +392,8 @@ export function computeNet(state: GameState): Resources {
   for (const k of RESOURCE_KEYS) stock[k] = (state.resources[k] ?? 0) + net[k];
   const { eaten } = mealPlan(state, stock);
   for (const k of RESOURCE_KEYS) net[k] -= eaten[k];
+  // Bois de chauffage (hiver)
+  net.wood -= heatingNeed(state);
   return net;
 }
 

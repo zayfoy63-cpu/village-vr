@@ -4,6 +4,7 @@ import type * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, GameMap } from '../game/types';
 import { reinforceCost } from '../game/hazards';
+import { MINE } from '../game/mechanics/mine';
 import { useGame } from '../store/gameStore';
 import { Fields } from './Fields';
 import { UpgradeBurst } from './UpgradeBurst';
@@ -30,6 +31,23 @@ function Rubble({ id }: { id: number }) {
       <Part g="box" m="plank" p={[0.22, 0.03, 0.36]} s={[0.22, 0.02, 0.05]} r={[0, -0.4, -0.1]} shadow={false} />
     </group>
   );
+}
+
+/** Mine aux galeries instables : petites secousses par à-coups (indice discret) */
+function Tremor({ id, children }: { id: number; children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    const g = ref.current;
+    if (!g) return;
+    const b = useGame.getState().game.buildings.find((x) => x.id === id);
+    const k = (b?.instability ?? 0) >= MINE.hint.tremorFrom ? b!.instability! : 0;
+    const t = clock.elapsedTime;
+    // Secousses brèves toutes les quelques secondes, plus fréquentes quand ça empire
+    const burst = k > 0 && Math.sin(t * (0.8 + k)) > 0.85 ? 1 : 0;
+    g.position.x = burst * Math.sin(t * 60) * 0.012 * (1 + k);
+    g.position.z = burst * Math.cos(t * 53) * 0.01 * (1 + k);
+  });
+  return <group ref={ref}>{children}</group>;
 }
 
 /** Petite animation d'apparition (rebond) à la construction ou à l'amélioration */
@@ -95,7 +113,13 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
             <PopIn key={b.level} animate={animate}>
               {/* Endommagé : légèrement affaissé et entouré de gravats */}
               <group rotation={b.damaged ? [0.05, 0, -0.07] : [0, 0, 0]} scale={b.damaged ? [1, 0.93, 1] : 1}>
-                <Model id={b.id} level={b.level} />
+                {b.type === 'mine' ? (
+                  <Tremor id={b.id}>
+                    <Model id={b.id} level={b.level} />
+                  </Tremor>
+                ) : (
+                  <Model id={b.id} level={b.level} />
+                )}
               </group>
               {b.damaged && <Rubble id={b.id} />}
             </PopIn>

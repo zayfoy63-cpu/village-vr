@@ -258,3 +258,38 @@ export function Snowfall({ map }: { map: GameMap }) {
   if (!count) return null;
   return <instancedMesh ref={ref} args={[GEO.box, snowMat, MAX_FLAKES]} frustumCulled={false} />;
 }
+
+const MAX_SHOWER = 320;
+const showerMat = new THREE.MeshBasicMaterial({ color: '#b8cbe0', transparent: true, opacity: 0.4, depthWrite: false });
+
+/** Jour de pluie (saisons) : fine pluie sur toute la carte, sans nuage d'orage (1 draw call) */
+export function Rain({ map }: { map: GameMap }) {
+  const raining = useGame((s) => s.game.mech.rain && !s.game.storm && seasonOf(s.game.day).id !== 'winter');
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const drops = useMemo(
+    () =>
+      Array.from({ length: MAX_SHOWER }, (_, i) => ({
+        x: ((i * 7919) % 1000) / 1000 - 0.5,
+        z: ((i * 104729) % 1000) / 1000 - 0.5,
+        phase: ((i * 3571) % 1000) / 1000,
+      })),
+    [],
+  );
+  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0.12)), p: new THREE.Vector3(), s: new THREE.Vector3(0.012, 0.22, 0.012) }), []);
+
+  useFrame(({ clock }) => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const H = 6;
+    const t = clock.elapsedTime;
+    for (let i = 0; i < MAX_SHOWER; i++) {
+      const d = drops[i];
+      const y = H - ((t * 6 + d.phase * H) % H);
+      mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(d.x * (map.width + 2), y, d.z * (map.height + 2)), tmp.q, tmp.s));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  if (!raining) return null;
+  return <instancedMesh ref={ref} args={[GEO.box, showerMat, MAX_SHOWER]} frustumCulled={false} />;
+}

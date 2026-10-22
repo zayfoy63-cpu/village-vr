@@ -92,9 +92,36 @@ export function Sawmill() {
 }
 
 /** Mine de fer : butte rocheuse, entrée étayée de poutres, rails et wagonnet de minerai, lanterne */
-export function Mine() {
+/**
+ * Mine de fer. Niv. 2 : seconde galerie, terril, treuil. Niv. 3 : chevalement en bois et lanterne.
+ */
+export function Mine({ level = 1 }: { level?: number }) {
   return (
     <group>
+      {level >= 2 && (
+        <>
+          {/* Seconde galerie et terril */}
+          <Part g="box" m="ironDark" p={[0.3, 0.1, 0.12]} s={[0.16, 0.2, 0.04]} shadow={false} />
+          <Part g="box" m="woodRaw" p={[0.3, 0.21, 0.14]} s={[0.22, 0.03, 0.05]} />
+          <Part g="cone6" m="stoneDark" p={[0.36, 0.08, 0.36]} s={[0.22, 0.16, 0.22]} />
+          <Spinner p={[0.18, 0.36, 0.08]} axis="x" speed={1.2}>
+            <Wheel r={0.07} m="woodRaw" spokes={4} />
+          </Spinner>
+        </>
+      )}
+      {level >= 3 && (
+        <group position={[-0.3, 0, 0.05]}>
+          {/* Chevalement */}
+          {[-0.08, 0.08].map((x) => (
+            <Part key={x} g="box" m="timber" p={[x, 0.3, 0]} s={[0.03, 0.6, 0.03]} r={[0, 0, x > 0 ? -0.15 : 0.15]} />
+          ))}
+          <Part g="box" m="timber" p={[0, 0.58, 0]} s={[0.22, 0.03, 0.04]} />
+          <Spinner p={[0, 0.62, 0]} axis="z" speed={2}>
+            <Wheel r={0.08} m="ironDark" spokes={4} />
+          </Spinner>
+          <Torch p={[0.14, 0.02, 0.1]} />
+        </group>
+      )}
       <Part g="rock" m="stoneDark" p={[0, 0.2, -0.18]} s={[0.9, 0.5, 0.6]} />
       <Part g="rock" m="stone" p={[0.3, 0.14, -0.05]} s={[0.4, 0.32, 0.4]} />
       {/* Entrée étayée */}

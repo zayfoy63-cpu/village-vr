@@ -7,6 +7,7 @@ import { featureAt, ownsParcel, parcelOf } from '../game/parcels';
 import { buildingAt, hasModifier } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
 import { reinforceCost } from '../game/hazards';
+import { FLOOD } from '../game/mechanics/flood';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
 
@@ -21,6 +22,7 @@ const TILE_COLORS: Record<TileType, string> = {
 const SNOW = new THREE.Color('#eef3f7');
 const LOCKED = new THREE.Color('#2a2622');
 const ICE = new THREE.Color('#9cc7e6');
+const MUD = new THREE.Color('#4d5640');
 
 export function tileColor(type: TileType, season: SeasonId, jitter: number, out: THREE.Color, harsh = false) {
   out.set(TILE_COLORS[type]);
@@ -37,6 +39,11 @@ export function Terrain({ map }: { map: GameMap }) {
   const season = useGame((s) => seasonOf(s.game.day).id);
   const harsh = useGame((s) => hasModifier(s.game, 'harshWinter'));
   const owned = useGame((s) => s.game.parcels.owned);
+  // Rivière qui gonfle après des jours de pluie : plus sombre, un peu plus haute (indice de crue)
+  const swell = useGame((s) => {
+    const r = s.game.mech.river;
+    return r < FLOOD.hint.darkFrom ? 0 : Math.round(((r - FLOOD.hint.darkFrom) / (1 - FLOOD.hint.darkFrom)) * 10) / 10;
+  });
   const setHover = useGame((s) => s.setHover);
   const build = useGame((s) => s.build);
   const select = useGame((s) => s.select);
@@ -53,14 +60,15 @@ export function Terrain({ map }: { map: GameMap }) {
         const type = map.tiles[i];
         const [wx, , wz] = tileToWorld(x, z, map.width, map.height);
         const water = type === 'water';
-        const h = water ? 0.2 : 0.3;
+        const h = water ? 0.2 + swell * 0.06 : 0.3;
         m.compose(
-          new THREE.Vector3(wx, (water ? -0.1 : 0) - h / 2, wz),
+          new THREE.Vector3(wx, (water ? -0.1 + swell * 0.06 : 0) - h / 2, wz),
           new THREE.Quaternion(),
           new THREE.Vector3(0.995, h, 0.995),
         );
         mesh.setMatrixAt(i, m);
         tileColor(type, season, hash2(x, z, map.seed), c, harsh);
+        if (water && swell > 0) c.lerp(MUD, swell * 0.65);
         // Parcelles non achetées : assombries
         if (!owned.includes(parcelOf(x, z))) c.lerp(LOCKED, 0.5);
         mesh.setColorAt(i, c);
@@ -69,7 +77,7 @@ export function Terrain({ map }: { map: GameMap }) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [map, season, harsh, owned]);
+  }, [map, season, harsh, owned, swell]);
 
   const toTile = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
     if (e.instanceId === undefined) return null;

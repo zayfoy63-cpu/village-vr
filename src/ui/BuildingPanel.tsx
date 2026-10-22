@@ -154,7 +154,6 @@ export function BuildingPanel() {
           production à {Math.round((building.workers / stats.workers) * 100)} %. Logez plus d'habitants !
         </div>
       ) : null}
-      {def.seasonal && <div className="bp-note">❄️ Ne produit rien en hiver.</div>}
       <ChainStatus building={building} />
 
       {max > 1 &&

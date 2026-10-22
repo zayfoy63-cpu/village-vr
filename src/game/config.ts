@@ -61,7 +61,7 @@ export const DAMAGED_FACTOR = 0.5;
 export const REPAIR_COST_RATIO = 0.5;
 
 export const SAVE_KEY = 'village-vr-save-v1';
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export type SeasonId = 'spring' | 'summer' | 'autumn' | 'winter';
 

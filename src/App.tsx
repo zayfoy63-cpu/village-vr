@@ -3,6 +3,7 @@ import { useGame } from './store/gameStore';
 import { BuildBar } from './ui/BuildBar';
 import { BuildingPanel } from './ui/BuildingPanel';
 import { BanditMarkers } from './ui/BanditMarkers';
+import { ChronicleButton } from './ui/Chronicle';
 import { CrisisBanner } from './ui/CrisisBanner';
 import { EventFlash, Toast } from './ui/EventFlash';
 import { FeaturePanel, ParcelPanel } from './ui/LandPanel';
@@ -28,6 +29,7 @@ function SeedPanel() {
       >
         Nouvelle partie
       </button>
+      <ChronicleButton />
       <SettingsButton />
       <VRButton />
     </div>

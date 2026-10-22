@@ -5,6 +5,9 @@
 import { BUILDING_BY_ID } from './buildings';
 import { RESOURCE_KEYS } from './config';
 import { TUNING, addMorale, applyChoice, loseVillagers } from './events';
+import { mechanicsDue, updateMechanics } from './mechanics';
+import { extinguishFactor, onFireEnd, onFireSpread, spreadChance } from './mechanics/fire';
+import { chaseScout } from './mechanics/scout';
 import { dispatchGuard, realtimeDue, updateRealtime } from './realtime';
 import { Rng } from './rng';
 import { assignWorkers, canAfford } from './rules';
@@ -22,7 +25,7 @@ export function hazardsDue(state: GameState, t: number): boolean {
     if (!f) continue;
     if (f.extinguishEnd !== undefined ? t >= f.extinguishEnd : t >= f.nextSpread || t >= f.destroyAt) return true;
   }
-  if (realtimeDue(state, t)) return true;
+  if (realtimeDue(state, t) || mechanicsDue(state, t)) return true;
   for (const n of state.notices) if (n.choice && !n.choice.resolved && t >= n.choice.expiresT) return true;
   return false;
 }
@@ -34,6 +37,7 @@ export function updateHazards(state: GameState, t: number): GameState {
   const rng = new Rng(s.rngState);
   updateFires(s, t, rng);
   updateRealtime(s, t, rng);
+  updateMechanics(s, t, rng);
   for (const n of s.notices) {
     if (n.choice && !n.choice.resolved && t >= n.choice.expiresT) applyChoice(s, n, n.choice.defaultId, rng, t, true);
   }
@@ -65,6 +69,7 @@ function updateFires(s: GameState, t: number, rng: Rng) {
     const name = BUILDING_BY_ID[b.type].name;
     if (f.extinguishEnd !== undefined) {
       if (t >= f.extinguishEnd) {
+        onFireEnd(s, b);
         delete b.fire;
         b.damaged = true;
         s.stats.firesPutOut++;
@@ -74,15 +79,17 @@ function updateFires(s: GameState, t: number, rng: Rng) {
     while (t >= f.nextSpread && f.nextSpread < f.destroyAt) {
       const at = f.nextSpread;
       f.nextSpread += F.spreadEvery;
-      if (!rng.chance(F.spreadChance)) continue;
+      if (!rng.chance(spreadChance(s, b))) continue;
       const near = neighborsOf(s, b).filter((o) => o.type !== 'castle');
       if (!near.length) continue;
       const target = rng.pick(near);
+      onFireSpread(s, b);
       target.fire = { start: at, nextSpread: at + F.spreadEvery, destroyAt: at + F.destroyAfter };
       addMorale(s, TUNING.morale.fireStarted);
       pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Le feu se propage', text: `${name} → ${BUILDING_BY_ID[target.type].name}. Cliquez dessus pour l'éteindre !` });
     }
     if (t >= f.destroyAt) {
+      onFireEnd(s, b);
       if (b.type === 'castle') {
         delete b.fire;
         b.damaged = true;
@@ -110,13 +117,21 @@ export function extinguishFire(state: GameState, buildingId: number): GameState 
   const t = gameTime(s);
   const target = s.buildings.find((x) => x.id === buildingId)!;
   const crew = Math.min(TUNING.fire.crew, Math.max(1, s.population - 1));
-  target.fire!.extinguishEnd = t + TUNING.fire.extinguishTime;
+  target.fire!.extinguishEnd = t + TUNING.fire.extinguishTime * extinguishFactor(s, target);
   target.fire!.crew = crew;
   // Pendant l'extinction, le feu ne détruit plus et ne se propage plus
   target.fire!.destroyAt = 1e9;
   target.fire!.nextSpread = 1e9;
   assignWorkers(s);
   return s;
+}
+
+/** Action joueur : clic sur l'éclaireur au bord de la carte */
+export function catchScout(state: GameState): { state: GameState | null; reason?: string } {
+  if (!state.mech.scout || state.gameOver) return { state: null };
+  const s = cloneState(state);
+  const reason = chaseScout(s, gameTime(s));
+  return reason ? { state: null, reason } : { state: s };
 }
 
 /** Action joueur : clic sur un bandit → un garde (ou des villageois) part l'intercepter */
@@ -128,7 +143,6 @@ export function sendGuard(state: GameState, banditId: number): { state: GameStat
   return { state: s };
 }
 
-/** Action joueur : renforcer un bâtiment pendant un orage (bois) ou contre la crue (sacs de sable) */
 /** Coût pour renforcer ce bâtiment maintenant (null = rien à renforcer : pas d'orage ni de crue qui le menace) */
 export function reinforceCost(state: GameState, buildingId: number): Partial<Resources> | null {
   const b = state.buildings.find((x) => x.id === buildingId);

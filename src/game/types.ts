@@ -40,7 +40,16 @@ export type BuildingTypeId =
   | 'bakery'
   | 'sawmill'
   | 'mine'
-  | 'forge';
+  | 'forge'
+  // Bâtiments liés aux mécaniques cachées (description volontairement vague)
+  | 'dike'
+  | 'well'
+  | 'sheepfold'
+  | 'herbalist'
+  | 'palisade'
+  | 'torch'
+  /** Apparaît de lui-même après les premiers décès (non constructible) */
+  | 'cemetery';
 
 export interface Building {
   id: number;
@@ -61,6 +70,10 @@ export interface Building {
   reinforced?: boolean;
   /** Incendie en cours */
   fire?: Fire;
+  /** Champ : épuisement du sol, 0 (sol neuf) → 1 (épuisé) */
+  fatigue?: number;
+  /** Mine : instabilité des galeries, 0 → 1 (effondrement) */
+  instability?: number;
 }
 
 /** Les temps sont en "temps de jeu" : jour + avancement (ex. 12.5 = milieu du jour 12) */
@@ -73,6 +86,8 @@ export interface Fire {
   /** Extinction en cours : fin prévue et villageois mobilisés */
   extinguishEnd?: number;
   crew?: number;
+  /** Le feu a gagné un voisin */
+  spread?: boolean;
 }
 
 export interface Point {
@@ -164,6 +179,70 @@ export interface Flood {
   /** Bâtiments menacés (au bord de l'eau) */
   threatened: number[];
   resolved: boolean;
+  /** Bâtiments au bord de l'eau protégés par une digue */
+  saved?: number[];
+}
+
+/** Mécaniques cachées, découvertes en jouant (voir game/mechanics) */
+export type MechanicId =
+  | 'flood'
+  | 'soil'
+  | 'cold'
+  | 'fire'
+  | 'rats'
+  | 'disease'
+  | 'scout'
+  | 'deforestation'
+  | 'wolves'
+  | 'mine';
+
+/** Éclaireur bandit immobile au bord de la carte, quelques jours avant une attaque */
+export interface Scout {
+  pendingId: number;
+  x: number;
+  z: number;
+  /** Poursuite lancée par le joueur : départ, point de départ et capture */
+  chase?: { from: Point; startT: number; meetT: number };
+}
+
+/** Meute de loups sortie de la forêt pendant une nuit d'hiver */
+export interface WolfPack {
+  count: number;
+  from: Point;
+  /** Point où la meute s'arrête : la cible, ou la limite de la lumière si elle est protégée */
+  to: Point;
+  targetId: number;
+  startT: number;
+  arriveT: number;
+  leaveT: number;
+  repelled: boolean;
+  resolved: boolean;
+}
+
+export interface MechState {
+  /** Météo du jour (tirée selon la saison) */
+  rain: boolean;
+  rainStreak: number;
+  /** Gonflement de la rivière, 0 → 1 (crue) */
+  river: number;
+  /** Santé de la forêt par case (index = z * largeur + x ; 1 = intacte, 0 = rasée) */
+  forest: number[];
+  /** Jours d'hiver consécutifs sans bois de chauffage */
+  cold: number;
+  /** Jours sans bois de chauffage pendant l'hiver en cours */
+  coldThisWinter: number;
+  /** Maladie qui couve, 0 → 1 */
+  sickness: number;
+  /** Rats installés près des réserves (jours d'exposition) */
+  rats: number;
+  scout: Scout | null;
+  wolves: WolfPack | null;
+  /** Morts depuis le début de la partie (tombes du cimetière) */
+  deaths: number;
+  /** Compteurs internes des mécaniques (jours consécutifs, maxima…) */
+  memo: Record<string, number>;
+  /** Pages de la Chronique gagnées pendant cette partie */
+  chronicle: { struck: MechanicId[]; solved: MechanicId[] };
 }
 
 /** Villageois blessés : ne travaillent pas jusqu'au jour indiqué */
@@ -294,6 +373,8 @@ export interface GameState {
   storm: Storm | null;
   flood: Flood | null;
   injuries: Injury[];
+  /** Saisons, météo et mécaniques cachées */
+  mech: MechState;
   /** Parcelles possédées (ids, voir parcels.ts) et nombre d'achats effectués */
   parcels: { owned: number[]; bought: number };
   /** Dangers des parcelles (camps de bandits, ruines) */

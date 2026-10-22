@@ -3,6 +3,7 @@
 import { BUILDING_BY_ID, maxLevel, unlockKey } from './buildings';
 import { ALL_PARCELS } from './parcels';
 import { BASE_RESOURCES, MORALE, RESOURCE_KEYS, SAVE_KEY, SAVE_VERSION, START_RESOURCES } from './config';
+import { emptyMech } from './mechanics/common';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
 
@@ -25,6 +26,7 @@ export function saveGame(state: GameState): void {
  * v3 → v4 : parcelles (les anciennes parties possèdent toute la carte).
  * v4 → v5 : chaînes de production (farine, pain, planches, minerai, outils, armes).
  * v5 → v6 : bandits / orage / crue en temps réel, blessés.
+ * v6 → v7 : saisons, météo et mécaniques cachées (forêt intacte, sols neufs, aucune page de Chronique).
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -54,6 +56,11 @@ export function migrate(data: GameState): GameState | null {
   s.flood = data.flood ?? null;
   s.injuries = Array.isArray(data.injuries) ? data.injuries : [];
   s.floodUntil = Number(data.floodUntil) || 0;
+  // v6 → v7 : mécaniques cachées
+  const fresh = emptyMech(data.map.tiles.length);
+  const old = (data.mech ?? {}) as Partial<GameState['mech']>;
+  s.mech = { ...fresh, ...old, memo: { ...(old.memo ?? {}) }, chronicle: { ...fresh.chronicle, ...(old.chronicle ?? {}) } };
+  if (!Array.isArray(s.mech.forest) || s.mech.forest.length !== data.map.tiles.length) s.mech.forest = fresh.forest;
   // v3 → v4 : parcelles. Une ancienne partie garde toute sa carte (tout est déjà possédé), sans danger.
   if (!data.parcels || !Array.isArray(data.parcels.owned)) {
     s.parcels = { owned: ALL_PARCELS.map((p) => p.id), bought: 0 };

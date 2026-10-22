@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
 import type { Building, GameMap } from '../game/types';
+import { SOIL } from '../game/mechanics/soil';
 import { useGame } from '../store/gameStore';
 import { GEO, MAT, tileToWorld } from './shared';
 
@@ -13,6 +14,7 @@ const ROWS_BY_LEVEL = [4, 5, 6];
 const BALES_BY_LEVEL = [0, 1, 2];
 
 const DAMAGED_CROP = new THREE.Color('#6b5434');
+const TIRED_CROP = new THREE.Color('#d8c46a');
 
 const CROP_COLORS: Record<SeasonId, string> = {
   spring: '#93d35c',
@@ -41,6 +43,7 @@ export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
     const s = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
     const c = new THREE.Color(CROP_COLORS[season]);
+    const tc = new THREE.Color();
     const rowH = season === 'winter' ? 0.03 : season === 'spring' ? 0.08 : 0.14;
     // Couleurs remplies pour toutes les instances : l'attribut existe dès le premier rendu
     for (let i = 0; i < MAX_FIELDS * MAX_ROWS; i++) rows.setColorAt(i, c);
@@ -61,7 +64,11 @@ export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
       for (let k = 0; k < count; k++) {
         const off = -span / 2 + (k * span) / (count - 1);
         m.compose(p.set(x + (rot ? 0 : off), 0.04 + h / 2, z + (rot ? off : 0)), q, s.set(0.09, h, 0.74));
+        // Sol épuisé : les cultures jaunissent peu à peu (indice discret)
+        const tired = Math.max(0, ((f.fatigue ?? 0) - SOIL.hint.yellowFrom) / (1 - SOIL.hint.yellowFrom));
         if (f.damaged) rows.setColorAt(r, DAMAGED_CROP);
+        else if (season !== 'winter') rows.setColorAt(r, tc.copy(c).lerp(TIRED_CROP, tired * 0.8));
+        else rows.setColorAt(r, c);
         rows.setMatrixAt(r++, m);
       }
       for (let k = 0; k < BALES_BY_LEVEL[lvl]; k++) {

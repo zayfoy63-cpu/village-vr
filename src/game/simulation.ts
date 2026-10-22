@@ -12,6 +12,7 @@ import {
   dayInSeason,
   seasonIndex,
   seasonOf,
+  type SeasonId,
 } from './config';
 import {
   EVENTS,
@@ -30,6 +31,8 @@ import {
   startEvent,
 } from './events';
 import { hazardsDue, updateHazards } from './hazards';
+import { emptyMech } from './mechanics/common';
+import { mechanicsEndOfDay, mechanicsStartOfDay } from './mechanics';
 import { generateMap } from './mapgen';
 import {
   PARCELS,
@@ -59,6 +62,14 @@ import {
 import { clamp, cloneState, gameTime, pushNotice } from './stateUtils';
 import type { BuildingTypeId, GameState } from './types';
 
+/** Une phrase d'ambiance par saison (aucun effet de jeu n'est dit) */
+const SEASON_TEXT: Record<SeasonId, string> = {
+  spring: 'La neige fond, la terre se réveille. Le ciel est souvent gris.',
+  summer: 'Les journées sont longues et chaudes. L\'herbe jaunit au bord des chemins.',
+  autumn: 'Les feuilles roussissent et les routes s\'animent.',
+  winter: 'Le froid tombe sur la vallée. Les nuits s\'allongent.',
+};
+
 export function createInitialState(seed: number): GameState {
   const { map, castle, mill } = generateMap(seed);
   const state: GameState = {
@@ -87,6 +98,7 @@ export function createInitialState(seed: number): GameState {
     storm: null,
     flood: null,
     injuries: [],
+    mech: emptyMech(map.tiles.length),
     parcels: { owned: [...PARCELS.start], bought: 0 },
     features: generateFeatures(map, seed),
     discovered: ['food', 'wood', 'stone', 'gold'],
@@ -421,6 +433,9 @@ export function advanceDay(state: GameState): GameState {
     }
   }
 
+  // 3 bis. Mécaniques cachées : sols, chauffage, rats, fièvre, forêt, mines…
+  mechanicsEndOfDay(s, rng, s.day + 1);
+
   // 4. Moral du jour écoulé
   updateMorale(s, hungry, rng);
 
@@ -433,12 +448,8 @@ export function advanceDay(state: GameState): GameState {
   s.injuries = s.injuries.filter((i) => i.untilDay >= s.day);
   if ((s.day - 1) % DAYS_PER_SEASON === 0) {
     const season = seasonOf(s.day);
-    pushNotice(s, {
-      kind: 'info',
-      icon: season.icon,
-      title: season.name,
-      text: season.id === 'winter' ? 'L\'hiver arrive : les champs ne produisent plus.' : `Début de la saison : ${season.name.toLowerCase()}.`,
-    });
+    // Aucun effet n'est annoncé : seulement l'ambiance
+    pushNotice(s, { kind: 'info', icon: season.icon, title: season.name, text: SEASON_TEXT[season.id] });
   }
 
   if (s.population > 0) {
@@ -476,6 +487,9 @@ export function advanceDay(state: GameState): GameState {
         }
       }
     }
+
+    // 9. Météo du jour et mécaniques cachées qui se préparent (crue, loups, éclaireur…)
+    mechanicsStartOfDay(s, rng, now);
   }
 
   finalize(s);

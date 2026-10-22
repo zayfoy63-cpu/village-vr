@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, BuildingTypeId, GameMap } from '../game/types';
+import { useGame } from '../store/gameStore';
 import { CASTLE_CHIMNEY } from './models/Castle';
 import { HOUSE_CHIMNEY, houseRotation } from './models/House';
 import { HUT_CHIMNEYS, MANOR_CHIMNEYS, TOWNHOUSE_CHIMNEYS } from './models/Housing';
@@ -36,7 +37,7 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
   const ref = useRef<THREE.InstancedMesh>(null);
 
   const chimneys = useMemo(() => {
-    const out: THREE.Vector3[] = [];
+    const out: { p: THREE.Vector3; home: boolean }[] = [];
     const up = new THREE.Vector3(0, 1, 0);
     for (const b of buildings) {
       const locals = CHIMNEYS[b.type] ?? LEVEL_CHIMNEYS[b.type]?.[b.level];
@@ -46,7 +47,8 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
         const local = new THREE.Vector3(...l);
         // Seules les habitations sont tournées selon leur id
         if (CHIMNEYS[b.type] && b.type !== 'castle') local.applyAxisAngle(up, houseRotation(b.id));
-        out.push(local.add(new THREE.Vector3(x, y, z)));
+        // home : cheminée d'habitation (éteinte quand il n'y a plus de bois de chauffage)
+        out.push({ p: local.add(new THREE.Vector3(x, y, z)), home: !!CHIMNEYS[b.type] });
       }
       if (out.length >= MAX_CHIMNEYS) break;
     }
@@ -62,8 +64,11 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
     const mesh = ref.current;
     if (!mesh) return;
     const t = clock.elapsedTime;
+    // Plus de bois de chauffage : les foyers s'éteignent (indice du froid)
+    const cold = useGame.getState().game.mech.cold > 0;
     let i = 0;
-    chimneys.forEach((c, ci) => {
+    chimneys.forEach(({ p: c, home }, ci) => {
+      if (cold && home) return;
       for (let k = 0; k < PUFFS; k++) {
         const life = (t * 0.28 + k / PUFFS + ci * 0.137) % 1;
         const size = Math.sin(life * Math.PI) * (0.09 + life * 0.14);

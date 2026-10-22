@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
+import { DEFORESTATION } from '../game/mechanics/deforestation';
 import { hash2 } from '../game/rng';
 import type { GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
@@ -11,6 +12,9 @@ interface TreeSpot {
   z: number;
   scale: number;
   pine: boolean;
+  /** Case et rang de l'arbre dans sa case (déforestation : les arbres disparaissent un à un) */
+  tile: number;
+  rank: number;
 }
 
 interface RockSpot {
@@ -45,6 +49,8 @@ function layout(map: GameMap) {
             z: cz + Math.sin(a) * r,
             scale: 0.75 + hash2(x + k, z + k, map.seed + 4) * 0.5,
             pine: hash2(x, z + k * 7, map.seed + 5) > 0.45,
+            tile: z * map.width + x,
+            rank: (k + 1) / (n + 1),
           });
         }
       } else if (type === 'fertile') {
@@ -78,6 +84,8 @@ export function Nature({ map }: { map: GameMap }) {
   const pines = trees.filter((t) => t.pine);
   const rounds = trees.filter((t) => !t.pine);
   const season = useGame((s) => seasonOf(s.game.day).id);
+  // Santé de la forêt (déforestation) : relue une fois par jour
+  const forest = useGame((s) => s.game.mech.forest);
 
   const trunkRef = useRef<THREE.InstancedMesh>(null);
   const coneRef = useRef<THREE.InstancedMesh>(null);
@@ -92,26 +100,37 @@ export function Nature({ map }: { map: GameMap }) {
     const s = new THREE.Vector3();
     const c = new THREE.Color();
 
+    // Arbre encore debout ? Sinon une souche. Les survivants rapetissent avec la santé de la forêt.
+    const health = (t: TreeSpot) => forest[t.tile] ?? 1;
+    const standing = (t: TreeSpot) => health(t) >= DEFORESTATION.effect.clearedBelow && health(t) >= t.rank * DEFORESTATION.hint.thinFrom;
+    const size = (t: TreeSpot) => (standing(t) ? t.scale * (0.6 + 0.4 * health(t)) : 0.0001);
     trees.forEach((t, i) => {
-      m.compose(p.set(t.x, 0.12 * t.scale, t.z), q.identity(), s.set(0.08 * t.scale, 0.24 * t.scale, 0.08 * t.scale));
+      if (standing(t)) {
+        const k = size(t);
+        m.compose(p.set(t.x, 0.12 * k, t.z), q.identity(), s.set(0.08 * k, 0.24 * k, 0.08 * k));
+      } else {
+        m.compose(p.set(t.x, 0.025, t.z), q.identity(), s.set(0.09, 0.05, 0.09));
+      }
       trunkRef.current!.setMatrixAt(i, m);
     });
 
-    pines.forEach((t, i) => {
+    pines.forEach((tree, i) => {
+      const t = { ...tree, scale: size(tree) };
       // Deux cônes empilés par sapin
       m.compose(p.set(t.x, 0.42 * t.scale, t.z), q.identity(), s.set(0.42 * t.scale, 0.5 * t.scale, 0.42 * t.scale));
       coneRef.current!.setMatrixAt(i * 2, m);
       m.compose(p.set(t.x, 0.68 * t.scale, t.z), q.identity(), s.set(0.3 * t.scale, 0.4 * t.scale, 0.3 * t.scale));
       coneRef.current!.setMatrixAt(i * 2 + 1, m);
-      c.set(season === 'winter' ? '#a9c4b4' : '#2f6b34').offsetHSL(0, 0, (t.scale - 1) * 0.05);
+      c.set(season === 'winter' ? '#a9c4b4' : '#2f6b34').offsetHSL(0, 0, (tree.scale - 1) * 0.05);
       coneRef.current!.setColorAt(i * 2, c);
       coneRef.current!.setColorAt(i * 2 + 1, c);
     });
 
-    rounds.forEach((t, i) => {
+    rounds.forEach((tree, i) => {
+      const t = { ...tree, scale: size(tree) };
       m.compose(p.set(t.x, 0.45 * t.scale, t.z), q.identity(), s.set(0.42 * t.scale, 0.42 * t.scale, 0.42 * t.scale));
       ballRef.current!.setMatrixAt(i, m);
-      c.set(LEAF_COLORS[season]).offsetHSL((t.scale - 1) * 0.04, 0, (t.scale - 1) * 0.06);
+      c.set(LEAF_COLORS[season]).offsetHSL((tree.scale - 1) * 0.04, 0, (tree.scale - 1) * 0.06);
       ballRef.current!.setColorAt(i, c);
     });
 
@@ -136,7 +155,7 @@ export function Nature({ map }: { map: GameMap }) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
-  }, [trees, pines, rounds, rocks, flowers, season]);
+  }, [trees, pines, rounds, rocks, flowers, season, forest]);
 
   return (
     <group>

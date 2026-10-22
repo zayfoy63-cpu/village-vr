@@ -1,11 +1,12 @@
 // Store Zustand : relie la logique pure (game/) au rendu et à l'interface.
 
 import { create } from 'zustand';
+import { loadChronicle, mergeChronicle, saveChronicle, type Chronicle } from './chronicle';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { DAY_DURATION_SEC } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
-import { extinguishFire, protectCrops, reinforceBuilding, sendGuard, shelterVillagers } from '../game/hazards';
+import { catchScout, extinguishFire, protectCrops, reinforceBuilding, sendGuard, shelterVillagers } from '../game/hazards';
 import {
   attackCamp as attackCampSim,
   buyParcel as buyParcelSim,
@@ -26,6 +27,8 @@ interface GameStore {
   game: GameState;
   speed: Speed;
   settings: Settings;
+  /** Chronique du village (toutes parties confondues) */
+  chronicle: Chronicle;
   /** Vitesse à reprendre après une pause automatique (null = pas de pause auto en cours) */
   resumeSpeed: Speed | null;
   selected: BuildingTypeId | null;
@@ -57,6 +60,8 @@ interface GameStore {
   /** Clic sur un bandit : un garde part l'intercepter */
   chase: (banditId: number) => boolean;
   reinforce: (buildingId: number) => boolean;
+  /** Clic sur la silhouette au bord de la carte */
+  catchScout: () => boolean;
   shelter: () => boolean;
   protectCrops: () => boolean;
   /** Petit message éphémère (action impossible, etc.) */
@@ -92,6 +97,7 @@ export const useGame = create<GameStore>((set, get) => {
     game: initial,
     speed: 1,
     settings: loadSettings(),
+    chronicle: loadChronicle(),
     resumeSpeed: null,
     selected: null,
     hover: null,
@@ -192,6 +198,14 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     shelter: () => apply(shelterVillagers(get().game)),
+    catchScout: () => {
+      const res = catchScout(get().game);
+      if (!res.state) {
+        if (res.reason) get().showToast(res.reason);
+        return false;
+      }
+      return apply(res.state);
+    },
     protectCrops: () => apply(protectCrops(get().game)),
     toast: null,
     showToast: (text) => set({ toast: { text, at: Date.now() } }),
@@ -212,4 +226,14 @@ export const useGame = create<GameStore>((set, get) => {
       });
     },
   };
+});
+
+// Chronique : chaque page gagnée pendant la partie est reportée dans la mémoire du village
+useGame.subscribe((s, prev) => {
+  if (s.game.mech.chronicle === prev.game.mech.chronicle) return;
+  const { next, added, completed } = mergeChronicle(s.chronicle, s.game);
+  if (!added.length && !completed.length) return;
+  saveChronicle(next);
+  useGame.setState({ chronicle: next });
+  s.showToast(added.length ? '📜 Une page s\'ajoute à la Chronique du village…' : '📜 Une page de la Chronique se complète.');
 });

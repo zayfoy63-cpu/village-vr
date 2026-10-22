@@ -16,6 +16,7 @@ import {
   wearWeapons,
 } from './events';
 import { neighbors8, tileAt } from './mapgen';
+import { onFloodPeak } from './mechanics/flood';
 import type { Rng } from './rng';
 import { statsOf } from './rules';
 import { clamp, pushNotice } from './stateUtils';
@@ -475,7 +476,9 @@ export function updateStorm(state: GameState, t: number, rng: Rng) {
 
 /** Bâtiments au bord de l'eau */
 export function riversideBuildings(state: GameState): Building[] {
-  return playerBuildings(state).filter((b) => neighbors8(b.x, b.z).some(([x, z]) => tileAt(state.map, x, z) === 'water'));
+  return playerBuildings(state).filter(
+    (b) => b.type !== 'dike' && neighbors8(b.x, b.z).some(([x, z]) => tileAt(state.map, x, z) === 'water'),
+  );
 }
 
 export function startFlood(state: GameState, now: number, isProtected: boolean): Flood {
@@ -522,8 +525,17 @@ export function updateFlood(state: GameState, t: number) {
       kind: lost.length ? 'bad' : 'good',
       icon: '🌊',
       title: 'La crue est au plus haut',
-      text: f.protected ? 'Les berges tiennent bon !' : lost.length ? `${lost.join(', ')}.` : 'Les sacs de sable ont tout protégé !',
+      text: f.protected
+        ? 'Les berges tiennent bon !'
+        : lost.length
+          ? `${lost.join(', ')}.`
+          : f.saved?.length
+            ? 'L\'eau vient buter contre le talus et s\'arrête là.'
+            : f.threatened.length
+              ? 'Les sacs de sable ont tout protégé !'
+              : 'L\'eau monte, puis redescend sans rien emporter.',
     });
+    onFloodPeak(state, lost.length);
     clearReinforcements(state);
   }
   if (t >= f.endT) {

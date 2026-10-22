@@ -9,11 +9,11 @@
 
 import { BUILDING_BY_ID, CHAINS } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
-import { neighbors8, tileAt } from './mapgen';
 import { PARCELS, activeCamps } from './parcels';
-import { raidTurnBack, startFlood, startRaid, startStorm } from './realtime';
+import { raidTurnBack, startRaid, startStorm } from './realtime';
 import type { Rng } from './rng';
-import { canAfford, defensePower, housingCapacity, storageCapacity } from './rules';
+import { seasonEventWeight } from './seasons';
+import { canAfford, defensePower, housingCapacity } from './rules';
 import { clamp, pushNotice } from './stateUtils';
 import type {
   Building,
@@ -256,6 +256,8 @@ export function addMorale(state: GameState, delta: number) {
 export function loseVillagers(state: GameState, n: number, keep = 0): number {
   const lost = Math.max(0, Math.min(n, state.population - keep));
   state.population -= lost;
+  // Les morts reposent au cimetière (voir mechanics/disease.ts)
+  if (state.mech) state.mech.deaths += lost;
   if (lost > 0) addMorale(state, Math.max(TUNING.morale.deathCap, lost * TUNING.morale.perDeath));
   return lost;
 }
@@ -409,17 +411,6 @@ function resolveBandits({ state, rng, now }: EventContext, optionId: string): Ev
   return { text: 'Cliquez sur les bandits pour envoyer les gardes.', kind: 'info' };
 }
 
-/** Bâtiments au bord de l'eau (aperçu des dégâts d'une crue) */
-function riverside(state: GameState): { fields: number; others: number } {
-  let fields = 0;
-  let others = 0;
-  for (const b of playerBuildings(state)) {
-    if (!neighbors8(b.x, b.z).some(([x, z]) => tileAt(state.map, x, z) === 'water')) continue;
-    if (b.type === 'field') fields++;
-    else others++;
-  }
-  return { fields, others };
-}
 
 /** Options communes à l'épidémie et à la grande épidémie */
 function epidemicOptions(state: GameState, p: EventParams, doctorCost: number, q: string, d: string, i: string): ChoiceOption[] {
@@ -456,7 +447,7 @@ export const EVENTS: EventDef[] = [
     weight: (s) => (s.day >= 6 ? (2.5 + 0.3 * seasonIndex(s.day)) * (1 + PARCELS.camp.banditWeightBonus * activeCamps(s).length) : 0),
     roll: ({ state, rng, severity: sev }) => ({ count: raidSize(state, sev), edge: campEdge(state) ?? rng.int(0, 3) }),
     announce: {
-      days: [1, 2],
+      days: [2, 3],
       text: (p, d) => `Environ ${p.count} bandits aperçus ${DIRECTIONS[p.edge]} – arrivée dans ${d} ${plural(d, 'jour', 'jours')}. Tours de garde et or seront utiles.`,
     },
     trigger: ({ state, rng, now }, p) => {
@@ -484,54 +475,6 @@ export const EVENTS: EventDef[] = [
       startStorm(state, p.edge ?? 0, now, rng);
       return {
         text: `Le nuage arrive ${DIRECTIONS[p.edge ?? 0]} ! Son ombre montre la zone touchée : cliquez sur les bâtiments pour les renforcer, abritez les villageois, bâchez les récoltes.`,
-      };
-    },
-  },
-  {
-    id: 'flood',
-    title: 'Crue',
-    icon: '🌊',
-    kind: 'bad',
-    weight: (s) => {
-      const exposed = s.buildings.some((b) => neighbors8(b.x, b.z).some(([x, z]) => tileAt(s.map, x, z) === 'water'));
-      const wet = ['spring', 'autumn'].includes(seasonOf(s.day).id) ? 1.5 : 0.6;
-      return exposed ? 2 * wet : 0;
-    },
-    roll: ({ severity: sev }) => ({ sev }),
-    announce: {
-      days: [2, 2],
-      text: (_p, d) => `La rivière monte : crue dans ${d} jours. Les champs collés à l'eau seront détruits.`,
-      prepare: (_ctx, p) => ({
-        defaultId: 'none',
-        options: [
-          {
-            id: 'dikes',
-            label: 'Renforcer les berges',
-            detail: 'Protège tous les bâtiments au bord de l\'eau.',
-            cost: { wood: fmt(10 + 4 * p.sev), stone: fmt(3 * p.sev) },
-            effects: [fx('🛡️', 'aucun dégât', 'good')],
-          },
-          {
-            id: 'none',
-            label: 'Ne rien faire',
-            detail: 'Les champs riverains seront perdus.',
-            effects: [fx('🌾', `-${riverside(_ctx.state).fields} champ(s)`, 'bad'), fx('🏚️', `${riverside(_ctx.state).others} bâtiment(s) abîmé(s)`, 'bad')],
-          },
-        ],
-      }),
-      onPrepare: (_ctx, id, p) => {
-        if (id === 'dikes') p.protected = 1;
-        return id === 'dikes' ? 'Les berges sont renforcées.' : 'Rien n\'est fait contre la crue.';
-      },
-    },
-    trigger: ({ state, now }, p) => {
-      const flood = startFlood(state, now, !!p.protected);
-      if (p.protected) return { text: 'La rivière monte… mais les berges renforcées devraient tenir.', kind: 'info' };
-      const n = flood.threatened.length;
-      return {
-        text: n
-          ? `L'eau monte ! ${n} ${plural(n, 'bâtiment menacé', 'bâtiments menacés')} au bord de l'eau : cliquez dessus pour poser des sacs de sable (${formatResources(TUNING.flood.sandbagCost)}).`
-          : 'L\'eau monte, mais aucun bâtiment n\'est au bord de la rivière.',
       };
     },
   },
@@ -712,24 +655,6 @@ export const EVENTS: EventDef[] = [
     },
   },
   {
-    id: 'rats',
-    title: 'Invasion de rats',
-    icon: '🐀',
-    kind: 'bad',
-    weight: (s) => {
-      const excess = s.resources.food - storageCapacity(s);
-      return excess > 30 ? 2 + excess / 100 : 0;
-    },
-    trigger: ({ state, severity: sev }) => {
-      const excess = Math.max(0, state.resources.food - storageCapacity(state));
-      const lost = Math.floor(excess * Math.min(0.7, 0.3 + 0.08 * sev));
-      state.resources.food -= lost;
-      addMorale(state, -3);
-      const hint = storageCapacity(state) ? 'Agrandissez vos greniers.' : 'Construisez un grenier !';
-      return { text: `Les rats dévorent ${lost} 🌾 stockés hors des greniers. ${hint}` };
-    },
-  },
-  {
     id: 'drought',
     title: 'Sécheresse',
     icon: '🌵',
@@ -878,7 +803,9 @@ export function pickEvent(state: GameState, rng: Rng): EventDef | undefined {
   if (state.flood) busy.add('flood');
   const pool = EVENTS.filter((e) => !e.major && !e.scheduled && !busy.has(e.id));
   const side = pool.filter((e) => (e.kind !== 'bad') === wantGood);
-  return rng.weighted(side, (e) => e.weight(state)) ?? rng.weighted(pool, (e) => e.weight(state));
+  // Les saisons pèsent sur le tirage (sécheresse l'été, marchands l'automne, bandits rares l'hiver…)
+  const w = (e: EventDef) => e.weight(state) * seasonEventWeight(state, e.id);
+  return rng.weighted(side, w) ?? rng.weighted(pool, w);
 }
 
 /** Déclenche un événement : annonce (compte à rebours) ou effet immédiat */

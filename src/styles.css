@@ -1274,3 +1274,79 @@ button.primary:hover {
 .hud-item.injured .hud-value {
   color: #ff9a8a;
 }
+
+/* ---------- Chronique du village ---------- */
+.chronicle {
+  background: #f1e6cc;
+  color: #3b2a1a;
+  border: 1px solid #b89b6a;
+  border-radius: 10px;
+  padding: 18px 22px;
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: Georgia, 'Times New Roman', serif;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.chronicle h2 {
+  margin: 0;
+  color: #6b3b1b;
+  font-size: 22px;
+}
+
+.chronicle-count {
+  font-size: 13px;
+  font-style: italic;
+  color: #7a5a35;
+}
+
+.chronicle-pages {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.chronicle-page {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px dashed #c9b083;
+}
+
+.chronicle-page .cp-icon {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.chronicle-page p {
+  margin: 3px 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.chronicle-page em {
+  font-size: 11px;
+  color: #8a6c45;
+}
+
+.chronicle-page.blank {
+  opacity: 0.45;
+}
+
+.chronicle-page .cp-solved {
+  color: #2f5d2a;
+}
+
+.chronicle-page .cp-missing {
+  color: #9a8466;
+  font-style: italic;
+}
+
+.chronicle .primary {
+  align-self: flex-end;
+}

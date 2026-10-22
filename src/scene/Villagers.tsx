@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
+import { DISEASE } from '../game/mechanics/disease';
 import { statsOf } from '../game/rules';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
@@ -9,6 +10,8 @@ import { GEO, tileToWorld } from './shared';
 
 const MAX_VILLAGERS = 150;
 const WALK_SPEED = 0.55;
+const SKIN = new THREE.Color('#f0c8a0');
+const PALE = new THREE.Color('#b9c4a6');
 const TUNICS = ['#b5523b', '#3f6fb5', '#6a8f3a', '#c48a2c', '#7a4f8f', '#a33c5a', '#4f7f86'];
 
 interface Agent {
@@ -48,6 +51,7 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
   const bodyRef = useRef<THREE.InstancedMesh>(null);
   const headRef = useRef<THREE.InstancedMesh>(null);
   const agents = useRef<Agent[]>([]);
+  const headMat = useRef<THREE.MeshStandardMaterial>(null);
   const { homes, works } = useSlots(buildings, map);
   const count = Math.min(population, MAX_VILLAGERS);
 
@@ -72,12 +76,17 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
     [],
   );
 
-  useFrame((_, rawDt) => {
+  useFrame(({ clock }, rawDt) => {
     const body = bodyRef.current;
     const head = headRef.current;
     if (!body || !head) return;
-    const speed = useGame.getState().speed;
+    const { speed, game } = useGame.getState();
     const dt = Math.min(rawDt, 0.1) * speed;
+    // Indices : froid (grelottent), fièvre qui couve (plus lents, plus pâles)
+    const shiver = game.mech.cold > 0;
+    const sick = Math.max(0, (game.mech.sickness - DISEASE.hint.paleFrom) / (1 - DISEASE.hint.paleFrom));
+    const walk = WALK_SPEED * (1 - 0.45 * sick);
+    if (headMat.current) headMat.current.color.copy(SKIN).lerp(PALE, sick * 0.85);
     const list = agents.current;
     const fallback = homes[0] ?? new THREE.Vector3();
 
@@ -87,7 +96,7 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
       const dist = tmp.d.length();
       let moving = false;
       if (dist > 0.03) {
-        a.pos.addScaledVector(tmp.d.normalize(), Math.min(dist, WALK_SPEED * dt));
+        a.pos.addScaledVector(tmp.d.normalize(), Math.min(dist, walk * dt));
         moving = dt > 0;
       } else if ((a.wait -= dt) <= 0) {
         // Arrivé : on repart, vers le travail ou la maison
@@ -100,9 +109,10 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
       }
       a.phase += dt * 12;
       const bob = moving ? Math.abs(Math.sin(a.phase)) * 0.03 : 0;
-      tmp.m.compose(tmp.p.set(a.pos.x, 0.11 + bob, a.pos.z), tmp.q, tmp.s.set(0.13, 0.22, 0.13));
+      const sx = shiver ? Math.sin(clock.elapsedTime * 55 + i * 1.7) * 0.012 : 0;
+      tmp.m.compose(tmp.p.set(a.pos.x + sx, 0.11 + bob, a.pos.z), tmp.q, tmp.s.set(0.13, 0.22, 0.13));
       body.setMatrixAt(i, tmp.m);
-      tmp.m.compose(tmp.p.set(a.pos.x, 0.28 + bob, a.pos.z), tmp.q, tmp.s.setScalar(0.11));
+      tmp.m.compose(tmp.p.set(a.pos.x + sx * 1.4, 0.28 + bob, a.pos.z), tmp.q, tmp.s.setScalar(0.11));
       head.setMatrixAt(i, tmp.m);
     });
     body.count = list.length;
@@ -117,7 +127,7 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
         <meshStandardMaterial flatShading />
       </instancedMesh>
       <instancedMesh ref={headRef} args={[GEO.ball, undefined, MAX_VILLAGERS]} castShadow frustumCulled={false}>
-        <meshStandardMaterial color="#f0c8a0" flatShading />
+        <meshStandardMaterial ref={headMat} color="#f0c8a0" flatShading />
       </instancedMesh>
     </group>
   );

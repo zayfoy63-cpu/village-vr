@@ -1,18 +1,30 @@
-// Simulation : création de partie, construction, passage d'un jour, échanges.
+// Simulation : création de partie, temps qui passe, construction, choix, actions du joueur.
 // Toutes les fonctions renvoient un NOUVEL état (l'état reçu n'est jamais modifié).
 
 import { BUILDING_BY_ID, buildCost, maxLevel, unlockKey } from './buildings';
 import {
   DAYS_PER_SEASON,
-  FIRST_EVENT_DAY,
+  MORALE,
   RESOURCE_KEYS,
   SAVE_VERSION,
   START_POPULATION,
   START_RESOURCES,
-  difficulty,
+  dayInSeason,
+  seasonIndex,
   seasonOf,
 } from './config';
-import { nextEventDelay, pickEvent } from './events';
+import {
+  EVENTS,
+  EVENT_BY_ID,
+  TUNING,
+  applyChoice,
+  arriveEvent,
+  pickEvent,
+  revolt,
+  scheduleEvent,
+  startEvent,
+} from './events';
+import { hazardsDue, updateHazards } from './hazards';
 import { generateMap } from './mapgen';
 import { Rng } from './rng';
 import {
@@ -24,21 +36,10 @@ import {
   findNewUnlocks,
   foodConsumption,
   housingCapacity,
+  repairCost,
 } from './rules';
-import type { BuildingTypeId, GameState, Notice } from './types';
-
-const MAX_NOTICES = 40;
-
-/** Copie profonde de l'état, en partageant la carte (immuable) */
-function cloneState(state: GameState): GameState {
-  const { map, ...rest } = state;
-  return { ...structuredClone(rest), map };
-}
-
-function pushNotice(state: GameState, notice: Omit<Notice, 'id' | 'day'>) {
-  state.notices.push({ ...notice, id: state.nextNoticeId++, day: state.day });
-  if (state.notices.length > MAX_NOTICES) state.notices.splice(0, state.notices.length - MAX_NOTICES);
-}
+import { clamp, cloneState, gameTime, pushNotice } from './stateUtils';
+import type { BuildingTypeId, GameState } from './types';
 
 export function createInitialState(seed: number): GameState {
   const { map, castle, mill } = generateMap(seed);
@@ -59,16 +60,27 @@ export function createInitialState(seed: number): GameState {
     modifiers: [],
     notices: [],
     nextNoticeId: 1,
-    nextEventDay: FIRST_EVENT_DAY + 1,
     unlocked: [],
-    stats: { maxPopulation: START_POPULATION, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0 },
+    morale: MORALE.start,
+    pending: [],
+    nextPendingId: 1,
+    raid: null,
+    floodUntil: 0,
+    stats: {
+      maxPopulation: START_POPULATION,
+      buildingsBuilt: 0,
+      upgrades: 0,
+      eventsSurvived: 0,
+      banditsKilled: 0,
+      firesPutOut: 0,
+    },
     gameOver: false,
   };
   pushNotice(state, {
     kind: 'info',
     icon: '🏰',
     title: 'Un nouveau départ',
-    text: 'Trois villageois s\'installent au pied du château. Construisez un champ avant l\'hiver !',
+    text: 'Trois villageois s\'installent au pied du château. Construisez un champ avant l\'hiver, et surveillez le moral !',
   });
   applyUnlocks(state, false);
   return state;
@@ -104,6 +116,10 @@ export function applyUnlocks(state: GameState, notify: boolean): void {
   }
 }
 
+// ============================================================================
+// ACTIONS DU JOUEUR
+// ============================================================================
+
 export function placeBuilding(state: GameState, type: BuildingTypeId, x: number, z: number): GameState | null {
   if (state.gameOver || !BUILDING_BY_ID[type].buildable) return null;
   if (!canPlace(state, type, x, z).ok) return null;
@@ -119,7 +135,7 @@ export function placeBuilding(state: GameState, type: BuildingTypeId, x: number,
 
 export function upgradeBuilding(state: GameState, buildingId: number): GameState | null {
   const b = state.buildings.find((x) => x.id === buildingId);
-  if (state.gameOver || !b || b.level >= maxLevel(b.type)) return null;
+  if (state.gameOver || !b || b.level >= maxLevel(b.type) || b.fire) return null;
   const check = canUpgrade(state, b);
   if (!check.ok || !check.next) return null;
   const s = cloneState(state);
@@ -130,7 +146,94 @@ export function upgradeBuilding(state: GameState, buildingId: number): GameState
   return s;
 }
 
-/** Fait passer un jour complet : production, repas, population, événements */
+export function repairBuilding(state: GameState, buildingId: number): GameState | null {
+  const b = state.buildings.find((x) => x.id === buildingId);
+  if (state.gameOver || !b?.damaged || b.fire) return null;
+  const cost = repairCost(b);
+  if (!canAfford(state.resources, cost)) return null;
+  const s = cloneState(state);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
+  delete s.buildings.find((x) => x.id === buildingId)!.damaged;
+  return s;
+}
+
+/** Répond à une carte à choix */
+export function resolveChoice(state: GameState, noticeId: number, optionId: string): GameState {
+  const n = state.notices.find((x) => x.id === noticeId);
+  if (!n?.choice || n.choice.resolved || state.gameOver) return state;
+  const s = cloneState(state);
+  const rng = new Rng(s.rngState);
+  const ok = applyChoice(s, s.notices.find((x) => x.id === noticeId)!, optionId, rng, gameTime(s));
+  if (!ok) return state;
+  s.rngState = rng.state;
+  finalize(s);
+  return s;
+}
+
+// ============================================================================
+// TEMPS
+// ============================================================================
+
+/**
+ * Fait avancer le temps de `dt` jours (fraction). Gère les dangers en temps réel
+ * (incendies, bandits, délais de choix) et le passage au jour suivant.
+ */
+export function advanceTime(state: GameState, dt: number): GameState {
+  if (state.gameOver || dt <= 0) return state;
+  const progress = state.dayProgress + dt;
+  if (progress < 1) {
+    const s = { ...state, dayProgress: progress };
+    const t = s.day + progress;
+    return hazardsDue(s, t) ? updateHazards(s, t) : s;
+  }
+  let s: GameState = { ...state, dayProgress: 1 };
+  s = updateHazards(s, s.day + 1);
+  return s.gameOver ? s : advanceDay(s);
+}
+
+/** Moral : dérive quotidienne vers une cible, puis conséquences d'un moral bas */
+function updateMorale(s: GameState, hungry: boolean, rng: Rng) {
+  const M = MORALE;
+  const capacity = housingCapacity(s);
+  const markets = s.buildings.filter((b) => b.type === 'market' && b.workers > 0 && !b.damaged).length;
+  const towers = s.buildings.filter((b) => b.type === 'tower' && b.workers > 0).length;
+  const damaged = s.buildings.filter((b) => b.damaged).length;
+  let target = M.base;
+  if (s.resources.food >= foodConsumption(s) * 3) target += M.fedBonus;
+  target -= Math.min(20, Math.max(0, s.population - capacity) * M.overcrowdPenalty);
+  target += Math.min(15, markets * M.marketBonus);
+  target += Math.min(6, towers * M.towerBonus);
+  target -= Math.min(15, damaged * M.damagedPenalty);
+  if (hungry) target -= M.hungerPenalty;
+  s.morale = clamp(s.morale + (target - s.morale) * M.drift - (hungry ? 10 : 0), 0, 100);
+
+  if (s.population <= 0) return;
+  if (s.morale < M.revoltBelow) {
+    pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Révolte !', text: revolt(s, rng) });
+  } else if (s.morale < M.leaveBelow) {
+    const n = Math.min(s.population, Math.max(1, Math.ceil(s.population * M.leaveRatio)));
+    s.population -= n;
+    pushNotice(s, {
+      kind: 'bad',
+      icon: '😠',
+      title: 'Mécontentement',
+      text: `Le moral est au plus bas : ${n} ${n > 1 ? 'villageois quittent' : 'villageois quitte'} le village.`,
+    });
+  }
+}
+
+function finalize(s: GameState) {
+  for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, Math.round(s.resources[k] * 10) / 10);
+  assignWorkers(s);
+  if (s.population > 0) applyUnlocks(s, true);
+  s.stats.maxPopulation = Math.max(s.stats.maxPopulation, s.population);
+  if (s.population <= 0) {
+    s.population = 0;
+    s.gameOver = true;
+  }
+}
+
+/** Fait passer un jour complet : production, repas, moral, annonces, événements */
 export function advanceDay(state: GameState): GameState {
   if (state.gameOver) return state;
   const s = cloneState(state);
@@ -143,7 +246,8 @@ export function advanceDay(state: GameState): GameState {
 
   // 2. Repas
   s.resources.food -= foodConsumption(s);
-  if (s.resources.food < 0) {
+  const hungry = s.resources.food < 0;
+  if (hungry) {
     const deficit = -s.resources.food;
     // Départs proportionnels au manque, mais au plus ~20 % de la population par jour
     const leaving = Math.min(s.population, Math.max(1, Math.ceil(deficit / 3)), Math.max(1, Math.ceil(s.population * 0.2)));
@@ -156,9 +260,9 @@ export function advanceDay(state: GameState): GameState {
       text: `Faute de nourriture, ${leaving} villageois ${leaving > 1 ? 'quittent' : 'quitte'} le village.`,
     });
   } else {
-    // 3. Croissance : place libre + nourriture suffisante
+    // 3. Croissance : place libre, nourriture suffisante et moral correct
     const free = housingCapacity(s) - s.population;
-    if (free > 0 && s.resources.food >= s.population * 2 + 4) {
+    if (free > 0 && s.morale >= MORALE.growthMin && s.resources.food >= s.population * 2 + 4) {
       const arrivals = free > 1 && s.resources.food >= s.population * 5 ? 2 : 1;
       s.population += arrivals;
       pushNotice(s, {
@@ -170,13 +274,14 @@ export function advanceDay(state: GameState): GameState {
     }
   }
 
-  // 4. Jour suivant
+  // 4. Moral du jour écoulé
+  updateMorale(s, hungry, rng);
+
+  // 5. Jour suivant
   s.day++;
   s.dayProgress = 0;
+  const now = s.day;
   s.modifiers = s.modifiers.filter((m) => m.untilDay >= s.day);
-  for (const n of s.notices) {
-    if (n.trade && !n.trade.resolved && n.trade.expiresDay < s.day) n.trade.resolved = true;
-  }
   if ((s.day - 1) % DAYS_PER_SEASON === 0) {
     const season = seasonOf(s.day);
     pushNotice(s, {
@@ -187,49 +292,44 @@ export function advanceDay(state: GameState): GameState {
     });
   }
 
-  // 5. Événement aléatoire
-  if (s.day >= s.nextEventDay && s.population > 0) {
-    const ev = pickEvent(s, rng);
-    if (ev) {
-      const outcome = ev.apply({ state: s, rng, severity: difficulty(s.day) });
-      pushNotice(s, {
-        kind: ev.kind,
-        icon: ev.icon,
-        title: ev.title,
-        text: outcome.text,
-        trade: outcome.trade ? { options: outcome.trade, expiresDay: s.day + 1, resolved: false } : undefined,
-      });
-      if (ev.kind === 'bad') s.stats.eventsSurvived++;
+  if (s.population > 0) {
+    // 6. Délais de choix expirés, puis arrivée des événements annoncés
+    for (const n of s.notices) {
+      if (n.choice && !n.choice.resolved && now >= n.choice.expiresT) applyChoice(s, n, n.choice.defaultId, rng, now, true);
     }
-    s.nextEventDay = s.day + nextEventDelay(s.day, rng);
+    for (const p of s.pending.filter((x) => x.arriveDay <= s.day)) arriveEvent(s, p.id, rng, now);
+
+    // 7. Événements programmés : hiver rude (fin d'automne), grand événement de fin d'année
+    const year = Math.floor((s.day - 1) / (DAYS_PER_SEASON * 4));
+    if (seasonOf(s.day).id === 'autumn' && dayInSeason(s.day) === DAYS_PER_SEASON - 2) {
+      const hw = TUNING.harshWinter;
+      if (rng.chance(hw.chance + hw.perYear * year)) scheduleEvent(s, EVENT_BY_ID.harshWinter, 3, {}, rng, now);
+    }
+    const ye = TUNING.yearEnd;
+    if ((s.day + ye.announceDays) % ye.every === 0) {
+      const major = rng.pick(EVENTS.filter((e) => e.major));
+      const ctx = { state: s, rng, severity: 1 + TUNING.severityPerSeason * seasonIndex(s.day + ye.announceDays), now };
+      scheduleEvent(s, major, ye.announceDays, major.roll?.(ctx) ?? {}, rng, now);
+      s.stats.eventsSurvived++;
+    }
+
+    // 8. Imprévus aléatoires (de plus en plus fréquents, parfois superposés)
+    if (s.day >= TUNING.firstEventDay) {
+      const season = seasonIndex(s.day);
+      const d = TUNING.dailyChance;
+      if (rng.chance(Math.min(d.max, d.base + d.perSeason * season))) {
+        const ev = pickEvent(s, rng);
+        if (ev) startEvent(s, ev, rng, now);
+        const se = TUNING.secondEvent;
+        if (season >= se.fromSeason && rng.chance(Math.min(se.max, se.base + se.perSeason * (season - se.fromSeason)))) {
+          const ev2 = pickEvent(s, rng);
+          if (ev2) startEvent(s, ev2, rng, now);
+        }
+      }
+    }
   }
 
-  // 6. Arrondis, travailleurs, déblocages, fin de partie
-  for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, Math.round(s.resources[k] * 10) / 10);
-  assignWorkers(s);
-  if (s.population > 0) applyUnlocks(s, true);
-  s.stats.maxPopulation = Math.max(s.stats.maxPopulation, s.population);
-  if (s.population <= 0) {
-    s.population = 0;
-    s.gameOver = true;
-  }
+  finalize(s);
   s.rngState = rng.state;
   return s;
 }
-
-export function resolveTrade(state: GameState, noticeId: number, optionIndex: number | null): GameState {
-  const notice = state.notices.find((n) => n.id === noticeId);
-  if (!notice?.trade || notice.trade.resolved) return state;
-  const s = cloneState(state);
-  const n = s.notices.find((x) => x.id === noticeId)!;
-  if (optionIndex !== null) {
-    const opt = n.trade!.options[optionIndex];
-    if (!opt || !canAfford(s.resources, opt.give)) return state;
-    for (const k of RESOURCE_KEYS) {
-      s.resources[k] += (opt.get[k] ?? 0) - (opt.give[k] ?? 0);
-    }
-  }
-  n.trade!.resolved = true;
-  return s;
-}
-

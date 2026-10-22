@@ -28,6 +28,16 @@ export function GameOver() {
             <em>bâtiments construits</em>
           </div>
           <div>
+            <span>🗡️</span>
+            <strong>{game.stats.banditsKilled}</strong>
+            <em>bandits abattus</em>
+          </div>
+          <div>
+            <span>🧯</span>
+            <strong>{game.stats.firesPutOut}</strong>
+            <em>incendies éteints</em>
+          </div>
+          <div>
             <span>⭐</span>
             <strong>{score(game)}</strong>
             <em>score</em>

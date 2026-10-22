@@ -1,5 +1,6 @@
 import { BUILDING_BY_ID, maxLevel } from '../game/buildings';
-import { canUpgrade, effectLabel, nominalProduction, statsOf } from '../game/rules';
+import { DAMAGED_FACTOR } from '../game/config';
+import { canAfford, canUpgrade, effectLabel, nominalProduction, repairCost, statsOf } from '../game/rules';
 import { useGame } from '../store/gameStore';
 import { CostLine } from './BuildBar';
 
@@ -12,6 +13,8 @@ export function BuildingPanel() {
   useGame((s) => s.game.unlocked);
   const inspect = useGame((s) => s.inspect);
   const upgrade = useGame((s) => s.upgrade);
+  const repair = useGame((s) => s.repair);
+  const extinguish = useGame((s) => s.extinguish);
   if (!building) return null;
 
   const game = useGame.getState().game;
@@ -40,6 +43,37 @@ export function BuildingPanel() {
         </button>
       </div>
 
+      {building.fire && (
+        <div className="bp-alert fire">
+          {building.fire.extinguishEnd !== undefined ? (
+            <span>💧 Extinction en cours…</span>
+          ) : (
+            <>
+              <span>🔥 En feu ! Ne produit plus rien.</span>
+              <button className="primary" onClick={() => extinguish(building.id)}>
+                Éteindre
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {building.damaged && !building.fire && (
+        <div className="bp-alert damaged">
+          <span>🔨 Endommagé : production x{DAMAGED_FACTOR}. Un nouveau dégât le détruira.</span>
+          <div className="bp-row">
+            <span>Réparation</span>
+            <CostLine cost={repairCost(building)} resources={resources} />
+          </div>
+          <button
+            className="primary"
+            disabled={!canAfford(resources, repairCost(building))}
+            onClick={() => repair(building.id)}
+          >
+            Réparer
+          </button>
+        </div>
+      )}
+
       <div className="bp-row">
         <span>Actuellement</span>
         <strong>{current || def.description}</strong>
@@ -66,7 +100,7 @@ export function BuildingPanel() {
               <span>Coût</span>
               <CostLine cost={check.next.cost} resources={resources} />
             </div>
-            <button className="primary bp-upgrade" disabled={!check.ok} onClick={() => upgrade(building.id)}>
+            <button className="primary bp-upgrade" disabled={!check.ok || !!building.fire} onClick={() => upgrade(building.id)}>
               ⬆️ Améliorer
             </button>
             {!check.ok && <div className={`bp-reason ${check.locked ? 'locked' : ''}`}>{check.reason}</div>}

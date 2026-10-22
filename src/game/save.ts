@@ -1,7 +1,7 @@
 // Sauvegarde automatique dans localStorage (toujours protégée par try/catch).
 
 import { BUILDING_BY_ID, maxLevel, unlockKey } from './buildings';
-import { SAVE_KEY, SAVE_VERSION } from './config';
+import { MORALE, SAVE_KEY, SAVE_VERSION } from './config';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
 
@@ -20,6 +20,7 @@ export function saveGame(state: GameState): void {
 /**
  * Met à niveau une sauvegarde d'une version précédente.
  * v1 → v2 : niveaux de bâtiments, déblocages, compteur d'améliorations.
+ * v2 → v3 : moral, événements annoncés, raids, incendies ; les anciennes offres de marchand sont closes.
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -31,9 +32,21 @@ export function migrate(data: GameState): GameState | null {
   s.buildings = data.buildings
     .filter((b) => b && BUILDING_BY_ID[b.type])
     .map((b) => ({ ...b, level: Math.max(1, Math.min(maxLevel(b.type), Number(b.level) || 1)) }));
-  const defaults = { maxPopulation: 0, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0 };
+  const defaults = { maxPopulation: 0, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0, banditsKilled: 0, firesPutOut: 0 };
   s.stats = { ...defaults, ...(data.stats as Partial<GameState['stats']>) };
-  s.notices = Array.isArray(data.notices) ? data.notices : [];
+  // Les anciennes cartes "trade" (v2) ne sont plus interactives : on les garde comme simple historique
+  s.notices = (Array.isArray(data.notices) ? data.notices : []).map((n) => {
+    const { trade: _old, ...rest } = n as typeof n & { trade?: unknown };
+    void _old;
+    return rest;
+  });
+  s.nextNoticeId = Number(data.nextNoticeId) || s.notices.reduce((m, n) => Math.max(m, n.id + 1), 1);
+  s.morale = typeof data.morale === 'number' ? data.morale : MORALE.start;
+  s.pending = Array.isArray(data.pending) ? data.pending : [];
+  s.nextPendingId = Number(data.nextPendingId) || 1;
+  s.raid = data.raid ?? null;
+  s.floodUntil = Number(data.floodUntil) || 0;
+  delete (s as GameState & { nextEventDay?: number }).nextEventDay;
   s.modifiers = Array.isArray(data.modifiers) ? data.modifiers : [];
   if (!Array.isArray(s.unlocked)) {
     // Anciennes parties : on accorde silencieusement ce que la situation actuelle débloque

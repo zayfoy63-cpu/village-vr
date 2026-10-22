@@ -6,7 +6,29 @@ import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { Fields } from './Fields';
 import { MODELS } from './models';
+import { Part } from './models/Part';
 import { tileToWorld } from './shared';
+
+/** Gravats et planches cassées autour d'un bâtiment endommagé */
+function Rubble({ id }: { id: number }) {
+  const r = (k: number) => ((id * 9301 + k * 49297) % 233280) / 233280;
+  return (
+    <group>
+      {[0, 1, 2, 3].map((k) => (
+        <Part
+          key={k}
+          g="rock"
+          m="stoneDark"
+          p={[(r(k) - 0.5) * 0.8, 0.03, 0.3 + r(k + 7) * 0.12]}
+          s={0.06 + r(k + 3) * 0.06}
+          shadow={false}
+        />
+      ))}
+      <Part g="box" m="timber" p={[-0.25, 0.04, 0.38]} s={[0.3, 0.025, 0.04]} r={[0, 0.6, 0.15]} shadow={false} />
+      <Part g="box" m="plank" p={[0.22, 0.03, 0.36]} s={[0.22, 0.02, 0.05]} r={[0, -0.4, -0.1]} shadow={false} />
+    </group>
+  );
+}
 
 /** Petite animation d'apparition (rebond) à la construction ou à l'amélioration */
 function PopIn({ children, animate }: { children: React.ReactNode; animate: boolean }) {
@@ -43,15 +65,30 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
           <group
             key={b.id}
             position={pos}
+            onPointerOver={() => {
+              if (b.fire && b.fire.extinguishEnd === undefined) document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => (document.body.style.cursor = '')}
             onClick={(e) => {
-              // Sans bâtiment sélectionné à construire, un clic ouvre le panneau du bâtiment
-              if (e.delta > 6 || useGame.getState().selected) return;
+              if (e.delta > 6) return;
+              const state = useGame.getState();
+              // Priorité : éteindre un incendie ; sinon, sans construction en cours, ouvrir le panneau
+              if (b.fire && b.fire.extinguishEnd === undefined) {
+                e.stopPropagation();
+                state.extinguish(b.id);
+                return;
+              }
+              if (state.selected) return;
               e.stopPropagation();
-              useGame.getState().inspect(b.id);
+              state.inspect(b.id);
             }}
           >
             <PopIn key={b.level} animate={animate}>
-              <Model id={b.id} level={b.level} />
+              {/* Endommagé : légèrement affaissé et entouré de gravats */}
+              <group rotation={b.damaged ? [0.05, 0, -0.07] : [0, 0, 0]} scale={b.damaged ? [1, 0.93, 1] : 1}>
+                <Model id={b.id} level={b.level} />
+              </group>
+              {b.damaged && <Rubble id={b.id} />}
             </PopIn>
           </group>
         );

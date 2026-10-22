@@ -13,11 +13,44 @@ export const START_RESOURCES: Resources = { food: 10, wood: 20, stone: 0, gold: 
 /** Nourriture mangée par villageois et par jour */
 export const FOOD_PER_VILLAGER = 1;
 
-/** Premier jour possible pour un événement aléatoire */
-export const FIRST_EVENT_DAY = 4;
+/** Moral : règles de base (les variations dues aux événements sont dans events.ts) */
+export const MORALE = {
+  start: 70,
+  /** Valeur vers laquelle le moral tend chaque jour, avant bonus / malus */
+  base: 58,
+  /** Part de l'écart à la cible rattrapée chaque jour */
+  drift: 0.2,
+  /** Bonus si les réserves couvrent au moins 3 jours de repas */
+  fedBonus: 10,
+  /** Malus le jour où la nourriture manque */
+  hungerPenalty: 25,
+  /** Malus par habitant sans logement (plafonné à 20) */
+  overcrowdPenalty: 3,
+  /** Bonus par marché en activité (plafonné à 15) */
+  marketBonus: 5,
+  /** Bonus par tour de garde en service (sécurité, plafonné à 6) */
+  towerBonus: 2,
+  /** Malus par bâtiment endommagé (plafonné à 15) */
+  damagedPenalty: 2,
+  /** Sous ce seuil, la production baisse (jusqu'à -40 % à 0) */
+  lowProduction: 40,
+  /** Sous ce seuil, des habitants partent chaque jour */
+  leaveBelow: 25,
+  /** Part de la population qui part chaque jour sous le seuil */
+  leaveRatio: 0.08,
+  /** Sous ce seuil : révolte */
+  revoltBelow: 10,
+  /** Pas de nouveaux habitants sous ce seuil */
+  growthMin: 40,
+};
+
+/** Bâtiment endommagé : production / défense multipliée par ce facteur */
+export const DAMAGED_FACTOR = 0.5;
+/** Coût de réparation = cette part du coût de construction (arrondi au supérieur) */
+export const REPAIR_COST_RATIO = 0.5;
 
 export const SAVE_KEY = 'village-vr-save-v1';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export type SeasonId = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -46,9 +79,9 @@ export function yearOf(day: number): number {
   return Math.floor((day - 1) / (DAYS_PER_SEASON * SEASONS.length)) + 1;
 }
 
-/** Facteur de difficulté qui augmente avec le temps (1 au départ) */
-export function difficulty(day: number): number {
-  return 1 + day / 30;
+/** Index de la saison depuis le début de la partie (0 = premier printemps) */
+export function seasonIndex(day: number): number {
+  return Math.floor((day - 1) / DAYS_PER_SEASON);
 }
 
 export const RESOURCE_META: Record<keyof Resources, { name: string; icon: string }> = {

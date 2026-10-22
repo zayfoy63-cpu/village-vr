@@ -24,6 +24,8 @@ export interface LevelDef {
   produces?: Partial<Resources>;
   /** Puissance défensive contre les bandits (à effectif complet) */
   defense?: number;
+  /** Nourriture mise à l'abri des rats */
+  storage?: number;
 }
 
 /** Onglets de la barre de construction (l'ordre ici = l'ordre affiché) */
@@ -193,6 +195,22 @@ export const BUILDINGS: BuildingDef[] = [
     ],
     requiresAdjacent: 'rock',
     priority: 3,
+    allowedTiles: LAND,
+  },
+  {
+    id: 'granary',
+    name: 'Grenier',
+    icon: '🏚️',
+    tab: 'production',
+    description: 'Met la nourriture à l\'abri des rats. Sans grenier, les gros stocks attirent la vermine.',
+    buildable: true,
+    size: 1,
+    levels: [
+      { cost: { wood: 18 }, storage: 150 },
+      { cost: { wood: 20, stone: 10 }, storage: 300, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 25, stone: 20, gold: 5 }, storage: 500, unlock: UPGRADE_LEVEL_3 },
+    ],
+    priority: 99,
     allowedTiles: LAND,
   },
   {

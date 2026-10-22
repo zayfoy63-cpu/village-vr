@@ -3,7 +3,9 @@ import { Canvas } from '@react-three/fiber';
 import { XR, useXR } from '@react-three/xr';
 import type { ReactNode } from 'react';
 import { useGame } from '../store/gameStore';
+import { Bandits } from './Bandits';
 import { Buildings } from './Buildings';
+import { FireFx } from './FireFx';
 import { GameClock } from './GameClock';
 import { Ghost, Selection } from './Ghost';
 import { Nature } from './Nature';
@@ -11,6 +13,7 @@ import { Smoke } from './Smoke';
 import { Table } from './Table';
 import { Terrain } from './Terrain';
 import { Villagers } from './Villagers';
+import { Flood, Snowfall } from './Weather';
 import { VR_WORLD_SCALE, xrStore } from './xr';
 
 const BG = '#2a1e17';
@@ -57,6 +60,10 @@ function World() {
       <Buildings buildings={buildings} map={map} />
       <Villagers buildings={buildings} map={map} />
       <Smoke buildings={buildings} map={map} />
+      <FireFx buildings={buildings} map={map} />
+      <Bandits map={map} />
+      <Flood map={map} />
+      <Snowfall map={map} />
       <Ghost />
       <Selection />
     </group>

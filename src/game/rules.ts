@@ -10,7 +10,7 @@ import {
   type LevelDef,
   type UnlockCondition,
 } from './buildings';
-import { FOOD_PER_VILLAGER, RESOURCE_KEYS, RESOURCE_META, seasonOf } from './config';
+import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META, seasonOf } from './config';
 import { neighbors8, tileAt } from './mapgen';
 import type {
   Building,
@@ -144,9 +144,44 @@ export function canUpgrade(state: GameState, b: Building): UpgradeCheck {
 
 // ---------- Travail et production ----------
 
+/** Villageois mobilisés pour éteindre des incendies (ne travaillent pas) */
+export function busyCrew(state: GameState): number {
+  return state.buildings.reduce((sum, b) => sum + (b.fire?.crew ?? 0), 0);
+}
+
+/** Facteur d'état d'un bâtiment : endommagé ou en feu = production réduite */
+export function conditionFactor(b: Building): number {
+  if (b.fire) return 0;
+  return b.damaged ? DAMAGED_FACTOR : 1;
+}
+
+/** Facteur de production dû au moral (1 au-dessus du seuil, jusqu'à 0,6 à 0) */
+export function moraleFactor(state: GameState): number {
+  const m = state.morale ?? MORALE.start;
+  if (m >= MORALE.lowProduction) return 1;
+  return 0.6 + 0.4 * (Math.max(0, m) / MORALE.lowProduction);
+}
+
+/** Facteur global de production : moral et quarantaine */
+export function globalProductionFactor(state: GameState): number {
+  return moraleFactor(state) * (hasModifier(state, 'quarantine') ? 0.6 : 1);
+}
+
+export function storageCapacity(state: GameState): number {
+  return state.buildings.reduce((sum, b) => sum + (b.damaged ? 0.5 : 1) * (statsOf(b).storage ?? 0), 0);
+}
+
+export function repairCost(b: Building): Partial<Resources> {
+  const base = levelDef(b.type, 1).cost;
+  const out: Partial<Resources> = {};
+  for (const k of RESOURCE_KEYS) if (base[k]) out[k] = Math.ceil(base[k]! * REPAIR_COST_RATIO * (1 + (b.level - 1) * 0.5));
+  if (!Object.keys(out).length) out.wood = 5;
+  return out;
+}
+
 /** Répartit la population sur les bâtiments selon leur priorité (mutation) */
 export function assignWorkers(state: GameState): void {
-  let free = state.population;
+  let free = Math.max(0, state.population - busyCrew(state));
   const sorted = [...state.buildings].sort(
     (a, b) => BUILDING_BY_ID[a.type].priority - BUILDING_BY_ID[b.type].priority || a.id - b.id,
   );
@@ -173,22 +208,25 @@ export function computeProduction(state: GameState): Resources {
   const winter = seasonOf(state.day).id === 'winter';
   const drought = hasModifier(state, 'drought');
   const harvest = hasModifier(state, 'goodHarvest');
+  const blight = hasModifier(state, 'blight');
+  const global = globalProductionFactor(state);
   for (const b of state.buildings) {
     const def = BUILDING_BY_ID[b.type];
     const stats = statsOf(b);
     if (!stats.produces || !stats.workers) continue;
     if (def.seasonal && winter) continue;
-    let factor = b.workers / stats.workers;
+    let factor = (b.workers / stats.workers) * conditionFactor(b) * global;
     if (def.fertileBonus && tileAt(state.map, b.x, b.z) === 'fertile') factor *= def.fertileBonus;
     if (def.seasonal && drought) factor *= 0.5;
     if (def.seasonal && harvest) factor *= 1.5;
+    if (def.seasonal && blight) factor *= 0.4;
     for (const k of RESOURCE_KEYS) out[k] += (stats.produces[k] ?? 0) * factor;
   }
   return out;
 }
 
 export function foodConsumption(state: GameState): number {
-  const harsh = hasModifier(state, 'harshWinter') ? 1.5 : 1;
+  const harsh = hasModifier(state, 'harshWinter') ? 2 : 1;
   return state.population * FOOD_PER_VILLAGER * harsh;
 }
 
@@ -203,7 +241,7 @@ export function defensePower(state: GameState): number {
   return state.buildings.reduce((sum, b) => {
     const stats = statsOf(b);
     if (!stats.defense || !stats.workers) return sum;
-    return sum + stats.defense * (b.workers / stats.workers);
+    return sum + stats.defense * (b.workers / stats.workers) * conditionFactor(b);
   }, 0);
 }
 
@@ -215,6 +253,7 @@ export function effectLabel(lvl: LevelDef, produces: Partial<Resources> = lvl.pr
     if (produces[k]) parts.push(`+${produces[k]} ${RESOURCE_META[k].icon}/jour`);
   }
   if (lvl.defense) parts.push(`Défense +${lvl.defense}`);
+  if (lvl.storage) parts.push(`Protège ${lvl.storage} ${RESOURCE_META.food.icon}`);
   return parts.join(' · ');
 }
 

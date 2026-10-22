@@ -35,7 +35,8 @@ src/
 │  ├─ events.ts       ⭐ Tableau de configuration des événements
 │  ├─ mapgen.ts       Génération de carte à partir d'une seed
 │  ├─ rules.ts        Placement, travailleurs, production, score
-│  ├─ simulation.ts   Passage d'un jour, construction, échanges
+│  ├─ simulation.ts   Temps qui passe, journée, construction, choix, réparations
+│  ├─ hazards.ts      Dangers en temps réel : incendies, bandits, délais de choix
 │  ├─ rng.ts          PRNG déterministe (état sauvegardé)
 │  └─ save.ts         Sauvegarde localStorage (try/catch)
 ├─ store/gameStore.ts Zustand : relie logique, rendu et UI
@@ -64,9 +65,27 @@ correspondant à la situation actuelle et les nouveaux compteurs. Une sauvegarde
    défense, condition de déblocage), contraintes de terrain…
 3. Créer son modèle dans `scene/models/` (il reçoit `id` et `level`) et l'enregistrer dans `scene/models/index.tsx`.
 
-### Ajouter un événement
-Ajouter une entrée dans `EVENTS` (`game/events.ts`) avec `weight(state)` (probabilité selon la situation)
-et `apply(ctx)` (effet + texte de la carte de notification).
+### Imprévus (`game/events.ts`)
+Tous les réglages sont dans l'objet `TUNING` en tête de fichier (fréquence, sévérité par saison, délais,
+incendies, bandits, variations de moral, révolte, hiver rude, grands événements de fin d'année).
+- **Annoncés avec compte à rebours** : bandits (1-2 j), tempête (1 j, renforcer les toits), crue (2 j, renforcer
+  les berges), hiver rude (3 j), et chaque fin d'année (j40, j80…) un grand événement : invasion, grande famine
+  ou grande épidémie (3 j).
+- **À choix** (délai de 10 s à x1, sinon option par défaut) : bandits (rançon / combattre / les laisser venir),
+  épidémie (quarantaine / médecin / ignorer → seconde vague), réfugiés (accueillir / refuser), marchand.
+- **En temps réel, en 3D** : incendie (clic sur le bâtiment pour l'éteindre, sinon propagation puis destruction),
+  bandits (marchent sur le château, les tours tirent, clic pour les abattre et récupérer le butin), crue, neige.
+- **Autres** : rats (dévorent la nourriture hors des greniers), sécheresse, bonne récolte, nouveaux arrivants.
+- **Bâtiments endommagés** : production x0,5 tant qu'ils ne sont pas réparés (panneau du bâtiment) ; un second
+  dégât les détruit.
+- **Moral** (règles de base dans `config.ts`, `MORALE`) : < 40 production réduite, < 25 départs, < 10 révolte.
+
+Pour ajouter un événement : une entrée dans `EVENTS` avec `weight`, `roll` (paramètres), `announce` (optionnel),
+`trigger` (effet / choix) et `resolve` (effet du choix).
+
+### Logique en temps réel
+`simulation.ts` → `advanceTime(state, dt)` fait avancer le temps de jeu continu (jour + avancement) ;
+`hazards.ts` gère incendies, attaques et délais des choix, de façon déterministe (le PRNG est dans l'état).
 
 ## Passage en VR (Meta Quest 3)
 - `@react-three/xr` est déjà branché : le `<Canvas>` est enveloppé dans `<XR store={xrStore}>`.

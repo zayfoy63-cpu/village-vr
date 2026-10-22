@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
 import { hash2 } from '../game/rng';
-import { buildingAt } from '../game/rules';
+import { buildingAt, hasModifier } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
@@ -19,11 +19,12 @@ const TILE_COLORS: Record<TileType, string> = {
 const SNOW = new THREE.Color('#eef3f7');
 const ICE = new THREE.Color('#9cc7e6');
 
-export function tileColor(type: TileType, season: SeasonId, jitter: number, out: THREE.Color) {
+export function tileColor(type: TileType, season: SeasonId, jitter: number, out: THREE.Color, harsh = false) {
   out.set(TILE_COLORS[type]);
   out.offsetHSL(0, 0, (jitter - 0.5) * 0.06);
   if (season === 'autumn' && type !== 'water' && type !== 'rock') out.offsetHSL(-0.04, -0.05, 0);
-  if (season === 'winter') out.lerp(type === 'water' ? ICE : SNOW, type === 'water' ? 0.35 : 0.65);
+  // Hiver rude : neige bien plus épaisse et rivière presque gelée
+  if (season === 'winter') out.lerp(type === 'water' ? ICE : SNOW, type === 'water' ? (harsh ? 0.7 : 0.35) : harsh ? 0.92 : 0.65);
   return out;
 }
 
@@ -31,6 +32,7 @@ export function tileColor(type: TileType, season: SeasonId, jitter: number, out:
 export function Terrain({ map }: { map: GameMap }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const season = useGame((s) => seasonOf(s.game.day).id);
+  const harsh = useGame((s) => hasModifier(s.game, 'harshWinter'));
   const setHover = useGame((s) => s.setHover);
   const build = useGame((s) => s.build);
   const select = useGame((s) => s.select);
@@ -54,13 +56,13 @@ export function Terrain({ map }: { map: GameMap }) {
           new THREE.Vector3(0.995, h, 0.995),
         );
         mesh.setMatrixAt(i, m);
-        mesh.setColorAt(i, tileColor(type, season, hash2(x, z, map.seed), c));
+        mesh.setColorAt(i, tileColor(type, season, hash2(x, z, map.seed), c, harsh));
       }
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [map, season]);
+  }, [map, season, harsh]);
 
   const toTile = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
     if (e.instanceId === undefined) return null;
@@ -84,8 +86,14 @@ export function Terrain({ map }: { map: GameMap }) {
         const t = toTile(e);
         if (!t) return;
         const state = useGame.getState();
+        const here = buildingAt(state.game, t.x, t.z);
+        // Les champs (instanciés) s'éteignent en cliquant sur leur case
+        if (here?.fire && here.fire.extinguishEnd === undefined) {
+          state.extinguish(here.id);
+          return;
+        }
         if (state.selected) build(t.x, t.z);
-        else state.inspect(buildingAt(state.game, t.x, t.z)?.id ?? null);
+        else state.inspect(here?.id ?? null);
       }}
       onContextMenu={(e) => {
         e.nativeEvent.preventDefault();

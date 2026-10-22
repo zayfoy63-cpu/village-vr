@@ -2,6 +2,7 @@ import { Scene } from './scene/Scene';
 import { useGame } from './store/gameStore';
 import { BuildBar } from './ui/BuildBar';
 import { BuildingPanel } from './ui/BuildingPanel';
+import { CrisisBanner } from './ui/CrisisBanner';
 import { EventCards } from './ui/EventCards';
 import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
@@ -37,6 +38,7 @@ export function App() {
           <HUD />
           <TimeControls />
         </div>
+        <CrisisBanner />
         <EventCards key={seed} />
         <BuildBar />
         <BuildingPanel />

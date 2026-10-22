@@ -12,6 +12,8 @@ const ROWS_BY_LEVEL = [4, 5, 6];
 /** Bottes de foin posées au bord du champ par niveau */
 const BALES_BY_LEVEL = [0, 1, 2];
 
+const DAMAGED_CROP = new THREE.Color('#6b5434');
+
 const CROP_COLORS: Record<SeasonId, string> = {
   spring: '#93d35c',
   summer: '#6fae3c',
@@ -54,11 +56,12 @@ export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
       soil.setMatrixAt(i, m);
       const count = ROWS_BY_LEVEL[lvl];
       const span = 0.66;
-      // Plus haut niveau = rangées plus serrées et légèrement plus hautes
-      const h = rowH * (1 + lvl * 0.2);
+      // Plus haut niveau = rangées plus serrées et légèrement plus hautes ; endommagé = cultures couchées
+      const h = rowH * (1 + lvl * 0.2) * (f.damaged ? 0.35 : 1);
       for (let k = 0; k < count; k++) {
         const off = -span / 2 + (k * span) / (count - 1);
         m.compose(p.set(x + (rot ? 0 : off), 0.04 + h / 2, z + (rot ? off : 0)), q, s.set(0.09, h, 0.74));
+        if (f.damaged) rows.setColorAt(r, DAMAGED_CROP);
         rows.setMatrixAt(r++, m);
       }
       for (let k = 0; k < BALES_BY_LEVEL[lvl]; k++) {

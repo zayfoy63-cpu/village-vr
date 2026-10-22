@@ -24,7 +24,8 @@ export type BuildingTypeId =
   | 'lumber'
   | 'quarry'
   | 'market'
-  | 'tower';
+  | 'tower'
+  | 'granary';
 
 export interface Building {
   id: number;
@@ -37,9 +38,42 @@ export interface Building {
   workers: number;
   /** Jour de construction */
   builtDay: number;
+  /** Endommagé (tempête, incendie, révolte…) : produit moins tant qu'il n'est pas réparé */
+  damaged?: boolean;
+  /** Incendie en cours */
+  fire?: Fire;
 }
 
-export type ModifierId = 'drought' | 'harshWinter' | 'goodHarvest';
+/** Les temps sont en "temps de jeu" : jour + avancement (ex. 12.5 = milieu du jour 12) */
+export interface Fire {
+  start: number;
+  /** Prochaine tentative de propagation */
+  nextSpread: number;
+  /** Destruction si le feu n'est pas éteint avant */
+  destroyAt: number;
+  /** Extinction en cours : fin prévue et villageois mobilisés */
+  extinguishEnd?: number;
+  crew?: number;
+}
+
+export interface Raid {
+  /** Début de l'approche */
+  startT: number;
+  /** Arrivée sur le château */
+  arriveT: number;
+  /** Fin du départ (les bandits quittent la carte) */
+  leaveT: number;
+  from: { x: number; z: number };
+  to: { x: number; z: number };
+  /** Moment de la mort de chaque bandit (-1 = vivant) */
+  killedAt: number[];
+  nextTowerKill: number;
+  /** Butin emporté par chaque bandit encore vivant (après l'arrivée) */
+  lootEach?: Partial<Resources>;
+  arrived: boolean;
+}
+
+export type ModifierId = 'drought' | 'harshWinter' | 'goodHarvest' | 'quarantine' | 'blight';
 
 export interface Modifier {
   id: ModifierId;
@@ -47,12 +81,38 @@ export interface Modifier {
   untilDay: number;
 }
 
-export type NoticeKind = 'good' | 'bad' | 'info' | 'trade';
+export type NoticeKind = 'good' | 'bad' | 'info' | 'trade' | 'threat';
 
-export interface TradeOption {
+/** Paramètres libres d'un événement (force, quantités…), sauvegardables */
+export type EventParams = Record<string, number>;
+
+export interface ChoiceOption {
+  id: string;
   label: string;
-  give: Partial<Resources>;
-  get: Partial<Resources>;
+  detail: string;
+  /** Coût payé si l'option est choisie (option grisée si impossible) */
+  cost?: Partial<Resources>;
+}
+
+export interface NoticeChoice {
+  eventId: string;
+  options: ChoiceOption[];
+  /** Option appliquée si le joueur ne répond pas à temps */
+  defaultId: string;
+  /** Temps de jeu limite pour répondre */
+  expiresT: number;
+  params: EventParams;
+  resolved: boolean;
+  picked?: string;
+}
+
+/** Événement annoncé à l'avance (compte à rebours) */
+export interface PendingEvent {
+  id: number;
+  eventId: string;
+  arriveDay: number;
+  params: EventParams;
+  noticeId: number;
 }
 
 export interface Notice {
@@ -62,12 +122,10 @@ export interface Notice {
   icon: string;
   title: string;
   text: string;
-  /** Présent uniquement pour une offre de marchand */
-  trade?: {
-    options: TradeOption[];
-    expiresDay: number;
-    resolved: boolean;
-  };
+  /** Carte à choix (bandits, épidémie, marchand…) */
+  choice?: NoticeChoice;
+  /** Menace annoncée : jour d'arrivée (la carte reste affichée jusque-là) */
+  threat?: { arriveDay: number; done: boolean };
 }
 
 export interface GameStats {
@@ -75,6 +133,8 @@ export interface GameStats {
   buildingsBuilt: number;
   upgrades: number;
   eventsSurvived: number;
+  banditsKilled: number;
+  firesPutOut: number;
 }
 
 export interface GameState {
@@ -94,9 +154,17 @@ export interface GameState {
   modifiers: Modifier[];
   notices: Notice[];
   nextNoticeId: number;
-  nextEventDay: number;
   /** Clés de déblocage acquises (voir unlockKey) : définitives une fois obtenues */
   unlocked: string[];
+  /** Moral des habitants, 0..100 */
+  morale: number;
+  /** Événements annoncés à venir */
+  pending: PendingEvent[];
+  nextPendingId: number;
+  /** Attaque de bandits en cours sur la carte */
+  raid: Raid | null;
+  /** Crue en cours (affichage) jusqu'à ce temps de jeu */
+  floodUntil: number;
   stats: GameStats;
   gameOver: boolean;
 }

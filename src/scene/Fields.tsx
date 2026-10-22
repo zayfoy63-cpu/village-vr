@@ -14,7 +14,8 @@ const ROWS_BY_LEVEL = [4, 5, 6];
 const BALES_BY_LEVEL = [0, 1, 2];
 
 const DAMAGED_CROP = new THREE.Color('#6b5434');
-const TIRED_CROP = new THREE.Color('#d8c46a');
+/** Cultures d'un sol épuisé : paille pâle et délavée (distincte du doré d'un blé mûr) */
+const TIRED_CROP = new THREE.Color('#d8d3a0');
 
 const CROP_COLORS: Record<SeasonId, string> = {
   spring: '#93d35c',
@@ -60,14 +61,16 @@ export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
       const count = ROWS_BY_LEVEL[lvl];
       const span = 0.66;
       // Plus haut niveau = rangées plus serrées et légèrement plus hautes ; endommagé = cultures couchées
-      const h = rowH * (1 + lvl * 0.2) * (f.damaged ? 0.35 : 1);
+      const tiredK = Math.pow(Math.max(0, ((f.fatigue ?? 0) - SOIL.hint.yellowFrom) / (1 - SOIL.hint.yellowFrom)), 0.7);
+      // Sol épuisé : cultures aussi plus basses et clairsemées (jusqu'à -45 %)
+      const h = rowH * (1 + lvl * 0.2) * (f.damaged ? 0.35 : 1) * (1 - 0.45 * tiredK);
       for (let k = 0; k < count; k++) {
         const off = -span / 2 + (k * span) / (count - 1);
         m.compose(p.set(x + (rot ? 0 : off), 0.04 + h / 2, z + (rot ? off : 0)), q, s.set(0.09, h, 0.74));
         // Sol épuisé : les cultures jaunissent peu à peu (indice discret)
-        const tired = Math.max(0, ((f.fatigue ?? 0) - SOIL.hint.yellowFrom) / (1 - SOIL.hint.yellowFrom));
+        const tired = tiredK;
         if (f.damaged) rows.setColorAt(r, DAMAGED_CROP);
-        else if (season !== 'winter') rows.setColorAt(r, tc.copy(c).lerp(TIRED_CROP, tired * 0.8));
+        else if (season !== 'winter') rows.setColorAt(r, tc.copy(c).lerp(TIRED_CROP, tired * 0.9));
         else rows.setColorAt(r, c);
         rows.setMatrixAt(r++, m);
       }

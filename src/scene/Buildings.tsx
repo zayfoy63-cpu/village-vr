@@ -44,8 +44,8 @@ function Tremor({ id, children }: { id: number; children: React.ReactNode }) {
     const t = clock.elapsedTime;
     // Secousses brèves toutes les quelques secondes, plus fréquentes quand ça empire
     const burst = k > 0 && Math.sin(t * (0.8 + k)) > 0.85 ? 1 : 0;
-    g.position.x = burst * Math.sin(t * 60) * 0.012 * (1 + k);
-    g.position.z = burst * Math.cos(t * 53) * 0.01 * (1 + k);
+    g.position.x = burst * Math.sin(t * 60) * 0.03 * (1 + k);
+    g.position.z = burst * Math.cos(t * 53) * 0.025 * (1 + k);
   });
   return <group ref={ref}>{children}</group>;
 }

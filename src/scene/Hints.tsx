@@ -5,6 +5,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { BUILDING_BY_ID } from '../game/buildings';
 import { seasonOf } from '../game/config';
 import { center, dist } from '../game/mechanics/common';
 import { isForest } from '../game/mechanics/deforestation';
@@ -16,16 +17,21 @@ import type { GameMap, Point } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, TILE } from './shared';
 
-const MAX_RATS = 16;
-const MAX_SPARKS = 60;
-const MAX_DUST = 24;
+const MAX_RATS = 18;
+const MAX_SPARKS = 90;
+const MAX_DUST = 40;
+const MAX_PEBBLES = 20;
 const MAX_WOLVES = 4;
 const MAX_EYES = 6;
 
-const ratMat = new THREE.MeshStandardMaterial({ color: '#6d6a66', flatShading: true });
-const sparkMat = new THREE.MeshBasicMaterial({ color: '#ffb347' });
-const dustMat = new THREE.MeshStandardMaterial({ color: '#a89c88', transparent: true, opacity: 0.6, depthWrite: false, flatShading: true });
-const cloakMat = new THREE.MeshStandardMaterial({ color: '#2b2622', flatShading: true });
+const ratMat = new THREE.MeshStandardMaterial({ color: '#2f2c2a', flatShading: true });
+const sparkMat = new THREE.MeshBasicMaterial({ color: '#ffc04d' });
+const dustMat = new THREE.MeshStandardMaterial({ color: '#d2c3a4', transparent: true, opacity: 0.75, depthWrite: false, flatShading: true });
+const pebbleMat = new THREE.MeshStandardMaterial({ color: '#5a554e', flatShading: true });
+// Éclaireur : manteau clair (pour se détacher du cadre en bois sombre) et capuche sombre
+const cloakMat = new THREE.MeshStandardMaterial({ color: '#c9c1ae', flatShading: true });
+const hoodMat = new THREE.MeshStandardMaterial({ color: '#2b2622', flatShading: true });
+const glintMat = new THREE.MeshBasicMaterial({ color: '#fff3b0' });
 const chaserMat = new THREE.MeshStandardMaterial({ color: '#2f6fd0', flatShading: true });
 const wolfMat = new THREE.MeshStandardMaterial({ color: '#5f6266', flatShading: true });
 const eyeMat = new THREE.MeshBasicMaterial({ color: '#ffe066' });
@@ -35,6 +41,9 @@ export function Hints({ map }: { map: GameMap }) {
   const rats = useRef<THREE.InstancedMesh>(null);
   const sparks = useRef<THREE.InstancedMesh>(null);
   const dust = useRef<THREE.InstancedMesh>(null);
+  const pebbles = useRef<THREE.InstancedMesh>(null);
+  const scoutBody = useRef<THREE.Group>(null);
+  const glint = useRef<THREE.Mesh>(null);
   const wolves = useRef<THREE.InstancedMesh>(null);
   const eyes = useRef<THREE.InstancedMesh>(null);
   const scout = useRef<THREE.Group>(null);
@@ -56,34 +65,41 @@ export function Hints({ map }: { map: GameMap }) {
       mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(x, y, z), tmp.q, tmp.s.setScalar(s)));
     };
 
-    // Rats : petites ombres grises qui filent au pied du château (les réserves)
+    // Rats : des ombres sombres qui filent par à-coups le long des murs du château et des greniers
     if (rats.current) {
-      const castle = g.buildings.find((b) => b.type === 'castle');
-      const n = castle ? Math.min(MAX_RATS, g.mech.rats * 3) : 0;
-      if (castle) {
-        const c = center(castle);
-        for (let i = 0; i < n; i++) {
-          const a = t * (0.9 + (i % 3) * 0.3) * (i % 2 ? 1 : -1) + i * 1.9;
-          const r = 1.15 + (i % 4) * 0.07;
-          const x = wx(c) + Math.cos(a) * r;
-          const z = wz(c) + Math.sin(a) * r;
-          rats.current.setMatrixAt(i, tmp.m.compose(tmp.p.set(x, 0.03, z), tmp.q.setFromEuler(tmp.e.set(0, -a, 0)), tmp.s.set(0.11, 0.06, 0.05)));
-        }
+      const nests = g.buildings.filter((b) => b.type === 'castle' || b.type === 'granary');
+      const n = nests.length && g.mech.rats > 0 ? Math.min(MAX_RATS, 5 + g.mech.rats * 3) : 0;
+      for (let i = 0; i < n; i++) {
+        const nest = nests[i % nests.length];
+        const c = center(nest);
+        const size = BUILDING_BY_ID[nest.type].size;
+        // Course par à-coups : la vitesse varie fortement (ils s'arrêtent, repartent)
+        const burst = 0.35 + 0.65 * Math.max(0, Math.sin(t * 1.7 + i * 2.3));
+        const dir = i % 2 ? 1 : -1;
+        const a = (t * 1.6 * burst + i * 1.9) * dir;
+        const r = size * 0.5 + 0.42 + (i % 3) * 0.1;
+        const x = wx(c) + Math.cos(a) * r;
+        const z = wz(c) + Math.sin(a) * r;
+        const hop = Math.abs(Math.sin(t * 22 + i)) * 0.012;
+        // Corps allongé tourné dans le sens de la course
+        const yaw = -a + (dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+        rats.current.setMatrixAt(i, tmp.m.compose(tmp.p.set(x, 0.05 + hop, z), tmp.q.setFromEuler(tmp.e.set(0, yaw, 0)), tmp.s.set(0.14, 0.13, 0.3)));
       }
       rats.current.count = n;
       rats.current.instanceMatrix.needsUpdate = true;
     }
 
-    // Escarbilles : l'été, au-dessus des habitations entassées sans puits
+    // Escarbilles : l'été, des braises montent des habitations entassées sans puits
     if (sparks.current) {
       let n = 0;
       if (seasonOf(g.day).id === FIRE.hint.season) {
         for (const h of exposedHouses(g)) {
-          if (n >= MAX_SPARKS) continue;
+          if (n >= MAX_SPARKS) break;
           const c = center(h);
-          for (let k = 0; k < 3 && n < MAX_SPARKS; k++) {
-            const life = (t * 0.5 + k / 3 + h.id * 0.31) % 1;
-            put(sparks.current, n++, wx(c) + Math.sin(t * 3 + k + h.id) * 0.12, 0.65 + life * 0.7, wz(c) + Math.cos(t * 2 + k) * 0.1, 0.045 * (1 - life));
+          for (let k = 0; k < 8 && n < MAX_SPARKS; k++) {
+            const life = (t * 0.5 + k / 8 + h.id * 0.31) % 1;
+            // Elles montent en dérivant, brillent puis s'éteignent
+            put(sparks.current, n++, wx(c) + Math.sin(t * 2.6 + k * 1.3 + h.id) * 0.16, 0.6 + life * 0.9, wz(c) + Math.cos(t * 2.1 + k) * 0.12, 0.13 * Math.sin(life * Math.PI));
           }
         }
       }
@@ -91,26 +107,46 @@ export function Hints({ map }: { map: GameMap }) {
       sparks.current.instanceMatrix.needsUpdate = true;
     }
 
-    // Poussière : mines aux galeries instables
-    if (dust.current) {
+    // Poussière et gravats : mines aux galeries instables (plus c'est instable, plus il y en a)
+    if (dust.current && pebbles.current) {
       let n = 0;
+      let pb = 0;
       for (const b of g.buildings) {
-        if (b.type !== 'mine' || (b.instability ?? 0) < MINE.hint.tremorFrom) continue;
+        const inst = b.instability ?? 0;
+        if (b.type !== 'mine' || inst < MINE.hint.tremorFrom) continue;
         const c = center(b);
-        for (let k = 0; k < 4 && n < MAX_DUST; k++) {
-          const life = (t * 0.35 + k / 4 + b.id * 0.17) % 1;
-          put(dust.current, n++, wx(c) - 0.08 + Math.sin(k * 2.1) * 0.15 * life, 0.1 + life * 0.35, wz(c) + 0.15 + life * 0.1, 0.05 + 0.1 * life);
+        const puffs = 5 + Math.round(inst * 4);
+        for (let k = 0; k < puffs && n < MAX_DUST; k++) {
+          const life = (t * 0.4 + k / puffs + b.id * 0.17) % 1;
+          put(dust.current, n++, wx(c) - 0.05 + Math.sin(k * 2.1 + t) * 0.16 * life, 0.12 + life * 0.55, wz(c) + 0.12 + life * 0.18, (0.14 + 0.26 * life) * (1 - 0.4 * life));
+        }
+        // Petits cailloux qui tombent de la voûte, par à-coups
+        for (let k = 0; k < 3 && pb < MAX_PEBBLES; k++) {
+          const cycle = (t * 0.9 + k * 0.37 + b.id) % 1.6;
+          if (cycle > 0.5) continue;
+          put(pebbles.current, pb++, wx(c) - 0.1 + k * 0.1, 0.36 - cycle * 0.7, wz(c) + 0.2, 0.035);
         }
       }
       dust.current.count = n;
+      pebbles.current.count = pb;
       dust.current.instanceMatrix.needsUpdate = true;
+      pebbles.current.instanceMatrix.needsUpdate = true;
     }
 
     // Éclaireur immobile + poursuivant
     const sc = g.mech.scout;
     if (scout.current) {
       scout.current.visible = !!sc;
-      if (sc) scout.current.position.set(wx(sc), 0, wz(sc));
+      if (sc) {
+        scout.current.position.set(wx(sc), 0, wz(sc));
+        // Immobile, mais il respire et tourne lentement la tête vers le village ; un éclat de lunette de temps en temps
+        const toward = Math.atan2(-wx(sc), -wz(sc));
+        if (scoutBody.current) {
+          scoutBody.current.rotation.y = toward + Math.sin(t * 0.5) * 0.25;
+          scoutBody.current.scale.y = 1 + Math.sin(t * 1.6) * 0.02;
+        }
+        if (glint.current) glint.current.visible = Math.sin(t * 1.3) > 0.88;
+      }
     }
     if (chaser.current) {
       const ch = sc?.chase;
@@ -160,18 +196,22 @@ export function Hints({ map }: { map: GameMap }) {
       <instancedMesh ref={rats} args={[GEO.ball, ratMat, MAX_RATS]} frustumCulled={false} />
       <instancedMesh ref={sparks} args={[GEO.ball, sparkMat, MAX_SPARKS]} frustumCulled={false} />
       <instancedMesh ref={dust} args={[GEO.ball, dustMat, MAX_DUST]} frustumCulled={false} />
+      <instancedMesh ref={pebbles} args={[GEO.rock, pebbleMat, MAX_PEBBLES]} frustumCulled={false} />
       <instancedMesh ref={wolves} args={[GEO.box, wolfMat, MAX_WOLVES]} castShadow frustumCulled={false} />
       <instancedMesh ref={eyes} args={[GEO.ball, eyeMat, MAX_EYES * 2 + MAX_WOLVES * 2]} frustumCulled={false} />
       {/* Éclaireur : silhouette encapuchonnée, immobile ; un clic envoie quelqu'un l'attraper */}
       <group ref={scout} visible={false}>
-        <mesh geometry={GEO.cone6} material={cloakMat} position={[0, 0.16, 0]} scale={[0.17, 0.32, 0.17]} castShadow />
-        <mesh geometry={GEO.ball} material={cloakMat} position={[0, 0.35, 0]} scale={0.12} castShadow />
+        <group ref={scoutBody}>
+          <mesh geometry={GEO.cone6} material={cloakMat} position={[0, 0.34, 0]} scale={[0.38, 0.68, 0.38]} castShadow />
+          <mesh geometry={GEO.ball} material={hoodMat} position={[0, 0.74, 0]} scale={0.26} castShadow />
+          <mesh ref={glint} geometry={GEO.ball} material={glintMat} position={[0, 0.64, 0.2]} scale={0.06} visible={false} />
+        </group>
         {hasScout && (
           <mesh
             geometry={GEO.cylinderLow}
             material={hitMat}
             position={[0, 0.25, 0]}
-            scale={[0.6, 0.6, 0.6]}
+            scale={[0.8, 0.9, 0.8]}
             onClick={(e) => {
               e.stopPropagation();
               catchScout();

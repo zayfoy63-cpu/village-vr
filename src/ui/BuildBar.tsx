@@ -1,13 +1,28 @@
 import { useEffect } from 'react';
-import { BUILDABLE, BUILDING_BY_ID } from '../game/buildings';
+import { BUILDABLE, BUILDING_BY_ID, buildCost } from '../game/buildings';
 import { RESOURCE_KEYS, RESOURCE_META } from '../game/config';
 import { tileAt } from '../game/mapgen';
-import { canAfford, canPlace } from '../game/rules';
+import { canAfford, canPlace, conditionLabel, effectLabel, isUnlocked } from '../game/rules';
+import type { Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
 
-/** Barre de construction en bas de l'écran (clic ou touches 1 à 6, Échap pour annuler) */
+export function CostLine({ cost, resources }: { cost: Partial<Resources>; resources: Resources }) {
+  return (
+    <span className="build-cost">
+      {RESOURCE_KEYS.filter((k) => cost[k]).map((k) => (
+        <span key={k} className={resources[k] >= (cost[k] ?? 0) ? '' : 'missing'}>
+          {cost[k]}
+          {RESOURCE_META[k].icon}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Barre de construction en bas de l'écran (clic ou touches 1 à 9, Échap pour annuler) */
 export function BuildBar() {
   const resources = useGame((s) => s.game.resources);
+  const unlocked = useGame((s) => s.game.unlocked);
   const selected = useGame((s) => s.selected);
   const select = useGame((s) => s.select);
   const fertile = useGame(
@@ -19,13 +34,21 @@ export function BuildBar() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return select(null);
+      const state = useGame.getState();
+      if (e.key === 'Escape') {
+        state.select(null);
+        state.inspect(null);
+        return;
+      }
       const def = BUILDABLE.find((b) => b.hotkey === e.key);
-      if (def) select(useGame.getState().selected === def.id ? null : def.id);
+      if (def && isUnlocked(state.game, def.id)) state.select(state.selected === def.id ? null : def.id);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [select]);
+  }, []);
+
+  // `unlocked` est lu pour re-rendre la barre quand un déblocage arrive
+  const game = { ...useGame.getState().game, unlocked };
 
   return (
     <div className="buildbar-wrap">
@@ -38,26 +61,30 @@ export function BuildBar() {
       )}
       <div className="buildbar">
         {BUILDABLE.map((def) => {
-          const affordable = canAfford(resources, def.cost);
+          const cost = buildCost(def.id);
+          const open = isUnlocked(game, def.id);
+          const affordable = canAfford(resources, cost);
+          const lvl = def.levels[0];
           return (
             <button
               key={def.id}
-              className={`build-btn ${selected === def.id ? 'active' : ''} ${affordable ? '' : 'poor'}`}
+              className={`build-btn ${selected === def.id ? 'active' : ''} ${affordable ? '' : 'poor'} ${open ? '' : 'locked'}`}
+              disabled={!open}
               onClick={() => select(selected === def.id ? null : def.id)}
-              title={def.description}
             >
               <span className="build-key">{def.hotkey}</span>
-              <span className="build-icon">{def.icon}</span>
+              <span className="build-icon">{open ? def.icon : '🔒'}</span>
               <span className="build-name">{def.name}</span>
-              <span className="build-cost">
-                {RESOURCE_KEYS.filter((k) => def.cost[k]).map((k) => (
-                  <span key={k} className={resources[k] >= (def.cost[k] ?? 0) ? '' : 'missing'}>
-                    {def.cost[k]}
-                    {RESOURCE_META[k].icon}
-                  </span>
-                ))}
+              <CostLine cost={cost} resources={resources} />
+              {open ? (
+                <span className="build-effect">{effectLabel(lvl)}</span>
+              ) : (
+                <span className="build-lock">{conditionLabel(lvl.unlock)}</span>
+              )}
+              <span className="build-desc">
+                {def.description}
+                {def.levels.length > 1 && ` Améliorable jusqu'au niveau ${def.levels.length}.`}
               </span>
-              <span className="build-desc">{def.description}</span>
             </button>
           );
         })}

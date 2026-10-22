@@ -17,7 +17,8 @@ npm run build     # vérification TypeScript + build de production dans dist/
 | --- | --- |
 | Tourner la caméra | clic gauche + glisser |
 | Zoom | molette |
-| Choisir un bâtiment | barre du bas ou touches 1 à 6 |
+| Choisir un bâtiment | barre du bas ou touches 1 à 9 |
+| Détails / amélioration | clic sur un bâtiment existant |
 | Construire | clic sur une case (aperçu vert = possible, rouge = impossible) |
 | Annuler la sélection | clic droit ou Échap |
 | Pause / reprise | Espace, ou boutons ⏸ / x1 / x2 |
@@ -43,10 +44,24 @@ src/
 └─ ui/              HUD, barre de construction, notifications, fin de partie
 ```
 
+### Progression
+Tout est réglable dans `src/game/buildings.ts` :
+- **Habitations** débloquées par conditions (`levels[0].unlock`) : Cabane (2 places) → Maison (3, dès 6 habitants)
+  → Maison bourgeoise (5, dès 15 habitants + 1 marché) → Manoir (8, dès 30 habitants + 1 tour de garde).
+- **Bâtiments de production** améliorables niveaux 1 → 3 (`levels[1]`, `levels[2]`) : chaque niveau a son coût,
+  sa production / défense et sa condition (`UPGRADE_LEVEL_2` = 10 habitants, `UPGRADE_LEVEL_3` = 25 habitants).
+- Un déblocage est définitif une fois obtenu et déclenche une notification.
+- Clic sur un bâtiment : panneau avec niveau, production actuelle et suivante, coût et bouton « Améliorer ».
+
+### Sauvegardes
+`game/save.ts` migre les anciennes sauvegardes (`migrate`) : la v1 reçoit les niveaux (1), les déblocages
+correspondant à la situation actuelle et les nouveaux compteurs. Une sauvegarde illisible est ignorée sans planter.
+
 ### Ajouter un bâtiment
 1. Ajouter l'id dans `BuildingTypeId` (`game/types.ts`).
-2. Ajouter une entrée dans `BUILDINGS` (`game/buildings.ts`) : coût, travailleurs, production, contraintes…
-3. Créer son modèle dans `scene/models/` et l'enregistrer dans `scene/models/index.tsx`.
+2. Ajouter une entrée dans `BUILDINGS` (`game/buildings.ts`) : niveaux (coût, places, travailleurs, production,
+   défense, condition de déblocage), contraintes de terrain…
+3. Créer son modèle dans `scene/models/` (il reçoit `id` et `level`) et l'enregistrer dans `scene/models/index.tsx`.
 
 ### Ajouter un événement
 Ajouter une entrée dans `EVENTS` (`game/events.ts`) avec `weight(state)` (probabilité selon la situation)

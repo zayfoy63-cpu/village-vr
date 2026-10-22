@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useGame } from '../store/gameStore';
 import { Buildings } from './Buildings';
 import { GameClock } from './GameClock';
-import { Ghost } from './Ghost';
+import { Ghost, Selection } from './Ghost';
 import { Nature } from './Nature';
 import { Smoke } from './Smoke';
 import { Table } from './Table';
@@ -58,6 +58,7 @@ function World() {
       <Villagers buildings={buildings} map={map} />
       <Smoke buildings={buildings} map={map} />
       <Ghost />
+      <Selection />
     </group>
   );
 }

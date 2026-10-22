@@ -42,6 +42,13 @@ export const MAT = {
   soil: std('#7b5534'),
   hay: std('#e0c25a'),
   millBlade: std('#e9dcc0'),
+  thatch: std('#c9a24e'),
+  roofSlate: std('#4c5a6b'),
+  roofBurgundy: std('#7c2f3b'),
+  plaster: std('#f4e7cf'),
+  hedge: std('#3d7a34'),
+  gold: std('#f0c040', { emissive: new THREE.Color('#a06a00'), emissiveIntensity: 0.4, metalness: 0.3 }),
+  water: std('#4a9ad8', { roughness: 0.3 }),
   white: std('#ffffff'),
 };
 
@@ -58,5 +65,13 @@ export const GEO = {
   cone: new THREE.ConeGeometry(0.5, 1, 8),
   cone6: new THREE.ConeGeometry(0.5, 1, 6),
   ball: new THREE.IcosahedronGeometry(0.5, 0),
+  /** Toit à deux pans : base 1x1 au sol (y=0), faîtage à y=1 orienté selon z */
+  gable: (() => {
+    const g = new THREE.CylinderGeometry(0.5, 0.5, 1, 3, 1);
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, 0.25, 0);
+    g.scale(1 / (0.5 * Math.sqrt(3)), 1 / 0.75, 1);
+    return g;
+  })(),
   rock: new THREE.DodecahedronGeometry(0.5, 0),
 };

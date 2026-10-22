@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { DAY_DURATION_SEC } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
-import { advanceDay, createInitialState, placeBuilding, resolveTrade } from '../game/simulation';
+import { advanceDay, createInitialState, placeBuilding, resolveTrade, upgradeBuilding } from '../game/simulation';
 import type { BuildingTypeId, GameState } from '../game/types';
 
 export type Speed = 0 | 1 | 2;
@@ -14,10 +14,14 @@ interface GameStore {
   speed: Speed;
   selected: BuildingTypeId | null;
   hover: { x: number; z: number } | null;
+  /** Bâtiment dont le panneau d'information est ouvert */
+  inspected: number | null;
 
   tick: (dtSec: number) => void;
   build: (x: number, z: number) => boolean;
   select: (type: BuildingTypeId | null) => void;
+  inspect: (buildingId: number | null) => void;
+  upgrade: (buildingId: number) => boolean;
   setHover: (tile: { x: number; z: number } | null) => void;
   setSpeed: (speed: Speed) => void;
   trade: (noticeId: number, option: number | null) => void;
@@ -33,6 +37,7 @@ export const useGame = create<GameStore>((set, get) => ({
   speed: 1,
   selected: null,
   hover: null,
+  inspected: null,
 
   tick: (dt) => {
     const { game, speed } = get();
@@ -45,7 +50,13 @@ export const useGame = create<GameStore>((set, get) => ({
     }
     const next = advanceDay(game);
     saveGame(next);
-    set({ game: next, selected: next.gameOver ? null : get().selected });
+    const inspected = get().inspected;
+    set({
+      game: next,
+      selected: next.gameOver ? null : get().selected,
+      // Ferme le panneau si le bâtiment a disparu (tempête)
+      inspected: inspected !== null && next.buildings.some((b) => b.id === inspected) ? inspected : null,
+    });
   },
 
   build: (x, z) => {
@@ -58,7 +69,15 @@ export const useGame = create<GameStore>((set, get) => ({
     return true;
   },
 
-  select: (type) => set({ selected: type }),
+  select: (type) => set({ selected: type, inspected: type ? null : get().inspected }),
+  inspect: (buildingId) => set({ inspected: buildingId, selected: buildingId !== null ? null : get().selected }),
+  upgrade: (buildingId) => {
+    const next = upgradeBuilding(get().game, buildingId);
+    if (!next) return false;
+    saveGame(next);
+    set({ game: next });
+    return true;
+  },
   setHover: (tile) => {
     const h = get().hover;
     if (h === tile || (h && tile && h.x === tile.x && h.z === tile.z)) return;
@@ -76,6 +95,6 @@ export const useGame = create<GameStore>((set, get) => ({
     clearSave();
     const game = createInitialState(seed ?? randomSeed());
     saveGame(game);
-    set({ game, selected: null, hover: null, speed: 1 });
+    set({ game, selected: null, hover: null, inspected: null, speed: 1 });
   },
 }));

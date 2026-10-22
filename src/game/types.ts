@@ -16,7 +16,10 @@ export type Resources = Record<ResourceKey, number>;
 export type BuildingTypeId =
   | 'castle'
   | 'mill'
+  | 'hut'
   | 'house'
+  | 'townhouse'
+  | 'manor'
   | 'field'
   | 'lumber'
   | 'quarry'
@@ -28,6 +31,8 @@ export interface Building {
   type: BuildingTypeId;
   x: number;
   z: number;
+  /** Niveau d'amélioration (1 = construit) */
+  level: number;
   /** Nombre de villageois actuellement affectés */
   workers: number;
   /** Jour de construction */
@@ -68,6 +73,7 @@ export interface Notice {
 export interface GameStats {
   maxPopulation: number;
   buildingsBuilt: number;
+  upgrades: number;
   eventsSurvived: number;
 }
 
@@ -89,6 +95,8 @@ export interface GameState {
   notices: Notice[];
   nextNoticeId: number;
   nextEventDay: number;
+  /** Clés de déblocage acquises (voir unlockKey) : définitives une fois obtenues */
+  unlocked: string[];
   stats: GameStats;
   gameOver: boolean;
 }

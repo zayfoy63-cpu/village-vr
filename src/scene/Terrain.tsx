@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
 import { hash2 } from '../game/rng';
+import { buildingAt } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
@@ -81,11 +82,15 @@ export function Terrain({ map }: { map: GameMap }) {
         if (e.delta > 6) return;
         e.stopPropagation();
         const t = toTile(e);
-        if (t) build(t.x, t.z);
+        if (!t) return;
+        const state = useGame.getState();
+        if (state.selected) build(t.x, t.z);
+        else state.inspect(buildingAt(state.game, t.x, t.z)?.id ?? null);
       }}
       onContextMenu={(e) => {
         e.nativeEvent.preventDefault();
         select(null);
+        useGame.getState().inspect(null);
       }}
     >
       <meshStandardMaterial flatShading roughness={0.95} />

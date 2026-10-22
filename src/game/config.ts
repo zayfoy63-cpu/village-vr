@@ -17,7 +17,7 @@ export const FOOD_PER_VILLAGER = 1;
 export const FIRST_EVENT_DAY = 4;
 
 export const SAVE_KEY = 'village-vr-save-v1';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export type SeasonId = 'spring' | 'summer' | 'autumn' | 'winter';
 

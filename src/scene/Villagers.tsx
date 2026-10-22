@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
+import { statsOf } from '../game/rules';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
@@ -30,7 +31,7 @@ function useSlots(buildings: Building[], map: GameMap) {
       const c = center(b);
       // Point de rendez-vous devant le bâtiment
       const front = c.clone().add(new THREE.Vector3(0, 0, def.size * 0.5 + 0.12));
-      for (let i = 0; i < (def.housing ?? 0); i++) homes.push(front);
+      for (let i = 0; i < (statsOf(b).housing ?? 0); i++) homes.push(front);
       for (let i = 0; i < b.workers; i++) works.push(b.type === 'field' ? c : front);
     }
     return { homes, works };

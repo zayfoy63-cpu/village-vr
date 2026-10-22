@@ -32,6 +32,9 @@ export interface EventDef {
 
 const fmt = (n: number) => Math.round(n);
 
+/** La force des bandits est multipliée par (1 + population / N) : les grands villages attirent de plus grosses bandes */
+const BANDITS_POP_SCALE = 30;
+
 function addModifier(state: GameState, id: ModifierId, days: number) {
   state.modifiers = state.modifiers.filter((m) => m.id !== id);
   state.modifiers.push({ id, untilDay: state.day + days - 1 });
@@ -120,7 +123,8 @@ export const EVENTS: EventDef[] = [
     weight: (s) => (s.day >= 8 ? 2.5 : 0),
     apply: ({ state, severity, rng }) => {
       const defense = defensePower(state);
-      const attack = rng.range(0.8, 1.4) * severity;
+      // Les grands villages attirent des bandes plus nombreuses
+      const attack = rng.range(0.8, 1.4) * severity * (1 + state.population / BANDITS_POP_SCALE);
       if (defense >= attack) {
         return { text: `Les tours de garde ont repoussé les bandits ! (défense ${defense.toFixed(1)} / attaque ${attack.toFixed(1)})` };
       }

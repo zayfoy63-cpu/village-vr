@@ -1,7 +1,7 @@
 // Simulation : création de partie, construction, passage d'un jour, échanges.
 // Toutes les fonctions renvoient un NOUVEL état (l'état reçu n'est jamais modifié).
 
-import { BUILDING_BY_ID } from './buildings';
+import { BUILDING_BY_ID, buildCost, maxLevel, unlockKey } from './buildings';
 import {
   DAYS_PER_SEASON,
   FIRST_EVENT_DAY,
@@ -19,7 +19,9 @@ import {
   assignWorkers,
   canAfford,
   canPlace,
+  canUpgrade,
   computeProduction,
+  findNewUnlocks,
   foodConsumption,
   housingCapacity,
 } from './rules';
@@ -48,8 +50,8 @@ export function createInitialState(seed: number): GameState {
     resources: { ...START_RESOURCES },
     population: START_POPULATION,
     buildings: [
-      { id: 1, type: 'castle', x: castle.x, z: castle.z, workers: 0, builtDay: 0 },
-      { id: 2, type: 'mill', x: mill.x, z: mill.z, workers: 0, builtDay: 0 },
+      { id: 1, type: 'castle', x: castle.x, z: castle.z, level: 1, workers: 0, builtDay: 0 },
+      { id: 2, type: 'mill', x: mill.x, z: mill.z, level: 1, workers: 0, builtDay: 0 },
     ],
     nextBuildingId: 3,
     day: 1,
@@ -58,7 +60,8 @@ export function createInitialState(seed: number): GameState {
     notices: [],
     nextNoticeId: 1,
     nextEventDay: FIRST_EVENT_DAY + 1,
-    stats: { maxPopulation: START_POPULATION, buildingsBuilt: 0, eventsSurvived: 0 },
+    unlocked: [],
+    stats: { maxPopulation: START_POPULATION, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0 },
     gameOver: false,
   };
   pushNotice(state, {
@@ -67,17 +70,62 @@ export function createInitialState(seed: number): GameState {
     title: 'Un nouveau départ',
     text: 'Trois villageois s\'installent au pied du château. Construisez un champ avant l\'hiver !',
   });
+  applyUnlocks(state, false);
   return state;
+}
+
+/**
+ * Enregistre les nouveaux déblocages (mutation). Une notification groupée est émise
+ * pour les nouveaux bâtiments et une autre pour les nouvelles améliorations.
+ */
+export function applyUnlocks(state: GameState, notify: boolean): void {
+  const found = findNewUnlocks(state);
+  if (!found.length) return;
+  for (const u of found) state.unlocked.push(unlockKey(u.type, u.level));
+  if (!notify) return;
+  const builds = found.filter((u) => u.level === 1);
+  const upgrades = found.filter((u) => u.level > 1);
+  if (builds.length) {
+    pushNotice(state, {
+      kind: 'good',
+      icon: '🔓',
+      title: builds.length > 1 ? 'Nouveaux bâtiments' : 'Nouveau bâtiment',
+      text: `Vous pouvez maintenant construire : ${builds.map((u) => `${BUILDING_BY_ID[u.type].icon} ${BUILDING_BY_ID[u.type].name}`).join(', ')}.`,
+    });
+  }
+  for (const level of [...new Set(upgrades.map((u) => u.level))]) {
+    const names = upgrades.filter((u) => u.level === level).map((u) => BUILDING_BY_ID[u.type].name);
+    pushNotice(state, {
+      kind: 'good',
+      icon: '⬆️',
+      title: `Améliorations niveau ${level}`,
+      text: `Débloqué pour : ${names.join(', ')}. Cliquez sur un bâtiment pour l'améliorer.`,
+    });
+  }
 }
 
 export function placeBuilding(state: GameState, type: BuildingTypeId, x: number, z: number): GameState | null {
   if (state.gameOver || !BUILDING_BY_ID[type].buildable) return null;
   if (!canPlace(state, type, x, z).ok) return null;
   const s = cloneState(state);
-  const def = BUILDING_BY_ID[type];
-  for (const k of RESOURCE_KEYS) s.resources[k] -= def.cost[k] ?? 0;
-  s.buildings.push({ id: s.nextBuildingId++, type, x, z, workers: 0, builtDay: s.day });
+  const cost = buildCost(type);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
+  s.buildings.push({ id: s.nextBuildingId++, type, x, z, level: 1, workers: 0, builtDay: s.day });
   s.stats.buildingsBuilt++;
+  assignWorkers(s);
+  applyUnlocks(s, true);
+  return s;
+}
+
+export function upgradeBuilding(state: GameState, buildingId: number): GameState | null {
+  const b = state.buildings.find((x) => x.id === buildingId);
+  if (state.gameOver || !b || b.level >= maxLevel(b.type)) return null;
+  const check = canUpgrade(state, b);
+  if (!check.ok || !check.next) return null;
+  const s = cloneState(state);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= check.next.cost[k] ?? 0;
+  s.buildings.find((x) => x.id === buildingId)!.level++;
+  s.stats.upgrades++;
   assignWorkers(s);
   return s;
 }
@@ -156,9 +204,10 @@ export function advanceDay(state: GameState): GameState {
     s.nextEventDay = s.day + nextEventDelay(s.day, rng);
   }
 
-  // 6. Arrondis, travailleurs, fin de partie
+  // 6. Arrondis, travailleurs, déblocages, fin de partie
   for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, Math.round(s.resources[k] * 10) / 10);
   assignWorkers(s);
+  if (s.population > 0) applyUnlocks(s, true);
   s.stats.maxPopulation = Math.max(s.stats.maxPopulation, s.population);
   if (s.population <= 0) {
     s.population = 0;

@@ -1,6 +1,7 @@
 import { Scene } from './scene/Scene';
 import { useGame } from './store/gameStore';
 import { BuildBar } from './ui/BuildBar';
+import { BuildingPanel } from './ui/BuildingPanel';
 import { EventCards } from './ui/EventCards';
 import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
@@ -38,7 +39,8 @@ export function App() {
         </div>
         <EventCards key={seed} />
         <BuildBar />
-        <div className="help">🖱️ Glisser : tourner · Molette : zoom · 1-6 : bâtiments · Espace : pause</div>
+        <BuildingPanel />
+        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails / amélioration · 1-9 : construire · Espace : pause</div>
         <GameOver />
       </div>
     </div>

@@ -331,7 +331,7 @@ button.active {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 104px;
+  width: 98px;
   padding: 6px 4px;
 }
 
@@ -364,8 +364,9 @@ button.active {
 
 .build-cost {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .build-cost .missing {
@@ -375,6 +376,38 @@ button.active {
 
 .build-btn.active .build-cost .missing {
   color: #8b1d10;
+}
+
+.build-effect {
+  font-size: 10.5px;
+  color: var(--good);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.build-btn.active .build-effect {
+  color: #1f5a25;
+}
+
+.build-lock {
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.build-btn.locked {
+  opacity: 0.5;
+  filter: grayscale(0.8);
+}
+
+.build-btn.locked:disabled {
+  opacity: 0.5;
+  cursor: help;
+}
+
+.build-btn.locked:hover .build-desc {
+  display: block;
 }
 
 .build-desc {
@@ -393,7 +426,39 @@ button.active {
   pointer-events: none;
 }
 
-.build-btn:hover .build-desc {
+.build-btn:hover .build-effect {
+  font-size: 10.5px;
+  color: var(--good);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.build-btn.active .build-effect {
+  color: #1f5a25;
+}
+
+.build-lock {
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.build-btn.locked {
+  opacity: 0.5;
+  filter: grayscale(0.8);
+}
+
+.build-btn.locked:disabled {
+  opacity: 0.5;
+  cursor: help;
+}
+
+.build-btn.locked:hover .build-desc {
+  display: block;
+}
+
+.build-desc {
   display: block;
 }
 
@@ -407,6 +472,113 @@ button.active {
   padding: 4px 8px;
   border-radius: 8px;
   max-width: 220px;
+}
+
+/* ---------- Panneau de bâtiment ---------- */
+.building-panel {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 260px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  animation: slide-in-left 0.25s ease-out;
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translate(-20px, -50%);
+  }
+}
+
+.bp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bp-icon {
+  font-size: 28px;
+}
+
+.bp-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.bp-title strong {
+  font-size: 15px;
+}
+
+.bp-level {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.bp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.bp-row > span:first-child {
+  color: var(--muted);
+}
+
+.bp-row strong {
+  text-align: right;
+}
+
+.bp-row .pos {
+  color: var(--good);
+}
+
+.bp-row .warn {
+  color: var(--bad);
+}
+
+.bp-row .build-cost {
+  font-size: 13px;
+}
+
+.bp-sep {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 6px 0;
+}
+
+.bp-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.bp-upgrade {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.bp-reason {
+  margin-top: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--bad);
+}
+
+.bp-reason.locked {
+  color: var(--muted);
 }
 
 /* ---------- Fin de partie ---------- */
@@ -502,6 +674,11 @@ button.primary:hover {
   }
   .help {
     display: none;
+  }
+  .building-panel {
+    top: auto;
+    bottom: 170px;
+    transform: none;
   }
   .recap {
     grid-template-columns: repeat(2, 1fr);

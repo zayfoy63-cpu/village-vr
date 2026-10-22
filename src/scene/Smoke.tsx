@@ -2,12 +2,22 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
-import type { Building, GameMap } from '../game/types';
+import type { Building, BuildingTypeId, GameMap } from '../game/types';
 import { CASTLE_CHIMNEY } from './models/Castle';
 import { HOUSE_CHIMNEY, houseRotation } from './models/House';
+import { HUT_CHIMNEYS, MANOR_CHIMNEYS, TOWNHOUSE_CHIMNEYS } from './models/Housing';
 import { GEO, tileToWorld } from './shared';
 
 const PUFFS = 4;
+
+/** Cheminées par type de bâtiment (coordonnées locales avant rotation) */
+const CHIMNEYS: Partial<Record<BuildingTypeId, [number, number, number][]>> = {
+  castle: [CASTLE_CHIMNEY],
+  hut: HUT_CHIMNEYS,
+  house: [HOUSE_CHIMNEY],
+  townhouse: TOWNHOUSE_CHIMNEYS,
+  manor: MANOR_CHIMNEYS,
+};
 const MAX_CHIMNEYS = 120;
 
 /** Fumée des cheminées : petites boules qui montent, grossissent puis disparaissent (1 draw call) */
@@ -16,15 +26,19 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
 
   const chimneys = useMemo(() => {
     const out: THREE.Vector3[] = [];
+    const up = new THREE.Vector3(0, 1, 0);
     for (const b of buildings) {
-      if (b.type !== 'house' && b.type !== 'castle') continue;
+      const locals = CHIMNEYS[b.type];
+      if (!locals) continue;
       const [x, y, z] = tileToWorld(b.x, b.z, map.width, map.height, BUILDING_BY_ID[b.type].size);
-      const local = new THREE.Vector3(...(b.type === 'house' ? HOUSE_CHIMNEY : CASTLE_CHIMNEY));
-      if (b.type === 'house') local.applyAxisAngle(new THREE.Vector3(0, 1, 0), houseRotation(b.id));
-      out.push(local.add(new THREE.Vector3(x, y, z)));
+      for (const l of locals) {
+        const local = new THREE.Vector3(...l);
+        if (b.type !== 'castle') local.applyAxisAngle(up, houseRotation(b.id));
+        out.push(local.add(new THREE.Vector3(x, y, z)));
+      }
       if (out.length >= MAX_CHIMNEYS) break;
     }
-    return out;
+    return out.slice(0, MAX_CHIMNEYS);
   }, [buildings, map]);
 
   const tmp = useMemo(

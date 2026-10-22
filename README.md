@@ -59,6 +59,24 @@ Tout est réglable dans `src/game/buildings.ts` :
 - Un déblocage est définitif une fois obtenu et déclenche une notification.
 - Clic sur un bâtiment : panneau avec niveau, production actuelle et suivante, coût et bouton « Améliorer ».
 
+### Chaînes de production (`game/buildings.ts`, réglages dans `CHAINS`)
+Débloquées progressivement (onglet **Artisanat**, visible au premier déblocage) :
+- Nourriture : Champ (🌾 blé) → **Moulin** (🥣 farine, dès 8 habitants ; le moulin de départ se met en marche)
+  → **Boulangerie** (🍞 pain, dès 10). Les habitants mangent le pain d'abord : 1 pain = 3 rations.
+- Bois : Cabane de bûcheron → **Scierie** (🪚 planches, dès 12).
+- Fer : **Mine** (🔩 minerai, touche des rochers, dès 15) → **Forge** (🛠️ outils, dès 20 + 1 mine) ;
+  forge niveau 2 : ⚔️ armes (défense contre les bandits).
+- Outils : équipent automatiquement champs, bûcherons, carrières et mines (+30 %, usure 0,1/bâtiment/jour).
+- Maisons bourgeoises, manoirs et niveaux 3 demandent des planches et/ou des outils.
+- Les recettes (`consumes` → `produces`) sont dans les niveaux des bâtiments ; un transformateur s'arrête seul
+  quand son stock est plein (`CHAINS.stockCap`) et peut être mis à l'arrêt depuis son panneau.
+- HUD : ligne de base + ligne avancée qui n'affiche que les ressources découvertes. Icône d'alerte au-dessus d'un
+  bâtiment à l'arrêt (rouge : matière première, orange : travailleurs).
+
+### Décisions
+- Pause automatique quand une carte à choix apparaît (désactivable dans ⚙️ Paramètres) ; reprise après la décision.
+- Chaque option affiche ses conséquences chiffrées ; les événements annoncés sont listés dans « Menaces à venir ».
+
 ### Parcelles (`game/parcels.ts`, réglages dans `PARCELS`)
 - La carte est découpée en 4 × 3 parcelles ; seules les 2 parcelles centrales sont possédées au départ.
 - Les parcelles verrouillées sont assombries et couvertes d'un brouillard léger, avec une pastille : prix

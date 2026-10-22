@@ -9,6 +9,7 @@ const SPEEDS: { value: Speed; label: string; title: string }[] = [
 
 export function TimeControls() {
   const speed = useGame((s) => s.speed);
+  const autoPaused = useGame((s) => s.resumeSpeed !== null && s.speed === 0);
   const setSpeed = useGame((s) => s.setSpeed);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function TimeControls() {
 
   return (
     <div className="time-controls">
+      {autoPaused && <span className="auto-pause" title="Le jeu reprendra après votre décision">⏸ Décision en attente</span>}
       {SPEEDS.map((s) => (
         <button key={s.value} className={speed === s.value ? 'active' : ''} onClick={() => setSpeed(s.value)} title={s.title}>
           {s.label}

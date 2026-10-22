@@ -10,7 +10,18 @@ export interface GameMap {
   tiles: TileType[];
 }
 
-export type ResourceKey = 'food' | 'wood' | 'stone' | 'gold';
+/** Ressources de base (food = blé) puis ressources avancées des chaînes de production */
+export type ResourceKey =
+  | 'food'
+  | 'wood'
+  | 'stone'
+  | 'gold'
+  | 'flour'
+  | 'bread'
+  | 'planks'
+  | 'ironOre'
+  | 'tools'
+  | 'weapons';
 export type Resources = Record<ResourceKey, number>;
 
 export type BuildingTypeId =
@@ -25,7 +36,11 @@ export type BuildingTypeId =
   | 'quarry'
   | 'market'
   | 'tower'
-  | 'granary';
+  | 'granary'
+  | 'bakery'
+  | 'sawmill'
+  | 'mine'
+  | 'forge';
 
 export interface Building {
   id: number;
@@ -40,6 +55,8 @@ export interface Building {
   builtDay: number;
   /** Endommagé (tempête, incendie, révolte…) : produit moins tant qu'il n'est pas réparé */
   damaged?: boolean;
+  /** Mis à l'arrêt par le joueur (libère ses travailleurs) */
+  paused?: boolean;
   /** Incendie en cours */
   fire?: Fire;
 }
@@ -86,12 +103,21 @@ export type NoticeKind = 'good' | 'bad' | 'info' | 'trade' | 'threat';
 /** Paramètres libres d'un événement (force, quantités…), sauvegardables */
 export type EventParams = Record<string, number>;
 
+/** Conséquence affichée sur une option : icône + texte court, colorée selon le ton */
+export interface ChoiceEffect {
+  icon: string;
+  text: string;
+  tone: 'good' | 'bad' | 'neutral';
+}
+
 export interface ChoiceOption {
   id: string;
   label: string;
   detail: string;
   /** Coût payé si l'option est choisie (option grisée si impossible) */
   cost?: Partial<Resources>;
+  /** Conséquences résumées (icônes + chiffres) */
+  effects?: ChoiceEffect[];
 }
 
 export interface NoticeChoice {
@@ -185,6 +211,8 @@ export interface GameState {
   parcels: { owned: number[]; bought: number };
   /** Dangers des parcelles (camps de bandits, ruines) */
   features: ParcelFeature[];
+  /** Ressources déjà découvertes (le HUD n'affiche que celles-ci) */
+  discovered: ResourceKey[];
   stats: GameStats;
   gameOver: boolean;
 }

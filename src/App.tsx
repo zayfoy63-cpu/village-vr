@@ -5,6 +5,8 @@ import { BuildingPanel } from './ui/BuildingPanel';
 import { CrisisBanner } from './ui/CrisisBanner';
 import { FeaturePanel, ParcelPanel } from './ui/LandPanel';
 import { ParcelBadges } from './ui/ParcelBadges';
+import { SettingsButton } from './ui/Settings';
+import { ThreatList } from './ui/ThreatList';
 import { EventCards } from './ui/EventCards';
 import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
@@ -24,6 +26,7 @@ function SeedPanel() {
       >
         Nouvelle partie
       </button>
+      <SettingsButton />
       <VRButton />
     </div>
   );
@@ -41,6 +44,7 @@ export function App() {
           <HUD />
           <TimeControls />
         </div>
+        <ThreatList />
         <CrisisBanner />
         <EventCards key={seed} />
         <BuildBar />

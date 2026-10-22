@@ -1,8 +1,67 @@
-import { BUILDING_BY_ID, maxLevel } from '../game/buildings';
-import { DAMAGED_FACTOR } from '../game/config';
-import { canAfford, canUpgrade, effectLabel, nominalProduction, repairCost, statsOf } from '../game/rules';
+import { BUILDING_BY_ID, CHAINS, levelDef, maxLevel } from '../game/buildings';
+import { DAMAGED_FACTOR, RESOURCE_META } from '../game/config';
+import {
+  canAfford,
+  canUpgrade,
+  conditionLabel,
+  effectLabel,
+  isCapped,
+  isUnlocked,
+  nominalProduction,
+  repairCost,
+  simulateProduction,
+  statsOf,
+} from '../game/rules';
+import type { Building, Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { CostLine } from './BuildBar';
+
+const icons = (keys: (keyof Resources)[]) => keys.map((k) => RESOURCE_META[k].icon).join(' ');
+
+/** Transformation et équipement : entrée → sortie, blocage, stock plein, outils, marche / arrêt */
+function ChainStatus({ building }: { building: Building }) {
+  useGame((s) => s.game.resources);
+  const togglePause = useGame((s) => s.togglePause);
+  const game = useGame.getState().game;
+  const stats = statsOf(building);
+  const run = simulateProduction(game).status.get(building.id);
+  const isProcessor = !!stats.consumes;
+  const equippable = CHAINS.tools.equips.includes(building.type);
+  const capped = isCapped(game, building);
+  const pct = run ? Math.round(run.ratio * 100) : 0;
+  return (
+    <>
+      {building.paused ? (
+        <div className="bp-alert damaged">
+          <span>⏸ Mis à l'arrêt : ses travailleurs sont affectés ailleurs.</span>
+        </div>
+      ) : capped ? (
+        <div className="bp-note">📦 Stock plein : en pause automatique (travailleurs libérés).</div>
+      ) : run?.blocked === 'input' ? (
+        <div className="bp-alert fire">
+          <span>⛔ À l'arrêt : manque de {icons(run.missing)} {run.missing.map((k) => RESOURCE_META[k].name.toLowerCase()).join(', ')}.</span>
+        </div>
+      ) : isProcessor && run && run.ratio < 0.999 && run.missing.length > 0 ? (
+        <div className="bp-note warn">
+          Tourne à {pct} % : pas assez de {icons(run.missing)}.
+        </div>
+      ) : null}
+      {run?.blocked === 'workers' && !building.paused && <div className="bp-note warn">👷 Aucun travailleur : bâtiment à l'arrêt.</div>}
+      {equippable && building.workers > 0 && (
+        <div className={`bp-note ${run?.equipped ? 'pos-note' : ''}`}>
+          {run?.equipped
+            ? `🛠️ Équipé d'outils : +${Math.round(CHAINS.tools.bonus * 100)} % de production.`
+            : `🛠️ Sans outils : une forge donnerait +${Math.round(CHAINS.tools.bonus * 100)} %.`}
+        </div>
+      )}
+      {stats.workers ? (
+        <button className="bp-toggle" onClick={() => togglePause(building.id)}>
+          {building.paused ? '▶ Relancer le bâtiment' : '⏸ Mettre à l\'arrêt'}
+        </button>
+      ) : null}
+    </>
+  );
+}
 
 /** Panneau d'un bâtiment existant : niveau, production actuelle / suivante, bouton Améliorer */
 export function BuildingPanel() {
@@ -22,6 +81,7 @@ export function BuildingPanel() {
   const stats = statsOf(building);
   const max = maxLevel(building.type);
   const check = canUpgrade(game, building);
+  const locked = !isUnlocked(game, building.type, building.level);
   const current = effectLabel(stats, nominalProduction(game, building));
   const next = check.next ? effectLabel(check.next, nominalProduction(game, building, building.level + 1)) : null;
 
@@ -86,13 +146,16 @@ export function BuildingPanel() {
           </strong>
         </div>
       ) : null}
-      {stats.workers && building.workers < stats.workers ? (
+      {locked ? (
+        <div className="bp-note">🔒 Se mettra en marche dès que {conditionLabel(levelDef(building.type, building.level).unlock)}.</div>
+      ) : stats.workers && building.workers < stats.workers && !building.paused && !isCapped(game, building) ? (
         <div className="bp-note warn">
           Il manque {stats.workers - building.workers} {stats.workers - building.workers > 1 ? 'travailleurs' : 'travailleur'} :
           production à {Math.round((building.workers / stats.workers) * 100)} %. Logez plus d'habitants !
         </div>
       ) : null}
       {def.seasonal && <div className="bp-note">❄️ Ne produit rien en hiver.</div>}
+      <ChainStatus building={building} />
 
       {max > 1 &&
         (check.next ? (

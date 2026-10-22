@@ -2,7 +2,7 @@
 
 import { BUILDING_BY_ID, maxLevel, unlockKey } from './buildings';
 import { ALL_PARCELS } from './parcels';
-import { MORALE, SAVE_KEY, SAVE_VERSION } from './config';
+import { BASE_RESOURCES, MORALE, RESOURCE_KEYS, SAVE_KEY, SAVE_VERSION, START_RESOURCES } from './config';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
 
@@ -23,6 +23,7 @@ export function saveGame(state: GameState): void {
  * v1 → v2 : niveaux de bâtiments, déblocages, compteur d'améliorations.
  * v2 → v3 : moral, événements annoncés, raids, incendies ; les anciennes offres de marchand sont closes.
  * v3 → v4 : parcelles (les anciennes parties possèdent toute la carte).
+ * v4 → v5 : chaînes de production (farine, pain, planches, minerai, outils, armes).
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -53,6 +54,12 @@ export function migrate(data: GameState): GameState | null {
     s.parcels = { owned: ALL_PARCELS.map((p) => p.id), bought: 0 };
   }
   s.features = Array.isArray(data.features) ? data.features : [];
+  // v4 → v5 : chaînes de production (nouvelles ressources à 0, ressources découvertes)
+  s.resources = { ...START_RESOURCES, ...(data.resources as Partial<GameState['resources']>) };
+  for (const k of RESOURCE_KEYS) s.resources[k] = Number(s.resources[k]) || 0;
+  s.discovered = Array.isArray(data.discovered)
+    ? data.discovered
+    : RESOURCE_KEYS.filter((k) => BASE_RESOURCES.includes(k) || s.resources[k] > 0);
   delete (s as GameState & { nextEventDay?: number }).nextEventDay;
   s.modifiers = Array.isArray(data.modifiers) ? data.modifiers : [];
   if (!Array.isArray(s.unlocked)) {

@@ -6,6 +6,7 @@ import type { Building, BuildingTypeId, GameMap } from '../game/types';
 import { CASTLE_CHIMNEY } from './models/Castle';
 import { HOUSE_CHIMNEY, houseRotation } from './models/House';
 import { HUT_CHIMNEYS, MANOR_CHIMNEYS, TOWNHOUSE_CHIMNEYS } from './models/Housing';
+import { BAKERY_CHIMNEYS, FORGE_CHIMNEYS } from './models/Craft';
 import { LUMBER_CHIMNEYS } from './models/Lumber';
 import { QUARRY_CHIMNEYS } from './models/Quarry';
 
@@ -13,6 +14,8 @@ import { QUARRY_CHIMNEYS } from './models/Quarry';
 const LEVEL_CHIMNEYS: Partial<Record<BuildingTypeId, Record<number, [number, number, number][]>>> = {
   lumber: LUMBER_CHIMNEYS,
   quarry: QUARRY_CHIMNEYS,
+  bakery: BAKERY_CHIMNEYS,
+  forge: FORGE_CHIMNEYS,
 };
 import { GEO, tileToWorld } from './shared';
 

@@ -7,7 +7,7 @@
 //   3. arrivée → trigger() : effet immédiat et/ou carte à choix (resolve() à la réponse)
 //   4. sans réponse avant la fin du délai : l'option par défaut s'applique
 
-import { BUILDING_BY_ID } from './buildings';
+import { BUILDING_BY_ID, CHAINS } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
 import { neighbors8, tileAt } from './mapgen';
 import { PARCELS, activeCamps } from './parcels';
@@ -16,6 +16,7 @@ import { canAfford, defensePower, housingCapacity, storageCapacity } from './rul
 import { clamp, pushNotice } from './stateUtils';
 import type {
   Building,
+  ChoiceEffect,
   ChoiceOption,
   EventParams,
   GameState,
@@ -31,7 +32,7 @@ import type {
 
 export const TUNING = {
   /** Sévérité = 1 + X par saison écoulée (printemps an 1 = 1 ; hiver an 1 = 2,05 ; hiver an 2 = 3,45) */
-  severityPerSeason: 0.42,
+  severityPerSeason: 0.38,
   /** Pas d'événement aléatoire avant ce jour */
   firstEventDay: 3,
   /** Chance d'un événement chaque jour */
@@ -228,6 +229,12 @@ export function damageBuilding(state: GameState, b: Building): string {
   return `${name} endommagé`;
 }
 
+/** Chaque combat use une partie des armes */
+export function wearWeapons(state: GameState) {
+  const w = state.resources.weapons ?? 0;
+  if (w > 0) state.resources.weapons = Math.max(0, w - Math.ceil(w * CHAINS.weapons.lostPerFight));
+}
+
 export function startFire(state: GameState, b: Building, now: number) {
   if (b.fire || b.type === 'mill') return;
   b.fire = { start: now, nextSpread: now + TUNING.fire.spreadEvery, destroyAt: now + TUNING.fire.destroyAfter };
@@ -287,14 +294,47 @@ export function scheduleEvent(state: GameState, ev: EventDef, days: number, para
 // ÉVÉNEMENTS
 // ============================================================================
 
-/** Choix commun aux bandits et à l'invasion */
-function banditChoice(count: number, ransom: number): ChoiceSpec {
+const fx = (icon: string, text: string, tone: ChoiceEffect['tone'] = 'neutral'): ChoiceEffect => ({ icon, text, tone });
+
+/** Choix commun aux bandits et à l'invasion, avec estimation chiffrée des conséquences */
+function banditChoice(state: GameState, count: number, ransom: number): ChoiceSpec {
+  const defense = defensePower(state);
+  const power = defense * 2 + Math.min(state.population, 40) * 0.12;
+  // Victoire si power >= count × roll, roll uniforme dans [0,6 ; 1,1]
+  const win = clamp((power / count - 0.6) / 0.5, 0, 1);
+  const lossIfLost = Math.max(1, Math.round((count * 0.85 - power) * 0.5));
+  const towerKills = Math.min(count, Math.floor((TUNING.raid.approach * defense) / TUNING.raid.towerKillInterval));
+  const pillage = Math.round(Math.min(TUNING.raid.maxSteal, (count - towerKills) * TUNING.raid.stealPerBandit) * 100);
   return {
     defaultId: 'let',
     options: [
-      { id: 'ransom', label: 'Payer la rançon', detail: 'Ils repartent sans combattre. Le village se sent humilié.', cost: { gold: ransom } },
-      { id: 'fight', label: 'Combattre', detail: `Affrontement immédiat contre ${count} bandits : pertes selon votre défense.` },
-      { id: 'let', label: 'Les laisser venir', detail: 'Ils marchent sur le château : vos tours tirent, cliquez sur eux pour les arrêter.' },
+      {
+        id: 'ransom',
+        label: 'Payer la rançon',
+        detail: 'Ils repartent sans combattre. Le village se sent humilié.',
+        cost: { gold: ransom },
+        effects: [fx('🪙', `-${ransom}`, 'bad'), fx('😟', `moral ${TUNING.morale.ransom}`, 'bad'), fx('🛡️', 'aucune perte', 'good')],
+      },
+      {
+        id: 'fight',
+        label: 'Combattre',
+        detail: `Affrontement immédiat contre ${count} bandits (votre force : ${power.toFixed(1)}).`,
+        effects: [
+          fx('🎲', `victoire ~${Math.round(win * 100)} %`, win >= 0.6 ? 'good' : win >= 0.3 ? 'neutral' : 'bad'),
+          fx('💀', `si défaite : ~${lossIfLost} morts, -${Math.round(Math.min(TUNING.raid.maxSteal, count * TUNING.raid.stealPerBandit) * 50)} % stocks`, 'bad'),
+          fx('😄', `si victoire : moral +${TUNING.morale.fightWon}`, 'good'),
+        ],
+      },
+      {
+        id: 'let',
+        label: 'Les laisser venir',
+        detail: 'Ils marchent sur le château : vos tours tirent, cliquez sur eux pour les arrêter.',
+        effects: [
+          fx('🗼', defense > 0 ? `tours : ~${towerKills} abattus` : 'aucune tour !', defense > 0 ? 'good' : 'bad'),
+          fx('💰', `pillage jusqu'à ~${pillage} % des stocks`, pillage > 30 ? 'bad' : 'neutral'),
+          fx('🖱️', 'clic = 1 bandit en moins', 'neutral'),
+        ],
+      },
     ],
   };
 }
@@ -307,6 +347,7 @@ function resolveBandits({ state, rng, now }: EventContext, optionId: string, par
   }
   if (optionId === 'fight') {
     const defense = defensePower(state) * 2 + Math.min(state.population, 40) * 0.12;
+    wearWeapons(state);
     const roll = rng.range(0.6, 1.1);
     if (defense >= count * roll) {
       const lost = loseVillagers(state, rng.chance(0.4) ? 1 : 0, 1);
@@ -330,6 +371,42 @@ function resolveBandits({ state, rng, now }: EventContext, optionId: string, par
   return { text: `${count} bandits marchent sur le château ! Cliquez sur eux pour les arrêter.`, kind: 'bad' };
 }
 
+/** Bâtiments au bord de l'eau (aperçu des dégâts d'une crue) */
+function riverside(state: GameState): { fields: number; others: number } {
+  let fields = 0;
+  let others = 0;
+  for (const b of playerBuildings(state)) {
+    if (!neighbors8(b.x, b.z).some(([x, z]) => tileAt(state.map, x, z) === 'water')) continue;
+    if (b.type === 'field') fields++;
+    else others++;
+  }
+  return { fields, others };
+}
+
+/** Options communes à l'épidémie et à la grande épidémie */
+function epidemicOptions(state: GameState, p: EventParams, doctorCost: number, q: string, d: string, i: string): ChoiceOption[] {
+  const deaths = Math.ceil(state.population * p.rate);
+  return [
+    {
+      id: 'quarantine',
+      label: q,
+      detail: 'On isole les malades.',
+      effects: [
+        fx('⚙️', `production -40 % (${p.quarantineDays} j)`, 'bad'),
+        fx('💀', '0 à 1 mort', 'neutral'),
+        fx('😟', `moral ${TUNING.morale.quarantine}`, 'bad'),
+      ],
+    },
+    { id: 'doctor', label: d, detail: 'Personne ne meurt.', cost: { gold: doctorCost }, effects: [fx('🪙', `-${doctorCost}`, 'bad'), fx('💀', 'aucun mort', 'good')] },
+    {
+      id: 'ignore',
+      label: i,
+      detail: 'La maladie suit son cours.',
+      effects: [fx('💀', `~${deaths} morts`, 'bad'), fx('🤢', `2e vague dans 2 j (~${Math.ceil(deaths * 1.2)})`, 'bad')],
+    },
+  ];
+}
+
 export const EVENTS: EventDef[] = [
   // ---------------- Annoncés à l'avance ----------------
   {
@@ -346,7 +423,7 @@ export const EVENTS: EventDef[] = [
     },
     trigger: ({ state }, p) => {
       const ransom = fmt(TUNING.raid.ransomBase + p.count * TUNING.raid.ransomPerBandit + state.population * 0.2);
-      return { text: `${p.count} bandits sont aux portes. Que faire ?`, choice: banditChoice(p.count, ransom) };
+      return { text: `${p.count} bandits sont aux portes. Que faire ?`, choice: banditChoice(state, p.count, ransom) };
     },
     resolve: resolveBandits,
   },
@@ -363,8 +440,19 @@ export const EVENTS: EventDef[] = [
       prepare: (_ctx, p) => ({
         defaultId: 'none',
         options: [
-          { id: 'reinforce', label: 'Renforcer les toits', detail: 'Moitié moins de dégâts, pas de foudre.', cost: { wood: 6 + 3 * p.hits } },
-          { id: 'none', label: 'Ne rien faire', detail: 'Croiser les doigts.' },
+          {
+            id: 'reinforce',
+            label: 'Renforcer les toits',
+            detail: 'Moitié moins de dégâts, pas de foudre.',
+            cost: { wood: 6 + 3 * p.hits },
+            effects: [fx('🪵', `-${6 + 3 * p.hits}`, 'bad'), fx('🏚️', `${Math.floor(p.hits / 2)} bâtiment(s) touché(s)`, 'good')],
+          },
+          {
+            id: 'none',
+            label: 'Ne rien faire',
+            detail: 'Croiser les doigts.',
+            effects: [fx('🏚️', `${p.hits} bâtiment(s) touché(s)`, 'bad'), ...(p.lightning ? [fx('⚡', 'risque d\'incendie', 'bad')] : [])],
+          },
         ],
       }),
       onPrepare: (_ctx, id, p) => {
@@ -408,8 +496,19 @@ export const EVENTS: EventDef[] = [
       prepare: (_ctx, p) => ({
         defaultId: 'none',
         options: [
-          { id: 'dikes', label: 'Renforcer les berges', detail: 'Protège tous les bâtiments au bord de l\'eau.', cost: { wood: fmt(10 + 4 * p.sev), stone: fmt(3 * p.sev) } },
-          { id: 'none', label: 'Ne rien faire', detail: 'Les champs riverains seront perdus.' },
+          {
+            id: 'dikes',
+            label: 'Renforcer les berges',
+            detail: 'Protège tous les bâtiments au bord de l\'eau.',
+            cost: { wood: fmt(10 + 4 * p.sev), stone: fmt(3 * p.sev) },
+            effects: [fx('🛡️', 'aucun dégât', 'good')],
+          },
+          {
+            id: 'none',
+            label: 'Ne rien faire',
+            detail: 'Les champs riverains seront perdus.',
+            effects: [fx('🌾', `-${riverside(_ctx.state).fields} champ(s)`, 'bad'), fx('🏚️', `${riverside(_ctx.state).others} bâtiment(s) abîmé(s)`, 'bad')],
+          },
         ],
       }),
       onPrepare: (_ctx, id, p) => {
@@ -471,15 +570,11 @@ export const EVENTS: EventDef[] = [
     kind: 'bad',
     weight: (s) => (s.population >= 5 ? 1.5 + 0.2 * seasonIndex(s.day) : 0),
     roll: ({ severity: sev }) => ({ rate: Math.min(0.4, 0.07 * sev), quarantineDays: 4 }),
-    trigger: ({ severity: sev }, p) => ({
+    trigger: ({ state, severity: sev }, p) => ({
       text: 'Une fièvre se répand dans le village.',
       choice: {
         defaultId: 'ignore',
-        options: [
-          { id: 'quarantine', label: 'Quarantaine', detail: `Production -40 % pendant ${p.quarantineDays} jours, 1 mort au plus.` },
-          { id: 'doctor', label: 'Faire venir un médecin', detail: 'Personne ne meurt.', cost: { gold: fmt(6 + 4 * sev) } },
-          { id: 'ignore', label: 'Ignorer', detail: `~${Math.round(p.rate * 100)} % de morts, et la maladie se propage.` },
-        ],
+        options: epidemicOptions(state, p, fmt(6 + 4 * sev), 'Quarantaine', 'Faire venir un médecin', 'Ignorer'),
       },
     }),
     resolve: ({ state, rng, now }, id, p) => {
@@ -507,8 +602,22 @@ export const EVENTS: EventDef[] = [
       choice: {
         defaultId: 'refuse',
         options: [
-          { id: 'welcome', label: 'Les accueillir', detail: `+${p.n} habitants (même sans logement) : plus de bras, plus de bouches à nourrir.` },
-          { id: 'refuse', label: 'Les refuser', detail: 'Le village a mauvaise conscience (moral en baisse).' },
+          {
+            id: 'welcome',
+            label: 'Les accueillir',
+            detail: 'Plus de bras, plus de bouches à nourrir (même sans logement).',
+            effects: [
+              fx('👥', `+${p.n} habitants`, 'good'),
+              fx('🌾', `-${p.n} nourriture/jour`, 'bad'),
+              fx('😄', `moral +${TUNING.morale.welcomeRefugees}`, 'good'),
+            ],
+          },
+          {
+            id: 'refuse',
+            label: 'Les refuser',
+            detail: 'Le village a mauvaise conscience.',
+            effects: [fx('😟', `moral ${TUNING.morale.refuseRefugees}`, 'bad')],
+          },
         ],
       },
     }),
@@ -559,7 +668,16 @@ export const EVENTS: EventDef[] = [
           if (p[`o${i}_give_${k}`]) give[k] = p[`o${i}_give_${k}`];
           if (p[`o${i}_get_${k}`]) get[k] = p[`o${i}_get_${k}`];
         }
-        return { id: `o${i}`, label: `Obtenir ${formatResources(get)}`, detail: `contre ${formatResources(give)}`, cost: give };
+        return {
+          id: `o${i}`,
+          label: `Obtenir ${formatResources(get)}`,
+          detail: `contre ${formatResources(give)}`,
+          cost: give,
+          effects: [
+            ...RESOURCE_KEYS.filter((k) => get[k]).map((k) => fx(RESOURCE_META[k].icon, `+${get[k]}`, 'good')),
+            ...RESOURCE_KEYS.filter((k) => give[k]).map((k) => fx(RESOURCE_META[k].icon, `-${give[k]}`, 'bad')),
+          ],
+        };
       };
       return { text: 'Il propose deux échanges.', choice: { defaultId: 'none', timeout: 1, options: [opt(0), opt(1), { id: 'none', label: 'Refuser', detail: '' }] } };
     },
@@ -605,7 +723,7 @@ export const EVENTS: EventDef[] = [
       state.resources.food -= lost;
       addMorale(state, -3);
       const hint = storageCapacity(state) ? 'Agrandissez vos greniers.' : 'Construisez un grenier !';
-      return { text: `Les rats dévorent ${lost} 🍞 stockés hors des greniers. ${hint}` };
+      return { text: `Les rats dévorent ${lost} 🌾 stockés hors des greniers. ${hint}` };
     },
   },
   {
@@ -634,7 +752,7 @@ export const EVENTS: EventDef[] = [
       state.resources.food += bonus;
       addModifier(state, 'goodHarvest', 3);
       addMorale(state, TUNING.morale.harvest);
-      return { text: `+${bonus} 🍞 et les champs produisent +50 % pendant 3 jours.` };
+      return { text: `+${bonus} 🌾 et les champs produisent +50 % pendant 3 jours.` };
     },
   },
   {
@@ -648,7 +766,7 @@ export const EVENTS: EventDef[] = [
       const n = Math.min(free, rng.int(1, 3));
       if (n <= 0) {
         state.resources.food += 6;
-        return { text: 'Faute de place, des voyageurs repartent en laissant 6 🍞.' };
+        return { text: 'Faute de place, des voyageurs repartent en laissant 6 🌾.' };
       }
       state.population += n;
       return { text: `${n} ${plural(n, 'villageois s\'installe', 'villageois s\'installent')} au village.` };
@@ -670,7 +788,7 @@ export const EVENTS: EventDef[] = [
     },
     trigger: ({ state }, p) => {
       const ransom = fmt((TUNING.raid.ransomBase + p.count * TUNING.raid.ransomPerBandit + state.population * 0.2) * 1.5);
-      return { text: `L'armée de ${p.count} pillards est là.`, choice: banditChoice(p.count, ransom) };
+      return { text: `L'armée de ${p.count} pillards est là.`, choice: banditChoice(state, p.count, ransom) };
     },
     resolve: resolveBandits,
   },
@@ -688,8 +806,14 @@ export const EVENTS: EventDef[] = [
       prepare: ({ severity: sev }) => ({
         defaultId: 'none',
         options: [
-          { id: 'seal', label: 'Sceller les réserves', detail: 'Pertes de stock divisées par deux.', cost: { wood: fmt(10 + 5 * sev), gold: fmt(4 * sev) } },
-          { id: 'none', label: 'Ne rien faire', detail: '' },
+          {
+            id: 'seal',
+            label: 'Sceller les réserves',
+            detail: 'Pertes de stock divisées par deux.',
+            cost: { wood: fmt(10 + 5 * sev), gold: fmt(4 * sev) },
+            effects: [fx('🌾', '-20 % du stock', 'neutral')],
+          },
+          { id: 'none', label: 'Ne rien faire', detail: '', effects: [fx('🌾', '-40 % du stock', 'bad')] },
         ],
       }),
       onPrepare: (_ctx, id, p) => {
@@ -701,7 +825,7 @@ export const EVENTS: EventDef[] = [
       const lost = loseResource(state, 'food', p.loss);
       addModifier(state, 'blight', p.days);
       addMorale(state, -10);
-      return { text: `-${lost} 🍞 gâtés, et les champs produisent 60 % de moins pendant ${p.days} jours.` };
+      return { text: `-${lost} 🌾 gâtés, et les champs produisent 60 % de moins pendant ${p.days} jours.` };
     },
   },
   {
@@ -716,15 +840,11 @@ export const EVENTS: EventDef[] = [
       days: [3, 3],
       text: (_p, d) => `La peste ravage les villages voisins : elle arrivera dans ${d} jours. Prévoyez de l'or pour un médecin.`,
     },
-    trigger: ({ severity: sev }, p) => ({
+    trigger: ({ state, severity: sev }, p) => ({
       text: 'La peste est dans le village !',
       choice: {
         defaultId: 'ignore',
-        options: [
-          { id: 'quarantine', label: 'Quarantaine stricte', detail: `Production -40 % pendant ${p.quarantineDays} jours, 1 mort au plus.` },
-          { id: 'doctor', label: 'Faire venir des médecins', detail: 'Personne ne meurt.', cost: { gold: fmt(12 + 6 * sev) } },
-          { id: 'ignore', label: 'Prier', detail: `~${Math.round(p.rate * 100)} % de morts, puis une seconde vague.` },
-        ],
+        options: epidemicOptions(state, p, fmt(12 + 6 * sev), 'Quarantaine stricte', 'Faire venir des médecins', 'Prier'),
       },
     }),
     resolve: (ctx, id, p) => EVENT_BY_ID.epidemic.resolve!(ctx, id, p),

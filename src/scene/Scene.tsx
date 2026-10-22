@@ -11,6 +11,7 @@ import { Ghost, Selection } from './Ghost';
 import { Nature } from './Nature';
 import { Parcels } from './Parcels';
 import { Smoke } from './Smoke';
+import { StatusAlerts } from './StatusAlerts';
 import { Table } from './Table';
 import { Terrain } from './Terrain';
 import { Villagers } from './Villagers';
@@ -63,6 +64,7 @@ function World() {
       <Villagers buildings={buildings} map={map} />
       <Smoke buildings={buildings} map={map} />
       <FireFx buildings={buildings} map={map} />
+      <StatusAlerts buildings={buildings} map={map} />
       <Bandits map={map} />
       <Flood map={map} />
       <Snowfall map={map} />

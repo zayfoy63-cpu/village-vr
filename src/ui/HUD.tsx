@@ -1,5 +1,15 @@
 import { useShallow } from 'zustand/react/shallow';
-import { MORALE, RESOURCE_KEYS, RESOURCE_META, dayInSeason, seasonOf, yearOf, DAYS_PER_SEASON } from '../game/config';
+import {
+  ADVANCED_RESOURCES,
+  BASE_RESOURCES,
+  MORALE,
+  RESOURCE_META,
+  dayInSeason,
+  seasonOf,
+  yearOf,
+  DAYS_PER_SEASON,
+} from '../game/config';
+import type { Resources } from '../game/types';
 import { severity } from '../game/events';
 import { computeNet, hasModifier, housingCapacity, jobsCapacity, moraleFactor } from '../game/rules';
 import { useGame } from '../store/gameStore';
@@ -47,6 +57,16 @@ function MoraleGauge() {
   );
 }
 
+function ResourceItem({ k, value, net }: { k: keyof Resources; value: number; net: number }) {
+  return (
+    <div className="hud-item" title={RESOURCE_META[k].name}>
+      <span className="hud-icon">{RESOURCE_META[k].icon}</span>
+      <span className="hud-value">{Math.floor(value)}</span>
+      {Math.abs(net) >= 0.05 && <span className={`hud-delta ${net < 0 ? 'neg' : 'pos'}`}>{signed(net)}/j</span>}
+    </div>
+  );
+}
+
 function signed(n: number) {
   const r = Math.round(n * 10) / 10;
   return r > 0 ? `+${r}` : `${r}`;
@@ -62,6 +82,7 @@ export function HUD() {
       buildings: s.game.buildings,
       day: s.game.day,
       modifiers: s.game.modifiers,
+      discovered: s.game.discovered,
     })),
   );
   const game = useGame.getState().game;
@@ -70,18 +91,13 @@ export function HUD() {
   const season = seasonOf(data.day);
   const capacity = housingCapacity(game);
   const jobs = jobsCapacity(game);
+  const advanced = ADVANCED_RESOURCES.filter((k) => data.discovered.includes(k));
 
   return (
     <div className="hud">
       <div className="hud-group">
-        {RESOURCE_KEYS.map((k) => (
-          <div key={k} className="hud-item" title={RESOURCE_META[k].name}>
-            <span className="hud-icon">{RESOURCE_META[k].icon}</span>
-            <span className="hud-value">{Math.floor(data.resources[k])}</span>
-            {Math.abs(net[k]) >= 0.05 && (
-              <span className={`hud-delta ${net[k] < 0 ? 'neg' : 'pos'}`}>{signed(net[k])}/j</span>
-            )}
-          </div>
+        {BASE_RESOURCES.map((k) => (
+          <ResourceItem key={k} k={k} value={data.resources[k]} net={net[k]} />
         ))}
       </div>
       <div className="hud-group">
@@ -93,7 +109,7 @@ export function HUD() {
         </div>
         <MoraleGauge />
         <div className="hud-item" title="Travailleurs occupés / postes">
-          <span className="hud-icon">🛠️</span>
+          <span className="hud-icon">👷</span>
           <span className="hud-value">
             {Math.min(data.population, jobs)}/{jobs}
           </span>
@@ -119,6 +135,13 @@ export function HUD() {
             <span key={m.id} className="hud-mod">
               {m.label}
             </span>
+          ))}
+        </div>
+      )}
+      {advanced.length > 0 && (
+        <div className="hud-group hud-advanced" title="Ressources avancées des chaînes de production">
+          {advanced.map((k) => (
+            <ResourceItem key={k} k={k} value={data.resources[k]} net={net[k]} />
           ))}
         </div>
       )}

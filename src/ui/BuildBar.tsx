@@ -3,7 +3,7 @@ import { BUILD_TABS, BUILDING_BY_ID, buildCost, buildingsInTab, type BuildTab } 
 import { RESOURCE_KEYS, RESOURCE_META } from '../game/config';
 import { tileAt } from '../game/mapgen';
 import { canAfford, canPlace, conditionLabel, effectLabel, isUnlocked, workersLabel } from '../game/rules';
-import type { Resources } from '../game/types';
+import type { GameState, Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
 
 const TAB_KEY = 'village-vr-build-tab';
@@ -31,6 +31,11 @@ function loadTab(): BuildTab {
   return BUILD_TABS[0].id;
 }
 
+/** Onglets affichés : l'Artisanat n'apparaît qu'une fois un de ses bâtiments débloqué */
+function visibleTabs(game: GameState) {
+  return BUILD_TABS.filter((t) => !t.hiddenUntilUnlocked || buildingsInTab(t.id).some((d) => isUnlocked(game, d.id)));
+}
+
 /**
  * Barre de construction : onglets par catégorie + cartes compactes qui passent à la ligne
  * (jamais de défilement). Touches 1 à 6 = bâtiment de l'onglet actif, Tab = onglet suivant.
@@ -40,13 +45,20 @@ export function BuildBar() {
   const unlocked = useGame((s) => s.game.unlocked);
   const selected = useGame((s) => s.selected);
   const select = useGame((s) => s.select);
-  const [tab, setTabState] = useState<BuildTab>(loadTab);
+  const [storedTab, setTabState] = useState<BuildTab>(loadTab);
+  let tab = storedTab;
   const fertile = useGame(
     (s) => s.selected === 'field' && !!s.hover && tileAt(s.game.map, s.hover.x, s.hover.z) === 'fertile',
   );
   const reason = useGame((s) =>
     s.hover && s.selected ? canPlace(s.game, s.selected, s.hover.x, s.hover.z).reason ?? null : null,
   );
+
+  // `unlocked` est lu pour re-rendre la barre quand un déblocage arrive
+  const game = { ...useGame.getState().game, unlocked };
+  // Onglet mémorisé encore masqué (ex. Artisanat pas encore débloqué) : on affiche le premier
+  const tabs = visibleTabs(game);
+  if (!tabs.some((t) => t.id === tab)) tab = tabs[0].id;
 
   const setTab = (t: BuildTab) => {
     setTabState(t);
@@ -67,9 +79,10 @@ export function BuildBar() {
       }
       if (e.key === 'Tab') {
         e.preventDefault();
-        const i = BUILD_TABS.findIndex((t) => t.id === tab);
-        const n = BUILD_TABS.length;
-        setTab(BUILD_TABS[(i + (e.shiftKey ? n - 1 : 1)) % n].id);
+        const tabs = visibleTabs(state.game);
+        const i = Math.max(0, tabs.findIndex((t) => t.id === tab));
+        const n = tabs.length;
+        setTab(tabs[(i + (e.shiftKey ? n - 1 : 1)) % n].id);
         return;
       }
       const index = Number(e.key) - 1;
@@ -81,8 +94,6 @@ export function BuildBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [tab]);
 
-  // `unlocked` est lu pour re-rendre la barre quand un déblocage arrive
-  const game = { ...useGame.getState().game, unlocked };
 
   return (
     <div className="buildbar-wrap">
@@ -94,7 +105,7 @@ export function BuildBar() {
         </div>
       )}
       <div className="build-tabs" role="tablist">
-        {BUILD_TABS.map((t) => {
+        {visibleTabs(game).map((t) => {
           const hasSelected = !!selected && BUILDING_BY_ID[selected].tab === t.id;
           return (
             <button

@@ -1,6 +1,7 @@
 // Store Zustand : relie la logique pure (game/) au rendu et à l'interface.
 
 import { create } from 'zustand';
+import { loadSettings, saveSettings, type Settings } from './settings';
 import { DAY_DURATION_SEC } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
@@ -13,6 +14,7 @@ import {
   createInitialState,
   placeBuilding,
   repairBuilding,
+  togglePause as togglePauseSim,
   resolveChoice,
   upgradeBuilding,
 } from '../game/simulation';
@@ -23,6 +25,9 @@ export type Speed = 0 | 1 | 2;
 interface GameStore {
   game: GameState;
   speed: Speed;
+  settings: Settings;
+  /** Vitesse à reprendre après une pause automatique (null = pas de pause auto en cours) */
+  resumeSpeed: Speed | null;
   selected: BuildingTypeId | null;
   hover: { x: number; z: number } | null;
   /** Bâtiment dont le panneau d'information est ouvert */
@@ -44,11 +49,24 @@ interface GameStore {
   upgrade: (buildingId: number) => boolean;
   setHover: (tile: { x: number; z: number } | null) => void;
   setSpeed: (speed: Speed) => void;
+  setSettings: (patch: Partial<Settings>) => void;
   choose: (noticeId: number, optionId: string) => void;
   extinguish: (buildingId: number) => boolean;
   repair: (buildingId: number) => boolean;
+  togglePause: (buildingId: number) => boolean;
   fight: (banditIndex: number) => boolean;
   newGame: (seed?: number) => void;
+}
+
+/** Identifiants des cartes à choix encore sans réponse */
+export function openChoiceIds(game: GameState): number[] {
+  return game.notices.filter((n) => n.choice && !n.choice.resolved).map((n) => n.id);
+}
+
+function hasNewChoice(before: GameState, after: GameState): boolean {
+  if (after.notices === before.notices) return false;
+  const old = new Set(openChoiceIds(before));
+  return openChoiceIds(after).some((id) => !old.has(id));
 }
 
 const initial = loadGame() ?? createInitialState(randomSeed());
@@ -66,6 +84,8 @@ export const useGame = create<GameStore>((set, get) => {
   return {
     game: initial,
     speed: 1,
+    settings: loadSettings(),
+    resumeSpeed: null,
     selected: null,
     hover: null,
     inspected: null,
@@ -81,6 +101,10 @@ export const useGame = create<GameStore>((set, get) => {
       const structural = next.day !== game.day || next.buildings !== game.buildings || next.notices !== game.notices;
       if (structural) saveGame(next);
       const inspected = get().inspected;
+      // Pause automatique : une nouvelle carte à choix vient d'apparaître
+      if (get().settings.autoPause && hasNewChoice(game, next)) {
+        set({ speed: 0, resumeSpeed: get().resumeSpeed ?? speed });
+      }
       set({
         game: next,
         selected: next.gameOver ? null : get().selected,
@@ -129,18 +153,40 @@ export const useGame = create<GameStore>((set, get) => {
       if (h === tile || (h && tile && h.x === tile.x && h.z === tile.z)) return;
       set({ hover: tile });
     },
-    setSpeed: (speed) => set({ speed }),
+    // Un changement de vitesse manuel annule la reprise automatique
+    setSpeed: (speed) => set({ speed, resumeSpeed: null }),
+    setSettings: (patch) => {
+      const settings = { ...get().settings, ...patch };
+      saveSettings(settings);
+      set({ settings });
+    },
 
-    choose: (noticeId, optionId) => apply(resolveChoice(get().game, noticeId, optionId)),
+    choose: (noticeId, optionId) => {
+      const ok = apply(resolveChoice(get().game, noticeId, optionId));
+      // Plus aucune décision en attente : on reprend à la vitesse d'avant la pause automatique
+      const resume = get().resumeSpeed;
+      if (ok && resume !== null && !openChoiceIds(get().game).length) set({ speed: resume, resumeSpeed: null });
+      return ok;
+    },
     extinguish: (buildingId) => apply(extinguishFire(get().game, buildingId)),
     repair: (buildingId) => apply(repairBuilding(get().game, buildingId)),
+    togglePause: (buildingId) => apply(togglePauseSim(get().game, buildingId)),
     fight: (banditIndex) => apply(fightBandit(get().game, banditIndex)),
 
     newGame: (seed) => {
       clearSave();
       const game = createInitialState(seed ?? randomSeed());
       saveGame(game);
-      set({ game, selected: null, hover: null, inspected: null, inspectedParcel: null, inspectedFeature: null, speed: 1 });
+      set({
+        game,
+        selected: null,
+        hover: null,
+        inspected: null,
+        inspectedParcel: null,
+        inspectedFeature: null,
+        speed: 1,
+        resumeSpeed: null,
+      });
     },
   };
 });

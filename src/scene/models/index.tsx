@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import type { BuildingTypeId } from '../../game/types';
 import { Castle } from './Castle';
+import { Bakery, Forge, Mine, Sawmill } from './Craft';
 import { FieldDecor } from './FieldDecor';
 import { Granary } from './Granary';
 import { House } from './House';
@@ -33,4 +34,8 @@ export const MODELS: Record<BuildingTypeId, FC<ModelProps> | null> = {
   market: Market,
   tower: Tower,
   granary: Granary,
+  bakery: Bakery,
+  sawmill: Sawmill,
+  mine: Mine,
+  forge: Forge,
 };

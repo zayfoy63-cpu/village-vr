@@ -25,6 +25,7 @@ import {
   pickEvent,
   revolt,
   scheduleEvent,
+  wearWeapons,
   severity,
   startEvent,
 } from './events';
@@ -48,7 +49,11 @@ import {
   defensePower,
   findNewUnlocks,
   foodConsumption,
+  foodReserve,
+  mealPlan,
+  statsOf,
   housingCapacity,
+  isUnlocked,
   repairCost,
 } from './rules';
 import { clamp, cloneState, gameTime, pushNotice } from './stateUtils';
@@ -81,6 +86,7 @@ export function createInitialState(seed: number): GameState {
     floodUntil: 0,
     parcels: { owned: [...PARCELS.start], bought: 0 },
     features: generateFeatures(map, seed),
+    discovered: ['food', 'wood', 'stone', 'gold'],
     stats: {
       maxPopulation: START_POPULATION,
       buildingsBuilt: 0,
@@ -145,6 +151,7 @@ export function placeBuilding(state: GameState, type: BuildingTypeId, x: number,
   s.stats.buildingsBuilt++;
   assignWorkers(s);
   applyUnlocks(s, true);
+  updateDiscovered(s);
   return s;
 }
 
@@ -157,6 +164,19 @@ export function upgradeBuilding(state: GameState, buildingId: number): GameState
   for (const k of RESOURCE_KEYS) s.resources[k] -= check.next.cost[k] ?? 0;
   s.buildings.find((x) => x.id === buildingId)!.level++;
   s.stats.upgrades++;
+  assignWorkers(s);
+  updateDiscovered(s);
+  return s;
+}
+
+/** Met en pause / relance un bâtiment (ses travailleurs vont ailleurs) */
+export function togglePause(state: GameState, buildingId: number): GameState | null {
+  const b = state.buildings.find((x) => x.id === buildingId);
+  if (state.gameOver || !b || !statsOf(b).workers) return null;
+  const s = cloneState(state);
+  const t = s.buildings.find((x) => x.id === buildingId)!;
+  if (t.paused) delete t.paused;
+  else t.paused = true;
   assignWorkers(s);
   return s;
 }
@@ -237,6 +257,7 @@ export function attackCamp(state: GameState, featureId: number): GameState | nul
   const feature = s.features.find((x) => x.id === featureId)!;
   const enemy = campStrength(s, feature.strength);
   const power = defensePower(s) * 2 + Math.min(s.population, 40) * 0.15;
+  wearWeapons(s);
   const roll = rng.range(0.7, 1.25);
   if (power * roll >= enemy) {
     feature.cleared = true;
@@ -307,7 +328,7 @@ function updateMorale(s: GameState, hungry: boolean, rng: Rng) {
   const towers = s.buildings.filter((b) => b.type === 'tower' && b.workers > 0).length;
   const damaged = s.buildings.filter((b) => b.damaged).length;
   let target = M.base;
-  if (s.resources.food >= foodConsumption(s) * 3) target += M.fedBonus;
+  if (foodReserve(s.resources) >= foodConsumption(s) * 3) target += M.fedBonus;
   target -= Math.min(20, Math.max(0, s.population - capacity) * M.overcrowdPenalty);
   target += Math.min(15, markets * M.marketBonus);
   target += Math.min(6, towers * M.towerBonus);
@@ -330,8 +351,22 @@ function updateMorale(s: GameState, hungry: boolean, rng: Rng) {
   }
 }
 
+/** Ressources découvertes : en stock ou produites / consommées par un bâtiment existant */
+function updateDiscovered(s: GameState) {
+  const found = new Set(s.discovered);
+  for (const k of RESOURCE_KEYS) if (s.resources[k] > 0) found.add(k);
+  for (const b of s.buildings) {
+    // Un bâtiment encore verrouillé (ex. le moulin de départ) ne fait rien découvrir
+    if (!isUnlocked(s, b.type, b.level)) continue;
+    const lvl = statsOf(b);
+    for (const k of RESOURCE_KEYS) if (lvl.produces?.[k] || lvl.consumes?.[k]) found.add(k);
+  }
+  if (found.size !== s.discovered.length) s.discovered = RESOURCE_KEYS.filter((k) => found.has(k));
+}
+
 function finalize(s: GameState) {
   for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, Math.round(s.resources[k] * 10) / 10);
+  updateDiscovered(s);
   assignWorkers(s);
   if (s.population > 0) applyUnlocks(s, true);
   s.stats.maxPopulation = Math.max(s.stats.maxPopulation, s.population);
@@ -347,20 +382,20 @@ export function advanceDay(state: GameState): GameState {
   const s = cloneState(state);
   const rng = new Rng(s.rngState);
 
-  // 1. Production de la journée écoulée
+  // 1. Production de la journée écoulée (producteurs, puis transformateurs, usure des outils)
   assignWorkers(s);
   const prod = computeProduction(s);
-  for (const k of RESOURCE_KEYS) s.resources[k] += prod[k];
+  for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, s.resources[k] + prod[k]);
 
-  // 2. Repas
-  s.resources.food -= foodConsumption(s);
-  const hungry = s.resources.food < 0;
+  // 2. Repas : pain (3 rations), farine, puis blé
+  const meal = mealPlan(s, s.resources);
+  for (const k of RESOURCE_KEYS) s.resources[k] -= meal.eaten[k];
+  const hungry = meal.missing > 0.01;
   if (hungry) {
-    const deficit = -s.resources.food;
+    const deficit = meal.missing;
     // Départs proportionnels au manque, mais au plus ~20 % de la population par jour
     const leaving = Math.min(s.population, Math.max(1, Math.ceil(deficit / 3)), Math.max(1, Math.ceil(s.population * 0.2)));
     s.population -= leaving;
-    s.resources.food = 0;
     pushNotice(s, {
       kind: 'bad',
       icon: '🍽️',
@@ -370,8 +405,9 @@ export function advanceDay(state: GameState): GameState {
   } else {
     // 3. Croissance : place libre, nourriture suffisante et moral correct
     const free = housingCapacity(s) - s.population;
-    if (free > 0 && s.morale >= MORALE.growthMin && s.resources.food >= s.population * 2 + 4) {
-      const arrivals = free > 1 && s.resources.food >= s.population * 5 ? 2 : 1;
+    const reserve = foodReserve(s.resources);
+    if (free > 0 && s.morale >= MORALE.growthMin && reserve >= s.population * 2 + 4) {
+      const arrivals = free > 1 && reserve >= s.population * 5 ? 2 : 1;
       s.population += arrivals;
       pushNotice(s, {
         kind: 'info',

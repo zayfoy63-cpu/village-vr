@@ -3,7 +3,7 @@
 
 import { BUILDING_BY_ID } from './buildings';
 import { RESOURCE_KEYS } from './config';
-import { TUNING, addMorale, applyChoice, formatResources, loseVillagers } from './events';
+import { TUNING, addMorale, applyChoice, formatResources, loseVillagers, wearWeapons } from './events';
 import { Rng } from './rng';
 import { assignWorkers, defensePower } from './rules';
 import { cloneState, gameTime, pushNotice } from './stateUtils';
@@ -183,6 +183,7 @@ function updateRaid(s: GameState, t: number, rng: Rng) {
       each[k] = stolen[k]! / alive;
     }
     raid.lootEach = each;
+    wearWeapons(s);
     addMorale(s, TUNING.morale.pillage * Math.min(1, alive / 4));
     pushNotice(s, {
       kind: 'bad',

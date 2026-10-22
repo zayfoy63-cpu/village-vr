@@ -29,6 +29,7 @@ export function EventCards() {
   // Temps de jeu arrondi : re-rendu ~2 fois par seconde, pas à chaque image
   const now = useGame((s) => Math.floor((s.game.day + s.game.dayProgress) * 40) / 40);
   const speed = useGame((s) => s.speed);
+  const autoPaused = useGame((s) => s.resumeSpeed !== null && s.speed === 0);
   const choose = useGame((s) => s.choose);
   const [clock, setClock] = useState(() => Date.now());
   const seenAt = useRef(new Map<number, number>());
@@ -49,7 +50,8 @@ export function EventCards() {
   firstRender.current = false;
 
   const choices = notices.filter((n) => isOpenChoice(n) && !n.threat);
-  const threats = notices.filter((n) => isOpenThreat(n));
+  // Les menaces sont listées dans "Menaces à venir" ; ici seulement celles qui attendent une préparation
+  const threats = notices.filter((n) => isOpenThreat(n) && isOpenChoice(n));
   const recent = notices.filter(
     (n) =>
       !isOpenChoice(n) &&
@@ -96,9 +98,11 @@ export function EventCards() {
                       style={{ width: `${Math.min(100, (remaining / TUNING.choiceTimeout) * 100)}%` }}
                     />
                     <span>
-                      {speed === 0
-                        ? '⏸ En pause'
-                        : `${Math.ceil((remaining * DAY_DURATION_SEC) / speed)} s pour décider`}
+                      {autoPaused
+                        ? '⏸ Jeu en pause : prenez votre temps'
+                        : speed === 0
+                          ? '⏸ En pause'
+                          : `${Math.ceil((remaining * DAY_DURATION_SEC) / speed)} s pour décider`}
                     </span>
                   </div>
                 )}
@@ -116,6 +120,15 @@ export function EventCards() {
                         {o.cost && <span className={`choice-cost ${affordable ? '' : 'missing'}`}>{formatResources(o.cost)}</span>}
                       </span>
                       {o.detail && <span className="choice-detail">{o.detail}</span>}
+                      {o.effects && o.effects.length > 0 && (
+                        <span className="choice-effects">
+                          {o.effects.map((e, i) => (
+                            <span key={i} className={`fx ${e.tone}`}>
+                              {e.icon} {e.text}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {o.id === c.defaultId && <span className="choice-default">par défaut</span>}
                     </button>
                   );

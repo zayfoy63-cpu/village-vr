@@ -8,7 +8,18 @@ export const DAY_DURATION_SEC = 20;
 export const DAYS_PER_SEASON = 10;
 
 export const START_POPULATION = 3;
-export const START_RESOURCES: Resources = { food: 10, wood: 20, stone: 0, gold: 0 };
+export const START_RESOURCES: Resources = {
+  food: 10,
+  wood: 20,
+  stone: 0,
+  gold: 0,
+  flour: 0,
+  bread: 0,
+  planks: 0,
+  ironOre: 0,
+  tools: 0,
+  weapons: 0,
+};
 
 /** Nourriture mangée par villageois et par jour */
 export const FOOD_PER_VILLAGER = 1;
@@ -50,7 +61,7 @@ export const DAMAGED_FACTOR = 0.5;
 export const REPAIR_COST_RATIO = 0.5;
 
 export const SAVE_KEY = 'village-vr-save-v1';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export type SeasonId = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -85,10 +96,20 @@ export function seasonIndex(day: number): number {
 }
 
 export const RESOURCE_META: Record<keyof Resources, { name: string; icon: string }> = {
-  food: { name: 'Nourriture', icon: '🍞' },
+  food: { name: 'Blé (nourriture de base)', icon: '🌾' },
   wood: { name: 'Bois', icon: '🪵' },
   stone: { name: 'Pierre', icon: '🪨' },
   gold: { name: 'Or', icon: '🪙' },
+  flour: { name: 'Farine', icon: '🥣' },
+  bread: { name: 'Pain', icon: '🍞' },
+  planks: { name: 'Planches', icon: '🪚' },
+  ironOre: { name: 'Minerai de fer', icon: '🔩' },
+  tools: { name: 'Outils', icon: '🛠️' },
+  weapons: { name: 'Armes', icon: '⚔️' },
 };
 
-export const RESOURCE_KEYS: (keyof Resources)[] = ['food', 'wood', 'stone', 'gold'];
+/** Ligne de base du HUD (toujours visible) */
+export const BASE_RESOURCES: (keyof Resources)[] = ['food', 'wood', 'stone', 'gold'];
+/** Ligne avancée du HUD (chaque ressource n'apparaît qu'une fois découverte) */
+export const ADVANCED_RESOURCES: (keyof Resources)[] = ['flour', 'bread', 'planks', 'ironOre', 'tools', 'weapons'];
+export const RESOURCE_KEYS: (keyof Resources)[] = [...BASE_RESOURCES, ...ADVANCED_RESOURCES];

@@ -22,6 +22,8 @@ export interface LevelDef {
   workers?: number;
   /** Production par jour à effectif complet */
   produces?: Partial<Resources>;
+  /** Matières premières consommées par jour à effectif complet (bâtiment de transformation) */
+  consumes?: Partial<Resources>;
   /** Puissance défensive contre les bandits (à effectif complet) */
   defense?: number;
   /** Nourriture mise à l'abri des rats */
@@ -29,14 +31,43 @@ export interface LevelDef {
 }
 
 /** Onglets de la barre de construction (l'ordre ici = l'ordre affiché) */
-export type BuildTab = 'housing' | 'production' | 'commerce' | 'defense';
+export type BuildTab = 'housing' | 'production' | 'craft' | 'commerce' | 'defense';
 
-export const BUILD_TABS: { id: BuildTab; label: string; icon: string }[] = [
+export const BUILD_TABS: { id: BuildTab; label: string; icon: string; hiddenUntilUnlocked?: boolean }[] = [
   { id: 'housing', label: 'Habitations', icon: '🏠' },
   { id: 'production', label: 'Production', icon: '🌾' },
+  // N'apparaît qu'une fois un premier bâtiment de transformation débloqué
+  { id: 'craft', label: 'Artisanat', icon: '⚒️', hiddenUntilUnlocked: true },
   { id: 'commerce', label: 'Commerce', icon: '⚖️' },
   { id: 'defense', label: 'Défense', icon: '🛡️' },
 ];
+
+/** Réglages des chaînes de production */
+export const CHAINS = {
+  /** Rations apportées par unité mangée ; les habitants mangent dans cet ordre */
+  nourishment: { bread: 3, flour: 1, food: 1 } as Partial<Record<keyof Resources, number>>,
+  eatOrder: ['bread', 'flour', 'food'] as (keyof Resources)[],
+  tools: {
+    /** Bonus de production des bâtiments équipés d'outils */
+    bonus: 0.3,
+    /** Outils usés par bâtiment équipé et par jour */
+    wearPerBuilding: 0.1,
+    /** Bâtiments qui peuvent être équipés */
+    equips: ['field', 'lumber', 'quarry', 'mine'] as BuildingTypeId[],
+  },
+  /**
+   * Stock au-delà duquel un bâtiment de transformation s'arrête de lui-même
+   * (il libère ses travailleurs et n'use plus de matière première)
+   */
+  stockCap: { flour: 60, bread: 150, planks: 40, tools: 30, weapons: 25 } as Partial<Record<keyof Resources, number>>,
+  weapons: {
+    /** Défense ajoutée par arme en stock (plafonnée) */
+    defenseEach: 0.15,
+    maxDefense: 3,
+    /** Part des armes perdues à chaque combat contre des bandits */
+    lostPerFight: 0.15,
+  },
+};
 
 export interface BuildingDef {
   id: BuildingTypeId;
@@ -86,11 +117,12 @@ export const BUILDINGS: BuildingDef[] = [
     id: 'mill',
     name: 'Moulin',
     icon: '🌬️',
-    description: 'Le vieux moulin du village.',
-    buildable: false,
+    tab: 'craft',
+    description: 'Moud le blé en farine. Le moulin de départ se met en marche dès qu\'il est débloqué.',
+    buildable: true,
     size: 1,
-    levels: [{ cost: {} }],
-    priority: 99,
+    levels: [{ cost: { wood: 15, stone: 5 }, workers: 1, consumes: { food: 4 }, produces: { flour: 4 }, unlock: { population: 8 } }],
+    priority: 6,
     allowedTiles: LAND,
   },
 
@@ -127,7 +159,7 @@ export const BUILDINGS: BuildingDef[] = [
     tab: 'housing',
     buildable: true,
     size: 1,
-    levels: [{ cost: { wood: 22, stone: 12 }, housing: 5, unlock: { population: 15, buildings: { market: 1 } } }],
+    levels: [{ cost: { wood: 15, stone: 12, planks: 5 }, housing: 5, unlock: { population: 15, buildings: { market: 1 } } }],
     priority: 99,
     allowedTiles: LAND,
   },
@@ -139,7 +171,7 @@ export const BUILDINGS: BuildingDef[] = [
     tab: 'housing',
     buildable: true,
     size: 1,
-    levels: [{ cost: { wood: 35, stone: 30, gold: 12 }, housing: 8, unlock: { population: 30, buildings: { tower: 1 } } }],
+    levels: [{ cost: { wood: 20, stone: 25, gold: 12, planks: 10, tools: 3 }, housing: 8, unlock: { population: 30, buildings: { tower: 1 } } }],
     priority: 99,
     allowedTiles: LAND,
   },
@@ -156,7 +188,7 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 5 }, workers: 1, produces: { food: 4 } },
       { cost: { wood: 10, stone: 4 }, workers: 2, produces: { food: 9 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 18, stone: 10, gold: 4 }, workers: 3, produces: { food: 15 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 12, stone: 10, gold: 4, planks: 4, tools: 2 }, workers: 3, produces: { food: 15 }, unlock: UPGRADE_LEVEL_3 },
     ],
     fertileBonus: 1.75,
     seasonal: true,
@@ -174,7 +206,7 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 10 }, workers: 1, produces: { wood: 3 } },
       { cost: { wood: 15, stone: 5 }, workers: 2, produces: { wood: 7 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 22, stone: 12, gold: 5 }, workers: 3, produces: { wood: 11 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 12, stone: 12, gold: 5, planks: 6, tools: 2 }, workers: 3, produces: { wood: 11 }, unlock: UPGRADE_LEVEL_3 },
     ],
     requiresAdjacent: 'forest',
     priority: 2,
@@ -191,7 +223,7 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 15 }, workers: 2, produces: { stone: 3 } },
       { cost: { wood: 20, stone: 5 }, workers: 3, produces: { stone: 5 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 30, stone: 10, gold: 6 }, workers: 4, produces: { stone: 8 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 20, stone: 10, gold: 6, planks: 6, tools: 3 }, workers: 4, produces: { stone: 8 }, unlock: UPGRADE_LEVEL_3 },
     ],
     requiresAdjacent: 'rock',
     priority: 3,
@@ -208,9 +240,62 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 18 }, storage: 150 },
       { cost: { wood: 20, stone: 10 }, storage: 300, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 25, stone: 20, gold: 5 }, storage: 500, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 15, stone: 20, gold: 5, planks: 8 }, storage: 500, unlock: UPGRADE_LEVEL_3 },
     ],
     priority: 99,
+    allowedTiles: LAND,
+  },
+  // ---------- Artisanat : chaînes de production (débloquées progressivement) ----------
+  {
+    id: 'bakery',
+    name: 'Boulangerie',
+    icon: '🥖',
+    tab: 'craft',
+    description: 'Cuit la farine en pain. Un pain nourrit 3 habitants !',
+    buildable: true,
+    size: 1,
+    levels: [{ cost: { wood: 15, stone: 10 }, workers: 1, consumes: { flour: 3 }, produces: { bread: 3 }, unlock: { population: 10 } }],
+    priority: 7,
+    allowedTiles: LAND,
+  },
+  {
+    id: 'sawmill',
+    name: 'Scierie',
+    icon: '🪚',
+    tab: 'craft',
+    description: 'Débite le bois en planches (maisons bourgeoises, manoirs, niveaux 3).',
+    buildable: true,
+    size: 1,
+    levels: [{ cost: { wood: 20, stone: 5 }, workers: 1, consumes: { wood: 3 }, produces: { planks: 2 }, unlock: { population: 12 } }],
+    priority: 6,
+    allowedTiles: LAND,
+  },
+  {
+    id: 'mine',
+    name: 'Mine de fer',
+    icon: '⛏️',
+    tab: 'craft',
+    description: 'Extrait du minerai de fer. Doit toucher des rochers.',
+    buildable: true,
+    size: 1,
+    levels: [{ cost: { wood: 20, stone: 5 }, workers: 2, produces: { ironOre: 3 }, unlock: { population: 15 } }],
+    requiresAdjacent: 'rock',
+    priority: 3,
+    allowedTiles: LAND,
+  },
+  {
+    id: 'forge',
+    name: 'Forge',
+    icon: '🔨',
+    tab: 'craft',
+    description: 'Forge des outils (+30 % de production des bâtiments équipés), puis des armes au niveau 2.',
+    buildable: true,
+    size: 1,
+    levels: [
+      { cost: { wood: 15, stone: 20, planks: 5 }, workers: 2, consumes: { ironOre: 2, wood: 1 }, produces: { tools: 1 }, unlock: { population: 20, buildings: { mine: 1 } } },
+      { cost: { stone: 20, planks: 10, gold: 10 }, workers: 3, consumes: { ironOre: 4, wood: 2 }, produces: { tools: 1, weapons: 1 }, unlock: UPGRADE_LEVEL_3 },
+    ],
+    priority: 7,
     allowedTiles: LAND,
   },
   {
@@ -224,7 +309,7 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 20, stone: 10 }, workers: 1, produces: { gold: 2 } },
       { cost: { wood: 25, stone: 18 }, workers: 2, produces: { gold: 5 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 30, stone: 28, gold: 10 }, workers: 3, produces: { gold: 8 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 20, stone: 28, gold: 10, planks: 8, tools: 2 }, workers: 3, produces: { gold: 8 }, unlock: UPGRADE_LEVEL_3 },
     ],
     priority: 4,
     allowedTiles: LAND,
@@ -240,7 +325,7 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [
       { cost: { wood: 10, stone: 15 }, workers: 1, defense: 1 },
       { cost: { wood: 15, stone: 25 }, workers: 2, defense: 2.2, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 20, stone: 40, gold: 10 }, workers: 3, defense: 3.8, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 10, stone: 40, gold: 10, planks: 6, tools: 3 }, workers: 3, defense: 3.8, unlock: UPGRADE_LEVEL_3 },
     ],
     priority: 5,
     allowedTiles: LAND,

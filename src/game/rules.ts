@@ -3,6 +3,7 @@
 import {
   BUILDING_BY_ID,
   BUILDINGS,
+  CHAINS,
   buildCost,
   levelDef,
   maxLevel,
@@ -23,7 +24,7 @@ import type {
 } from './types';
 
 export function emptyResources(): Resources {
-  return { food: 0, wood: 0, stone: 0, gold: 0 };
+  return { food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0 };
 }
 
 export function hasModifier(state: GameState, id: ModifierId): boolean {
@@ -183,6 +184,22 @@ export function repairCost(b: Building): Partial<Resources> {
   return out;
 }
 
+/** Transformateur à l'arrêt car tous ses produits sont au plafond de stock */
+export function isCapped(state: GameState, b: Building): boolean {
+  const lvl = statsOf(b);
+  if (!lvl.consumes || !lvl.produces) return false;
+  const outs = RESOURCE_KEYS.filter((k) => lvl.produces![k]);
+  return outs.length > 0 && outs.every((k) => CHAINS.stockCap[k] !== undefined && (state.resources[k] ?? 0) >= CHAINS.stockCap[k]!);
+}
+
+/**
+ * Bâtiment inactif : pause joueur, stock plein, ou pas encore débloqué (ex. le moulin de départ
+ * avant 8 habitants). Il n'emploie personne et ne produit rien.
+ */
+export function isIdle(state: GameState, b: Building): boolean {
+  return !!b.paused || isCapped(state, b) || !isUnlocked(state, b.type, b.level);
+}
+
 /** Répartit la population sur les bâtiments selon leur priorité (mutation) */
 export function assignWorkers(state: GameState): void {
   let free = Math.max(0, state.population - busyCrew(state));
@@ -190,7 +207,7 @@ export function assignWorkers(state: GameState): void {
     (a, b) => BUILDING_BY_ID[a.type].priority - BUILDING_BY_ID[b.type].priority || a.id - b.id,
   );
   for (const b of sorted) {
-    const n = Math.min(statsOf(b).workers ?? 0, free);
+    const n = isIdle(state, b) ? 0 : Math.min(statsOf(b).workers ?? 0, free);
     b.workers = n;
     free -= n;
   }
@@ -206,55 +223,184 @@ export function nominalProduction(state: GameState, b: Building, level = b.level
   return out;
 }
 
-/** Production journalière brute (avant consommation), selon l'état actuel */
-export function computeProduction(state: GameState): Resources {
-  const out = emptyResources();
+/** État de marche d'un bâtiment pendant la journée */
+export interface BuildingRun {
+  /** Part de la production réellement atteinte (0 = à l'arrêt) */
+  ratio: number;
+  /** Raison de l'arrêt complet (alerte au-dessus du bâtiment) */
+  blocked: 'workers' | 'input' | null;
+  /** Matières premières manquantes (bâtiment de transformation) */
+  missing: (keyof Resources)[];
+  /** Équipé d'outils aujourd'hui */
+  equipped: boolean;
+}
+
+export interface ProductionReport {
+  produced: Resources;
+  consumed: Resources;
+  status: Map<number, BuildingRun>;
+}
+
+/**
+ * Simule la production d'une journée : d'abord les producteurs de base (éventuellement équipés
+ * d'outils), puis les transformateurs par ordre de priorité, qui puisent dans le stock disponible.
+ */
+export function simulateProduction(state: GameState): ProductionReport {
+  const produced = emptyResources();
+  const consumed = emptyResources();
+  const status = new Map<number, BuildingRun>();
+  const stock: Resources = { ...emptyResources(), ...state.resources };
   const winter = seasonOf(state.day).id === 'winter';
   const drought = hasModifier(state, 'drought');
   const harvest = hasModifier(state, 'goodHarvest');
   const blight = hasModifier(state, 'blight');
   const global = globalProductionFactor(state);
-  for (const b of state.buildings) {
-    const def = BUILDING_BY_ID[b.type];
-    const stats = statsOf(b);
-    if (!stats.produces || !stats.workers) continue;
-    if (def.seasonal && winter) continue;
-    let factor = (b.workers / stats.workers) * conditionFactor(b) * global;
-    if (def.fertileBonus && tileAt(state.map, b.x, b.z) === 'fertile') factor *= def.fertileBonus;
-    if (def.seasonal && drought) factor *= 0.5;
-    if (def.seasonal && harvest) factor *= 1.5;
-    if (def.seasonal && blight) factor *= 0.4;
-    for (const k of RESOURCE_KEYS) out[k] += (stats.produces[k] ?? 0) * factor;
+  const T = CHAINS.tools;
+
+  // Outils : les bâtiments équipables en activité se partagent le stock d'outils
+  const equippable = state.buildings.filter((b) => T.equips.includes(b.type) && b.workers > 0 && !b.fire);
+  const toolsNeed = equippable.length * T.wearPerBuilding;
+  const toolsRatio = toolsNeed > 0 ? Math.min(1, (stock.tools ?? 0) / toolsNeed) : 0;
+  if (toolsNeed > 0) {
+    consumed.tools += toolsNeed * toolsRatio;
+    stock.tools -= toolsNeed * toolsRatio;
   }
+
+  const baseFactor = (b: Building, stats: LevelDef) => {
+    const def = BUILDING_BY_ID[b.type];
+    if (!stats.workers) return 0;
+    let f = (b.workers / stats.workers) * conditionFactor(b) * global;
+    if (def.fertileBonus && tileAt(state.map, b.x, b.z) === 'fertile') f *= def.fertileBonus;
+    if (def.seasonal && winter) f = 0;
+    if (def.seasonal && drought) f *= 0.5;
+    if (def.seasonal && harvest) f *= 1.5;
+    if (def.seasonal && blight) f *= 0.4;
+    return f;
+  };
+
+  const producers = state.buildings.filter((b) => statsOf(b).produces && !statsOf(b).consumes);
+  const processors = state.buildings
+    .filter((b) => statsOf(b).produces && statsOf(b).consumes)
+    .sort((a, b) => BUILDING_BY_ID[a.type].priority - BUILDING_BY_ID[b.type].priority || a.id - b.id);
+
+  for (const b of producers) {
+    const stats = statsOf(b);
+    const equipped = T.equips.includes(b.type) && b.workers > 0 && toolsRatio > 0;
+    const f = baseFactor(b, stats) * (equipped ? 1 + T.bonus * toolsRatio : 1);
+    for (const k of RESOURCE_KEYS) {
+      const q = (stats.produces![k] ?? 0) * f;
+      produced[k] += q;
+      stock[k] += q;
+    }
+    status.set(b.id, {
+      ratio: f > 0 ? 1 : 0,
+      blocked: stats.workers && b.workers === 0 && !isIdle(state, b) ? 'workers' : null,
+      missing: [],
+      equipped,
+    });
+  }
+
+  for (const b of processors) {
+    const stats = statsOf(b);
+    const f = baseFactor(b, stats);
+    let ratio = 1;
+    const missing: (keyof Resources)[] = [];
+    for (const k of RESOURCE_KEYS) {
+      const need = (stats.consumes![k] ?? 0) * f;
+      if (need <= 0) continue;
+      const r = Math.min(1, Math.max(0, stock[k]) / need);
+      if (r < 1) missing.push(k);
+      ratio = Math.min(ratio, r);
+    }
+    for (const k of RESOURCE_KEYS) {
+      const use = (stats.consumes![k] ?? 0) * f * ratio;
+      consumed[k] += use;
+      stock[k] -= use;
+      const out = (stats.produces![k] ?? 0) * f * ratio;
+      produced[k] += out;
+      stock[k] += out;
+    }
+    const noWorkers = !!stats.workers && b.workers === 0 && !isIdle(state, b);
+    status.set(b.id, {
+      ratio: f > 0 ? ratio : 0,
+      blocked: noWorkers ? 'workers' : f > 0 && ratio <= 0.001 ? 'input' : null,
+      missing,
+      equipped: false,
+    });
+  }
+  return { produced, consumed, status };
+}
+
+/** Variation des stocks due aux bâtiments (production − matières premières − usure des outils) */
+export function computeProduction(state: GameState): Resources {
+  const { produced, consumed } = simulateProduction(state);
+  const out = emptyResources();
+  for (const k of RESOURCE_KEYS) out[k] = produced[k] - consumed[k];
   return out;
 }
 
+/** Rations nécessaires pour la journée (1 par habitant, x2 en hiver rude) */
 export function foodConsumption(state: GameState): number {
   const harsh = hasModifier(state, 'harshWinter') ? 2 : 1;
   return state.population * FOOD_PER_VILLAGER * harsh;
 }
 
+/** Ce que les habitants mangent (pain d'abord, puis farine, puis blé) et les rations manquantes */
+export function mealPlan(state: GameState, stock: Resources): { eaten: Resources; missing: number } {
+  let need = foodConsumption(state);
+  const eaten = emptyResources();
+  for (const k of CHAINS.eatOrder) {
+    const value = CHAINS.nourishment[k] ?? 1;
+    const use = Math.min(Math.max(0, stock[k]), need / value);
+    eaten[k] += use;
+    need -= use * value;
+    if (need <= 1e-9) break;
+  }
+  return { eaten, missing: Math.max(0, need) };
+}
+
+/** Réserves en rations (pain x3) : sert au moral et aux conseils */
+export function foodReserve(res: Resources): number {
+  return CHAINS.eatOrder.reduce((sum, k) => sum + Math.max(0, res[k] ?? 0) * (CHAINS.nourishment[k] ?? 1), 0);
+}
+
 /** Bilan net par jour, utile pour le HUD */
 export function computeNet(state: GameState): Resources {
-  const p = computeProduction(state);
-  p.food -= foodConsumption(state);
-  return p;
+  const net = computeProduction(state);
+  const stock = emptyResources();
+  for (const k of RESOURCE_KEYS) stock[k] = (state.resources[k] ?? 0) + net[k];
+  const { eaten } = mealPlan(state, stock);
+  for (const k of RESOURCE_KEYS) net[k] -= eaten[k];
+  return net;
+}
+
+export function weaponsDefense(state: GameState): number {
+  return Math.min(CHAINS.weapons.maxDefense, (state.resources.weapons ?? 0) * CHAINS.weapons.defenseEach);
 }
 
 export function defensePower(state: GameState): number {
-  return state.buildings.reduce((sum, b) => {
+  return weaponsDefense(state) + state.buildings.reduce((sum, b) => {
     const stats = statsOf(b);
     if (!stats.defense || !stats.workers) return sum;
     return sum + stats.defense * (b.workers / stats.workers) * conditionFactor(b);
   }, 0);
 }
 
-/** Effet d'un niveau en texte court : "+4 🍞/jour", "+3 places", "Défense +2" */
+/** Effet d'un niveau en texte court : "+4 🌾/jour", "+3 places", "Défense +2" */
 export function effectLabel(lvl: LevelDef, produces: Partial<Resources> = lvl.produces ?? {}): string {
   const parts: string[] = [];
   if (lvl.housing) parts.push(`+${lvl.housing} places`);
-  for (const k of RESOURCE_KEYS) {
-    if (produces[k]) parts.push(`+${produces[k]} ${RESOURCE_META[k].icon}/jour`);
+  const list = (r: Partial<Resources>) =>
+    RESOURCE_KEYS.filter((k) => r[k])
+      .map((k) => `${r[k]} ${RESOURCE_META[k].icon}`)
+      .join(' + ');
+  if (lvl.consumes) {
+    // Transformation : entrée → sortie
+    parts.push(`${list(lvl.consumes)} → ${list(produces)} /jour`);
+  } else {
+    for (const k of RESOURCE_KEYS) {
+      if (produces[k]) parts.push(`+${produces[k]} ${RESOURCE_META[k].icon}/jour`);
+    }
   }
   if (lvl.defense) parts.push(`Défense +${lvl.defense}`);
   if (lvl.storage) parts.push(`Protège ${lvl.storage} ${RESOURCE_META.food.icon}`);

@@ -18,7 +18,7 @@ export interface LevelDef {
   unlock?: UnlockCondition;
   /** Places d'habitants fournies */
   housing?: number;
-  /** Nombre maximal de travailleurs */
+  /** Travailleurs requis à ce niveau (production réduite en proportion s'il en manque) */
   workers?: number;
   /** Production par jour à effectif complet */
   produces?: Partial<Resources>;
@@ -155,8 +155,8 @@ export const BUILDINGS: BuildingDef[] = [
     size: 1,
     levels: [
       { cost: { wood: 5 }, workers: 1, produces: { food: 4 } },
-      { cost: { wood: 10, stone: 4 }, workers: 1, produces: { food: 5 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 18, stone: 10, gold: 4 }, workers: 1, produces: { food: 7 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 10, stone: 4 }, workers: 2, produces: { food: 9 }, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 18, stone: 10, gold: 4 }, workers: 3, produces: { food: 15 }, unlock: UPGRADE_LEVEL_3 },
     ],
     fertileBonus: 1.75,
     seasonal: true,
@@ -173,8 +173,8 @@ export const BUILDINGS: BuildingDef[] = [
     size: 1,
     levels: [
       { cost: { wood: 10 }, workers: 1, produces: { wood: 3 } },
-      { cost: { wood: 15, stone: 5 }, workers: 1, produces: { wood: 5 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 22, stone: 12, gold: 5 }, workers: 1, produces: { wood: 8 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 15, stone: 5 }, workers: 2, produces: { wood: 7 }, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 22, stone: 12, gold: 5 }, workers: 3, produces: { wood: 11 }, unlock: UPGRADE_LEVEL_3 },
     ],
     requiresAdjacent: 'forest',
     priority: 2,
@@ -190,8 +190,8 @@ export const BUILDINGS: BuildingDef[] = [
     size: 1,
     levels: [
       { cost: { wood: 15 }, workers: 2, produces: { stone: 3 } },
-      { cost: { wood: 20, stone: 5 }, workers: 2, produces: { stone: 5 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 30, stone: 10, gold: 6 }, workers: 2, produces: { stone: 8 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 20, stone: 5 }, workers: 3, produces: { stone: 5 }, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 30, stone: 10, gold: 6 }, workers: 4, produces: { stone: 8 }, unlock: UPGRADE_LEVEL_3 },
     ],
     requiresAdjacent: 'rock',
     priority: 3,
@@ -223,8 +223,8 @@ export const BUILDINGS: BuildingDef[] = [
     size: 1,
     levels: [
       { cost: { wood: 20, stone: 10 }, workers: 1, produces: { gold: 2 } },
-      { cost: { wood: 25, stone: 18 }, workers: 1, produces: { gold: 4 }, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 30, stone: 28, gold: 10 }, workers: 1, produces: { gold: 7 }, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 25, stone: 18 }, workers: 2, produces: { gold: 5 }, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 30, stone: 28, gold: 10 }, workers: 3, produces: { gold: 8 }, unlock: UPGRADE_LEVEL_3 },
     ],
     priority: 4,
     allowedTiles: LAND,
@@ -239,8 +239,8 @@ export const BUILDINGS: BuildingDef[] = [
     size: 1,
     levels: [
       { cost: { wood: 10, stone: 15 }, workers: 1, defense: 1 },
-      { cost: { wood: 15, stone: 25 }, workers: 1, defense: 2, unlock: UPGRADE_LEVEL_2 },
-      { cost: { wood: 20, stone: 40, gold: 10 }, workers: 1, defense: 3.5, unlock: UPGRADE_LEVEL_3 },
+      { cost: { wood: 15, stone: 25 }, workers: 2, defense: 2.2, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 20, stone: 40, gold: 10 }, workers: 3, defense: 3.8, unlock: UPGRADE_LEVEL_3 },
     ],
     priority: 5,
     allowedTiles: LAND,

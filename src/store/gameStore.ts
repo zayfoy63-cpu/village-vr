@@ -6,6 +6,9 @@ import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
 import { extinguishFire, fightBandit } from '../game/hazards';
 import {
+  attackCamp as attackCampSim,
+  buyParcel as buyParcelSim,
+  clearRuins as clearRuinsSim,
   advanceTime,
   createInitialState,
   placeBuilding,
@@ -24,11 +27,20 @@ interface GameStore {
   hover: { x: number; z: number } | null;
   /** Bâtiment dont le panneau d'information est ouvert */
   inspected: number | null;
+  /** Parcelle verrouillée dont le panneau d'achat est ouvert */
+  inspectedParcel: number | null;
+  /** Danger (camp, ruines) dont le panneau est ouvert */
+  inspectedFeature: number | null;
 
   tick: (dtSec: number) => void;
   build: (x: number, z: number) => boolean;
   select: (type: BuildingTypeId | null) => void;
   inspect: (buildingId: number | null) => void;
+  inspectParcel: (parcelId: number | null) => void;
+  inspectFeature: (featureId: number | null) => void;
+  buyParcel: (parcelId: number) => boolean;
+  clearRuins: (featureId: number) => boolean;
+  attackCamp: (featureId: number) => boolean;
   upgrade: (buildingId: number) => boolean;
   setHover: (tile: { x: number; z: number } | null) => void;
   setSpeed: (speed: Speed) => void;
@@ -57,6 +69,8 @@ export const useGame = create<GameStore>((set, get) => {
     selected: null,
     hover: null,
     inspected: null,
+    inspectedParcel: null,
+    inspectedFeature: null,
 
     tick: (dt) => {
       const { game, speed } = get();
@@ -85,8 +99,24 @@ export const useGame = create<GameStore>((set, get) => {
       return true;
     },
 
-    select: (type) => set({ selected: type, inspected: type ? null : get().inspected }),
-    inspect: (buildingId) => set({ inspected: buildingId, selected: buildingId !== null ? null : get().selected }),
+    select: (type) =>
+      set(type ? { selected: type, inspected: null, inspectedParcel: null, inspectedFeature: null } : { selected: null }),
+    inspect: (buildingId) =>
+      set({ inspected: buildingId, inspectedParcel: null, inspectedFeature: null, selected: buildingId !== null ? null : get().selected }),
+    inspectParcel: (parcelId) => set({ inspectedParcel: parcelId, inspected: null, inspectedFeature: null }),
+    inspectFeature: (featureId) =>
+      set({ inspectedFeature: featureId, inspected: null, inspectedParcel: null, selected: featureId !== null ? null : get().selected }),
+    buyParcel: (parcelId) => {
+      const ok = apply(buyParcelSim(get().game, parcelId));
+      if (ok) set({ inspectedParcel: null });
+      return ok;
+    },
+    clearRuins: (featureId) => {
+      const ok = apply(clearRuinsSim(get().game, featureId));
+      if (ok) set({ inspectedFeature: null });
+      return ok;
+    },
+    attackCamp: (featureId) => apply(attackCampSim(get().game, featureId)),
     upgrade: (buildingId) => {
       const next = upgradeBuilding(get().game, buildingId);
       if (!next) return false;
@@ -110,7 +140,7 @@ export const useGame = create<GameStore>((set, get) => {
       clearSave();
       const game = createInitialState(seed ?? randomSeed());
       saveGame(game);
-      set({ game, selected: null, hover: null, inspected: null, speed: 1 });
+      set({ game, selected: null, hover: null, inspected: null, inspectedParcel: null, inspectedFeature: null, speed: 1 });
     },
   };
 });

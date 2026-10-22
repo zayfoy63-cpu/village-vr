@@ -82,8 +82,14 @@ export function BuildingPanel() {
         <div className="bp-row">
           <span>Travailleurs</span>
           <strong className={building.workers < stats.workers ? 'warn' : ''}>
-            {building.workers}/{stats.workers}
+            👷 {building.workers}/{stats.workers}
           </strong>
+        </div>
+      ) : null}
+      {stats.workers && building.workers < stats.workers ? (
+        <div className="bp-note warn">
+          Il manque {stats.workers - building.workers} {stats.workers - building.workers > 1 ? 'travailleurs' : 'travailleur'} :
+          production à {Math.round((building.workers / stats.workers) * 100)} %. Logez plus d'habitants !
         </div>
       ) : null}
       {def.seasonal && <div className="bp-note">❄️ Ne produit rien en hiver.</div>}
@@ -96,6 +102,15 @@ export function BuildingPanel() {
               <span>Niveau {building.level + 1}</span>
               <strong className="pos">{next}</strong>
             </div>
+            {check.next.workers ? (
+              <div className="bp-row">
+                <span>Travailleurs requis</span>
+                <strong className={check.next.workers > (stats.workers ?? 0) ? 'warn-soft' : ''}>
+                  👷 {check.next.workers}
+                  {check.next.workers > (stats.workers ?? 0) ? ` (+${check.next.workers - (stats.workers ?? 0)})` : ''}
+                </strong>
+              </div>
+            ) : null}
             <div className="bp-row">
               <span>Coût</span>
               <CostLine cost={check.next.cost} resources={resources} />

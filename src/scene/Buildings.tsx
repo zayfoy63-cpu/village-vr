@@ -5,6 +5,7 @@ import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { Fields } from './Fields';
+import { UpgradeBurst } from './UpgradeBurst';
 import { MODELS } from './models';
 import { Part } from './models/Part';
 import { tileToWorld } from './shared';
@@ -90,6 +91,14 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
               </group>
               {b.damaged && <Rubble id={b.id} />}
             </PopIn>
+            {/* Étincelles + poussière à l'amélioration, poussière à la construction */}
+            {animate && (
+              <UpgradeBurst
+                key={`burst-${b.level}`}
+                kind={b.id >= firstNewId.current && b.level === 1 ? 'build' : 'upgrade'}
+                size={BUILDING_BY_ID[b.type].size}
+              />
+            )}
           </group>
         );
       })}

@@ -6,6 +6,14 @@ import type { Building, BuildingTypeId, GameMap } from '../game/types';
 import { CASTLE_CHIMNEY } from './models/Castle';
 import { HOUSE_CHIMNEY, houseRotation } from './models/House';
 import { HUT_CHIMNEYS, MANOR_CHIMNEYS, TOWNHOUSE_CHIMNEYS } from './models/Housing';
+import { LUMBER_CHIMNEYS } from './models/Lumber';
+import { QUARRY_CHIMNEYS } from './models/Quarry';
+
+/** Cheminées qui n'apparaissent qu'à certains niveaux (bâtiments de production, non tournés) */
+const LEVEL_CHIMNEYS: Partial<Record<BuildingTypeId, Record<number, [number, number, number][]>>> = {
+  lumber: LUMBER_CHIMNEYS,
+  quarry: QUARRY_CHIMNEYS,
+};
 import { GEO, tileToWorld } from './shared';
 
 const PUFFS = 4;
@@ -28,12 +36,13 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
     const out: THREE.Vector3[] = [];
     const up = new THREE.Vector3(0, 1, 0);
     for (const b of buildings) {
-      const locals = CHIMNEYS[b.type];
+      const locals = CHIMNEYS[b.type] ?? LEVEL_CHIMNEYS[b.type]?.[b.level];
       if (!locals) continue;
       const [x, y, z] = tileToWorld(b.x, b.z, map.width, map.height, BUILDING_BY_ID[b.type].size);
       for (const l of locals) {
         const local = new THREE.Vector3(...l);
-        if (b.type !== 'castle') local.applyAxisAngle(up, houseRotation(b.id));
+        // Seules les habitations sont tournées selon leur id
+        if (CHIMNEYS[b.type] && b.type !== 'castle') local.applyAxisAngle(up, houseRotation(b.id));
         out.push(local.add(new THREE.Vector3(x, y, z)));
       }
       if (out.length >= MAX_CHIMNEYS) break;

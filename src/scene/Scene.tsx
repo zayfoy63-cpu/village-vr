@@ -9,6 +9,7 @@ import { FireFx } from './FireFx';
 import { GameClock } from './GameClock';
 import { Ghost, Selection } from './Ghost';
 import { Nature } from './Nature';
+import { Parcels } from './Parcels';
 import { Smoke } from './Smoke';
 import { Table } from './Table';
 import { Terrain } from './Terrain';
@@ -57,6 +58,7 @@ function World() {
       <Table width={map.width} height={map.height} />
       <Terrain map={map} />
       <Nature map={map} />
+      <Parcels map={map} />
       <Buildings buildings={buildings} map={map} />
       <Villagers buildings={buildings} map={map} />
       <Smoke buildings={buildings} map={map} />

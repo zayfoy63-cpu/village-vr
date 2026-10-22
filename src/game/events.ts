@@ -10,6 +10,7 @@
 import { BUILDING_BY_ID } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
 import { neighbors8, tileAt } from './mapgen';
+import { PARCELS, activeCamps } from './parcels';
 import type { Rng } from './rng';
 import { canAfford, defensePower, housingCapacity, storageCapacity } from './rules';
 import { clamp, pushNotice } from './stateUtils';
@@ -30,7 +31,7 @@ import type {
 
 export const TUNING = {
   /** Sévérité = 1 + X par saison écoulée (printemps an 1 = 1 ; hiver an 1 = 2,05 ; hiver an 2 = 3,45) */
-  severityPerSeason: 0.35,
+  severityPerSeason: 0.42,
   /** Pas d'événement aléatoire avant ce jour */
   firstEventDay: 3,
   /** Chance d'un événement chaque jour */
@@ -171,6 +172,16 @@ export interface EventDef {
 const fmt = (n: number) => Math.round(n);
 const plural = (n: number, one: string, many: string) => (n > 1 ? many : one);
 const DIRECTIONS = ['au nord', 'à l\'est', 'au sud', 'à l\'ouest'];
+
+/** Bord de carte du côté d'un camp de bandits actif (les attaques en viennent) */
+function campEdge(state: GameState): number | undefined {
+  const camp = activeCamps(state)[0];
+  if (!camp) return undefined;
+  const dx = camp.x + 1 - state.map.width / 2;
+  const dz = camp.z + 1 - state.map.height / 2;
+  if (Math.abs(dx) / state.map.width > Math.abs(dz) / state.map.height) return dx > 0 ? 1 : 3;
+  return dz > 0 ? 2 : 0;
+}
 
 export function addModifier(state: GameState, id: ModifierId, days: number) {
   state.modifiers = state.modifiers.filter((m) => m.id !== id);
@@ -326,8 +337,9 @@ export const EVENTS: EventDef[] = [
     title: 'Bandits',
     icon: '🗡️',
     kind: 'bad',
-    weight: (s) => (s.day >= 6 ? 2.5 + 0.3 * seasonIndex(s.day) : 0),
-    roll: ({ state, rng, severity: sev }) => ({ count: raidSize(state, sev), edge: rng.int(0, 3) }),
+    // Les camps de bandits proches (parcelles) rendent les attaques plus fréquentes
+    weight: (s) => (s.day >= 6 ? (2.5 + 0.3 * seasonIndex(s.day)) * (1 + PARCELS.camp.banditWeightBonus * activeCamps(s).length) : 0),
+    roll: ({ state, rng, severity: sev }) => ({ count: raidSize(state, sev), edge: campEdge(state) ?? rng.int(0, 3) }),
     announce: {
       days: [1, 2],
       text: (p, d) => `Environ ${p.count} bandits aperçus ${DIRECTIONS[p.edge]} – arrivée dans ${d} ${plural(d, 'jour', 'jours')}. Tours de garde et or seront utiles.`,

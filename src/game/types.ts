@@ -128,6 +128,22 @@ export interface Notice {
   threat?: { arriveDay: number; done: boolean };
 }
 
+/** Danger posé sur une parcelle : camp de bandits ou ruines (occupe des cases tant qu'il n'est pas réglé) */
+export interface ParcelFeature {
+  id: number;
+  parcel: number;
+  type: 'camp' | 'ruins';
+  x: number;
+  z: number;
+  w: number;
+  h: number;
+  cleared: boolean;
+  /** Force du camp (0 pour des ruines) */
+  strength: number;
+  /** Butin / trésor récupéré quand on règle le danger */
+  loot: Partial<Resources>;
+}
+
 export interface GameStats {
   maxPopulation: number;
   buildingsBuilt: number;
@@ -165,6 +181,10 @@ export interface GameState {
   raid: Raid | null;
   /** Crue en cours (affichage) jusqu'à ce temps de jeu */
   floodUntil: number;
+  /** Parcelles possédées (ids, voir parcels.ts) et nombre d'achats effectués */
+  parcels: { owned: number[]; bought: number };
+  /** Dangers des parcelles (camps de bandits, ruines) */
+  features: ParcelFeature[];
   stats: GameStats;
   gameOver: boolean;
 }

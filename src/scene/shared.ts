@@ -50,6 +50,16 @@ export const MAT = {
   gold: std('#f0c040', { emissive: new THREE.Color('#a06a00'), emissiveIntensity: 0.4, metalness: 0.3 }),
   water: std('#4a9ad8', { roughness: 0.3 }),
   white: std('#ffffff'),
+  // Niveaux : bois brut (1), tuiles et couleurs vives (2), pierre taillée (3)
+  woodRaw: std('#7d6148'),
+  roofTile: std('#c9572e'),
+  roofTileDark: std('#8e3518'),
+  paintBlue: std('#2f6fd0'),
+  paintYellow: std('#e8b830'),
+  paintGreen: std('#3f9a4a'),
+  whitewash: std('#f7f0e1'),
+  stoneLight: std('#b9b5ab'),
+  ironDark: std('#3b3b40'),
 };
 
 export const GEO = {

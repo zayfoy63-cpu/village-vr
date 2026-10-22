@@ -12,6 +12,7 @@ import {
 } from './buildings';
 import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META, seasonOf } from './config';
 import { neighbors8, tileAt } from './mapgen';
+import { featureAt, ownsTile } from './parcels';
 import type {
   Building,
   BuildingTypeId,
@@ -109,6 +110,9 @@ export function canPlace(state: GameState, type: BuildingTypeId, x: number, z: n
     for (let dx = 0; dx < def.size; dx++) {
       const t = tileAt(state.map, x + dx, z + dz);
       if (!t) return { ok: false, reason: 'Hors de la carte' };
+      if (!ownsTile(state, x + dx, z + dz)) return { ok: false, reason: 'Parcelle non achetée : cliquez dessus pour l\'acheter' };
+      const feature = featureAt(state, x + dx, z + dz);
+      if (feature) return { ok: false, reason: feature.type === 'camp' ? 'Camp de bandits à détruire' : 'Ruines à déblayer' };
       if (!def.allowedTiles.includes(t)) return { ok: false, reason: 'Terrain impossible' };
       if (buildingAt(state, x + dx, z + dz)) return { ok: false, reason: 'Case occupée' };
     }
@@ -255,6 +259,12 @@ export function effectLabel(lvl: LevelDef, produces: Partial<Resources> = lvl.pr
   if (lvl.defense) parts.push(`Défense +${lvl.defense}`);
   if (lvl.storage) parts.push(`Protège ${lvl.storage} ${RESOURCE_META.food.icon}`);
   return parts.join(' · ');
+}
+
+/** "👷 2 travailleurs" (vide si le bâtiment n'emploie personne) */
+export function workersLabel(lvl: LevelDef): string {
+  if (!lvl.workers) return '';
+  return `👷 ${lvl.workers} ${lvl.workers > 1 ? 'travailleurs' : 'travailleur'}`;
 }
 
 export function score(state: GameState): number {

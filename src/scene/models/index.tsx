@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import type { BuildingTypeId } from '../../game/types';
 import { Castle } from './Castle';
+import { FieldDecor } from './FieldDecor';
 import { Granary } from './Granary';
 import { House } from './House';
 import { Hut, Manor, Townhouse } from './Housing';
@@ -17,7 +18,7 @@ export interface ModelProps {
 
 /**
  * Registre des modèles 3D par type de bâtiment (reçoivent id et niveau).
- * null = rendu instancié ailleurs (les champs, voir Fields.tsx).
+ * Les champs sont rendus en instancing (Fields.tsx) ; FieldDecor n'ajoute que le décor des niveaux 2 et 3.
  */
 export const MODELS: Record<BuildingTypeId, FC<ModelProps> | null> = {
   castle: Castle,
@@ -26,7 +27,7 @@ export const MODELS: Record<BuildingTypeId, FC<ModelProps> | null> = {
   house: House,
   townhouse: Townhouse,
   manor: Manor,
-  field: null,
+  field: FieldDecor,
   lumber: Lumber,
   quarry: Quarry,
   market: Market,

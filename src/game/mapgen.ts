@@ -1,6 +1,7 @@
 // Génération procédurale de la carte à partir d'une seed.
 
 import { MAP_HEIGHT, MAP_WIDTH } from './config';
+import { PARCELS, parcelRect } from './parcels';
 import { Rng } from './rng';
 import type { GameMap, TileType } from './types';
 
@@ -124,11 +125,20 @@ export function generateMap(seed: number): GeneratedMap {
   while (count('forest') < 20) stamp('forest', 4);
   while (count('rock') < 7) stamp('rock', 3);
 
-  // 4. Emplacement du château : zone 2x2 sans eau, la plus proche du centre
+  // Zone de départ (parcelles possédées au début) : rectangle englobant
+  const startRects = PARCELS.start.map(parcelRect);
+  const zone = {
+    x0: Math.min(...startRects.map((r) => r.x0)),
+    x1: Math.max(...startRects.map((r) => r.x1)),
+    z0: Math.min(...startRects.map((r) => r.z0)),
+    z1: Math.max(...startRects.map((r) => r.z1)),
+  };
+
+  // 4. Emplacement du château : zone 2x2 sans eau, la plus proche du centre, dans la zone de départ
   let castle = { x: Math.floor(w / 2) - 1, z: Math.floor(h / 2) - 1 };
   let best = Infinity;
-  for (let z = 1; z < h - 2; z++) {
-    for (let x = 1; x < w - 2; x++) {
+  for (let z = zone.z0 + 1; z <= zone.z1 - 3; z++) {
+    for (let x = zone.x0 + 1; x <= zone.x1 - 3; x++) {
       let ok = true;
       for (let dz = -1; dz <= 2 && ok; dz++)
         for (let dx = -1; dx <= 2 && ok; dx++) if (tiles[idx(x + dx, z + dz)] === 'water') ok = false;
@@ -156,6 +166,36 @@ export function generateMap(seed: number): GeneratedMap {
   ];
   const mill = millSpots.find((p) => p.x >= 0 && p.z >= 0 && p.x < w && p.z < h) ?? millSpots[0];
   tiles[idx(mill.x, mill.z)] = 'grass';
+
+  // 6. Bois et pierre accessibles dès le départ : forêt et rochers dans la zone de départ ou juste au bord
+  const reserved = (x: number, z: number) =>
+    (x >= castle.x - 1 && x <= castle.x + 2 && z >= castle.z - 1 && z <= castle.z + 2) || (x === mill.x && z === mill.z);
+  const nearZone = (t: TileType) => {
+    let n = 0;
+    for (let z = zone.z0 - 1; z <= zone.z1; z++)
+      for (let x = zone.x0 - 1; x <= zone.x1; x++) if (x >= 0 && z >= 0 && x < w && z < h && tiles[idx(x, z)] === t) n++;
+    return n;
+  };
+  const edgeTiles: [number, number][] = [];
+  for (let z = zone.z0; z < zone.z1; z++)
+    for (let x = zone.x0; x < zone.x1; x++) {
+      const edge = x === zone.x0 || x === zone.x1 - 1 || z === zone.z0 || z === zone.z1 - 1;
+      if (edge && !reserved(x, z) && tiles[idx(x, z)] !== 'water') edgeTiles.push([x, z]);
+    }
+  const ensure = (t: TileType, min: number, cluster: number) => {
+    for (let tries = 0; tries < 10 && nearZone(t) < min && edgeTiles.length; tries++) {
+      const [cx, cz] = rng.pick(edgeTiles);
+      let placed = 0;
+      for (const [nx, nz] of [[cx, cz], ...neighbors8(cx, cz)]) {
+        if (placed >= cluster || nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+        if (reserved(nx, nz) || tiles[idx(nx, nz)] === 'water') continue;
+        tiles[idx(nx, nz)] = t;
+        placed++;
+      }
+    }
+  };
+  ensure('forest', 5, 3);
+  ensure('rock', 3, 2);
 
   return { map: { seed, width: w, height: h, tiles }, castle, mill };
 }

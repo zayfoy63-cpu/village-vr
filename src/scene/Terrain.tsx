@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
 import { hash2 } from '../game/rng';
+import { featureAt, ownsParcel, parcelOf } from '../game/parcels';
 import { buildingAt, hasModifier } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
 import { useGame } from '../store/gameStore';
@@ -17,6 +18,7 @@ const TILE_COLORS: Record<TileType, string> = {
 };
 
 const SNOW = new THREE.Color('#eef3f7');
+const LOCKED = new THREE.Color('#2a2622');
 const ICE = new THREE.Color('#9cc7e6');
 
 export function tileColor(type: TileType, season: SeasonId, jitter: number, out: THREE.Color, harsh = false) {
@@ -33,6 +35,7 @@ export function Terrain({ map }: { map: GameMap }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const season = useGame((s) => seasonOf(s.game.day).id);
   const harsh = useGame((s) => hasModifier(s.game, 'harshWinter'));
+  const owned = useGame((s) => s.game.parcels.owned);
   const setHover = useGame((s) => s.setHover);
   const build = useGame((s) => s.build);
   const select = useGame((s) => s.select);
@@ -56,13 +59,16 @@ export function Terrain({ map }: { map: GameMap }) {
           new THREE.Vector3(0.995, h, 0.995),
         );
         mesh.setMatrixAt(i, m);
-        mesh.setColorAt(i, tileColor(type, season, hash2(x, z, map.seed), c, harsh));
+        tileColor(type, season, hash2(x, z, map.seed), c, harsh);
+        // Parcelles non achetées : assombries
+        if (!owned.includes(parcelOf(x, z))) c.lerp(LOCKED, 0.5);
+        mesh.setColorAt(i, c);
       }
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [map, season, harsh]);
+  }, [map, season, harsh, owned]);
 
   const toTile = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
     if (e.instanceId === undefined) return null;
@@ -86,6 +92,17 @@ export function Terrain({ map }: { map: GameMap }) {
         const t = toTile(e);
         if (!t) return;
         const state = useGame.getState();
+        // Parcelle non achetée : ouvre son panneau d'achat
+        const parcel = parcelOf(t.x, t.z);
+        if (!ownsParcel(state.game, parcel)) {
+          state.inspectParcel(parcel);
+          return;
+        }
+        const feature = featureAt(state.game, t.x, t.z);
+        if (feature) {
+          state.inspectFeature(feature.id);
+          return;
+        }
         const here = buildingAt(state.game, t.x, t.z);
         // Les champs (instanciés) s'éteignent en cliquant sur leur case
         if (here?.fire && here.fire.extinguishEnd === undefined) {

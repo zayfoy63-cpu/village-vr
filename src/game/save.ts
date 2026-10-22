@@ -1,6 +1,7 @@
 // Sauvegarde automatique dans localStorage (toujours protégée par try/catch).
 
 import { BUILDING_BY_ID, maxLevel, unlockKey } from './buildings';
+import { ALL_PARCELS } from './parcels';
 import { MORALE, SAVE_KEY, SAVE_VERSION } from './config';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
@@ -21,6 +22,7 @@ export function saveGame(state: GameState): void {
  * Met à niveau une sauvegarde d'une version précédente.
  * v1 → v2 : niveaux de bâtiments, déblocages, compteur d'améliorations.
  * v2 → v3 : moral, événements annoncés, raids, incendies ; les anciennes offres de marchand sont closes.
+ * v3 → v4 : parcelles (les anciennes parties possèdent toute la carte).
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -46,6 +48,11 @@ export function migrate(data: GameState): GameState | null {
   s.nextPendingId = Number(data.nextPendingId) || 1;
   s.raid = data.raid ?? null;
   s.floodUntil = Number(data.floodUntil) || 0;
+  // v3 → v4 : parcelles. Une ancienne partie garde toute sa carte (tout est déjà possédé), sans danger.
+  if (!data.parcels || !Array.isArray(data.parcels.owned)) {
+    s.parcels = { owned: ALL_PARCELS.map((p) => p.id), bought: 0 };
+  }
+  s.features = Array.isArray(data.features) ? data.features : [];
   delete (s as GameState & { nextEventDay?: number }).nextEventDay;
   s.modifiers = Array.isArray(data.modifiers) ? data.modifiers : [];
   if (!Array.isArray(s.unlocked)) {

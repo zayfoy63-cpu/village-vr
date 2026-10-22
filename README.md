@@ -37,6 +37,7 @@ src/
 │  ├─ rules.ts        Placement, travailleurs, production, score
 │  ├─ simulation.ts   Temps qui passe, journée, construction, choix, réparations
 │  ├─ hazards.ts      Dangers en temps réel : incendies, bandits, délais de choix
+│  ├─ parcels.ts      ⭐ Parcelles : découpage, prix, contenu, camps de bandits et ruines
 │  ├─ rng.ts          PRNG déterministe (état sauvegardé)
 │  └─ save.ts         Sauvegarde localStorage (try/catch)
 ├─ store/gameStore.ts Zustand : relie logique, rendu et UI
@@ -52,12 +53,24 @@ Tout est réglable dans `src/game/buildings.ts` :
   → Maison bourgeoise (5, dès 15 habitants + 1 marché) → Manoir (8, dès 30 habitants + 1 tour de garde).
 - **Bâtiments de production** améliorables niveaux 1 → 3 (`levels[1]`, `levels[2]`) : chaque niveau a son coût,
   sa production / défense et sa condition (`UPGRADE_LEVEL_2` = 10 habitants, `UPGRADE_LEVEL_3` = 25 habitants).
+- Chaque niveau demande plus de **travailleurs** (`workers` par niveau) ; s'il en manque, la production baisse en proportion.
+- Chaque niveau a un **aspect bien distinct** : bois brut (1), tuiles + clôture + couleurs vives (2),
+  pierre + étage/tour + bannière + détails animés (3), avec une gerbe d'étincelles à l'amélioration.
 - Un déblocage est définitif une fois obtenu et déclenche une notification.
 - Clic sur un bâtiment : panneau avec niveau, production actuelle et suivante, coût et bouton « Améliorer ».
 
+### Parcelles (`game/parcels.ts`, réglages dans `PARCELS`)
+- La carte est découpée en 4 × 3 parcelles ; seules les 2 parcelles centrales sont possédées au départ.
+- Les parcelles verrouillées sont assombries et couvertes d'un brouillard léger, avec une pastille : prix
+  (ou 🔒 si trop loin) et aperçu du contenu (🌲 forêt, 🪨 rochers, 🌼 terre fertile, 🌊 rivière, ⛺ camp, 🏛️ ruines).
+- Achat d'une parcelle voisine en cliquant dessus : prix en or croissant (10 × 1,45ⁿ) et habitants requis à partir du 3e achat.
+- Dangers générés avec la seed : **camp de bandits** (attaques plus fréquentes tant qu'il existe, à détruire au combat
+  pour un butin) et **ruines** (bloquent 2 cases, à déblayer contre du bois : trésor, risque d'éboulement).
+
 ### Sauvegardes
 `game/save.ts` migre les anciennes sauvegardes (`migrate`) : la v1 reçoit les niveaux (1), les déblocages
-correspondant à la situation actuelle et les nouveaux compteurs. Une sauvegarde illisible est ignorée sans planter.
+correspondant à la situation actuelle et les nouveaux compteurs ; la v3 reçoit les parcelles (toute la carte possédée,
+sans danger). Une sauvegarde illisible est ignorée sans planter.
 
 ### Ajouter un bâtiment
 1. Ajouter l'id dans `BuildingTypeId` (`game/types.ts`).

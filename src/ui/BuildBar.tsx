@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BUILD_TABS, BUILDING_BY_ID, buildCost, buildingsInTab, type BuildTab } from '../game/buildings';
 import { RESOURCE_KEYS, RESOURCE_META } from '../game/config';
 import { tileAt } from '../game/mapgen';
-import { canAfford, canPlace, conditionLabel, effectLabel, isUnlocked } from '../game/rules';
+import { canAfford, canPlace, conditionLabel, effectLabel, isUnlocked, workersLabel } from '../game/rules';
 import type { Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
 
@@ -130,7 +130,10 @@ export function BuildBar() {
               <span className="build-name">{def.name}</span>
               <CostLine cost={cost} resources={resources} />
               {open ? (
-                <span className="build-effect">{effectLabel(lvl)}</span>
+                <>
+                  <span className="build-effect">{effectLabel(lvl)}</span>
+                  {lvl.workers ? <span className="build-workers">{workersLabel(lvl)}</span> : null}
+                </>
               ) : (
                 <span className="build-lock">{conditionLabel(lvl.unlock)}</span>
               )}

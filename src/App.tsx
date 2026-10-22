@@ -3,6 +3,8 @@ import { useGame } from './store/gameStore';
 import { BuildBar } from './ui/BuildBar';
 import { BuildingPanel } from './ui/BuildingPanel';
 import { CrisisBanner } from './ui/CrisisBanner';
+import { FeaturePanel, ParcelPanel } from './ui/LandPanel';
+import { ParcelBadges } from './ui/ParcelBadges';
 import { EventCards } from './ui/EventCards';
 import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
@@ -32,6 +34,7 @@ export function App() {
   return (
     <div className="app">
       <Scene />
+      <ParcelBadges />
       <div className="ui-layer">
         <div className="top-row">
           <SeedPanel />
@@ -42,6 +45,8 @@ export function App() {
         <EventCards key={seed} />
         <BuildBar />
         <BuildingPanel />
+        <ParcelPanel />
+        <FeaturePanel />
         <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause</div>
         <GameOver />
       </div>

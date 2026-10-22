@@ -17,15 +17,27 @@ import {
   EVENTS,
   EVENT_BY_ID,
   TUNING,
+  addMorale,
   applyChoice,
+  formatResources,
+  loseVillagers,
   arriveEvent,
   pickEvent,
   revolt,
   scheduleEvent,
+  severity,
   startEvent,
 } from './events';
 import { hazardsDue, updateHazards } from './hazards';
 import { generateMap } from './mapgen';
+import {
+  PARCELS,
+  canBuyParcel,
+  generateFeatures,
+  ownsParcel,
+  parcelContents,
+  parcelPrice,
+} from './parcels';
 import { Rng } from './rng';
 import {
   assignWorkers,
@@ -33,6 +45,7 @@ import {
   canPlace,
   canUpgrade,
   computeProduction,
+  defensePower,
   findNewUnlocks,
   foodConsumption,
   housingCapacity,
@@ -66,6 +79,8 @@ export function createInitialState(seed: number): GameState {
     nextPendingId: 1,
     raid: null,
     floodUntil: 0,
+    parcels: { owned: [...PARCELS.start], bought: 0 },
+    features: generateFeatures(map, seed),
     stats: {
       maxPopulation: START_POPULATION,
       buildingsBuilt: 0,
@@ -154,6 +169,99 @@ export function repairBuilding(state: GameState, buildingId: number): GameState 
   const s = cloneState(state);
   for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
   delete s.buildings.find((x) => x.id === buildingId)!.damaged;
+  return s;
+}
+
+/** Achète une parcelle voisine du territoire */
+export function buyParcel(state: GameState, parcelId: number): GameState | null {
+  if (state.gameOver || !canBuyParcel(state, parcelId).ok) return null;
+  const s = cloneState(state);
+  const price = parcelPrice(s);
+  s.resources.gold -= price;
+  s.parcels.owned.push(parcelId);
+  s.parcels.bought++;
+  const { counts, features } = parcelContents(s, parcelId);
+  const found = [
+    counts.forest ? `${counts.forest} 🌲` : '',
+    counts.rock ? `${counts.rock} 🪨` : '',
+    counts.fertile ? `${counts.fertile} 🌼` : '',
+    counts.water ? 'rivière' : '',
+  ].filter(Boolean);
+  const camp = features.find((f) => f.type === 'camp');
+  const ruins = features.find((f) => f.type === 'ruins');
+  pushNotice(s, {
+    kind: camp ? 'bad' : 'good',
+    icon: '🗺️',
+    title: 'Nouvelle parcelle',
+    text:
+      `Terres acquises pour ${price} 🪙${found.length ? ` : ${found.join(', ')}` : ''}.` +
+      (camp ? ' ⚠️ Un camp de bandits s\'y cache : détruisez-le, sinon les attaques se multiplieront !' : '') +
+      (ruins ? ' Des ruines y cachent peut-être un trésor : cliquez dessus pour les déblayer.' : ''),
+  });
+  return s;
+}
+
+/** Déblaie des ruines (parcelle possédée) : coûte du bois, rapporte un trésor, risque d'éboulement */
+export function clearRuins(state: GameState, featureId: number): GameState | null {
+  const f = state.features.find((x) => x.id === featureId);
+  if (state.gameOver || !f || f.cleared || f.type !== 'ruins' || !ownsParcel(state, f.parcel)) return null;
+  if (!canAfford(state.resources, PARCELS.ruins.clearCost)) return null;
+  const s = cloneState(state);
+  const rng = new Rng(s.rngState);
+  const feature = s.features.find((x) => x.id === featureId)!;
+  for (const k of RESOURCE_KEYS) s.resources[k] += (feature.loot[k] ?? 0) - (PARCELS.ruins.clearCost[k] ?? 0);
+  feature.cleared = true;
+  const collapse = rng.chance(PARCELS.ruins.collapseChance) ? loseVillagers(s, 1, 1) : 0;
+  pushNotice(s, {
+    kind: collapse ? 'bad' : 'good',
+    icon: '🏛️',
+    title: 'Ruines déblayées',
+    text: `Trésor : ${formatResources(feature.loot)}.${collapse ? ' Un éboulement a coûté la vie à un villageois.' : ''}`,
+  });
+  s.rngState = rng.state;
+  finalize(s);
+  return s;
+}
+
+/** Force contre laquelle il faut se battre pour détruire un camp (augmente avec les saisons) */
+export function campStrength(state: GameState, strength: number): number {
+  return Math.round(strength * severity(state.day) * 0.6);
+}
+
+/** Attaque un camp de bandits (parcelle possédée) : victoire = butin, défaite = pertes */
+export function attackCamp(state: GameState, featureId: number): GameState | null {
+  const f = state.features.find((x) => x.id === featureId);
+  if (state.gameOver || !f || f.cleared || f.type !== 'camp' || !ownsParcel(state, f.parcel)) return null;
+  const s = cloneState(state);
+  const rng = new Rng(s.rngState);
+  const feature = s.features.find((x) => x.id === featureId)!;
+  const enemy = campStrength(s, feature.strength);
+  const power = defensePower(s) * 2 + Math.min(s.population, 40) * 0.15;
+  const roll = rng.range(0.7, 1.25);
+  if (power * roll >= enemy) {
+    feature.cleared = true;
+    for (const k of RESOURCE_KEYS) s.resources[k] += feature.loot[k] ?? 0;
+    const lost = loseVillagers(s, rng.chance(0.35) ? 1 : 0, 1);
+    addMorale(s, TUNING.morale.fightWon);
+    s.stats.banditsKilled += enemy;
+    pushNotice(s, {
+      kind: 'good',
+      icon: '⛺',
+      title: 'Camp détruit',
+      text: `Le camp est rasé ! Butin : ${formatResources(feature.loot)}${lost ? ', 1 villageois tombé' : ''}.`,
+    });
+  } else {
+    const lost = loseVillagers(s, Math.max(1, Math.round((enemy - power * roll) * 0.4)), 1);
+    addMorale(s, TUNING.morale.fightLost);
+    pushNotice(s, {
+      kind: 'bad',
+      icon: '⛺',
+      title: 'Attaque repoussée',
+      text: `Les bandits tiennent bon : ${lost} ${lost > 1 ? 'morts' : 'mort'}. Renforcez votre défense (tours) avant de réessayer.`,
+    });
+  }
+  s.rngState = rng.state;
+  finalize(s);
   return s;
 }
 

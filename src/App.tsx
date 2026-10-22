@@ -1,0 +1,46 @@
+import { Scene } from './scene/Scene';
+import { useGame } from './store/gameStore';
+import { BuildBar } from './ui/BuildBar';
+import { EventCards } from './ui/EventCards';
+import { GameOver } from './ui/GameOver';
+import { HUD } from './ui/HUD';
+import { TimeControls } from './ui/TimeControls';
+import { VRButton } from './ui/VRButton';
+
+function SeedPanel() {
+  const seed = useGame((s) => s.game.seed);
+  const newGame = useGame((s) => s.newGame);
+  return (
+    <div className="seed-panel">
+      <span title="Chaque seed génère une carte unique">🎲 Seed : {seed}</span>
+      <button
+        onClick={() => {
+          if (confirm('Abandonner cette partie et en commencer une nouvelle ?')) newGame();
+        }}
+      >
+        Nouvelle partie
+      </button>
+      <VRButton />
+    </div>
+  );
+}
+
+export function App() {
+  const seed = useGame((s) => s.game.seed);
+  return (
+    <div className="app">
+      <Scene />
+      <div className="ui-layer">
+        <div className="top-row">
+          <SeedPanel />
+          <HUD />
+          <TimeControls />
+        </div>
+        <EventCards key={seed} />
+        <BuildBar />
+        <div className="help">🖱️ Glisser : tourner · Molette : zoom · 1-6 : bâtiments · Espace : pause</div>
+        <GameOver />
+      </div>
+    </div>
+  );
+}

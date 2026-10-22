@@ -2,9 +2,11 @@
 // menaces plantés au bord du plateau, bulles non bloquantes au-dessus des bâtiments concernés.
 
 import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 import { RESOURCE_KEYS, RESOURCE_META } from '../../game/config';
 import { canAfford } from '../../game/rules';
 import type { Notice, Resources } from '../../game/types';
+import { Part } from '../../scene/models/Part';
 import { useGame } from '../../store/gameStore';
 import { VR_CONFIG } from '../config';
 import { feedback } from '../feedback';
@@ -88,6 +90,10 @@ export function Cards3D() {
   );
 }
 
+const poleMat = new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.9, flatShading: true });
+const flagUrgent = new THREE.MeshBasicMaterial({ color: '#e23b2e' });
+const flagSoon = new THREE.MeshBasicMaterial({ color: '#e8902a' });
+
 const EDGE_DIR: [number, number][] = [
   [0, -1],
   [1, 0],
@@ -116,14 +122,8 @@ function Flag({ notice, edge, slot, count }: { notice: Notice; edge: number | un
   const urgent = notice.threat!.arriveDay - day <= 1;
   return (
     <group position={[x, 0, z]}>
-      <mesh position={[0, 0.07, 0]}>
-        <cylinderGeometry args={[0.004, 0.004, 0.14, 6]} />
-        <meshStandardMaterial color="#6b4a2b" />
-      </mesh>
-      <mesh position={[0.03, 0.12, 0]}>
-        <planeGeometry args={[0.06, 0.04]} />
-        <meshBasicMaterial color={urgent ? '#e23b2e' : '#e8902a'} side={2} />
-      </mesh>
+      <Part g="cylinderLow" m={poleMat} p={[0, 0.07, 0]} s={[0.008, 0.14, 0.008]} shadow={false} />
+      <Part g="box" m={urgent ? flagUrgent : flagSoon} p={[0.03, 0.12, 0]} s={[0.06, 0.04, 0.002]} shadow={false} />
       <FacePlayer position={[0, 0.2, 0]} tilt={0.2}>
         <group>
           <Button3D

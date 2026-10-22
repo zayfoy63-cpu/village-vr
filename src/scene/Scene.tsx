@@ -12,6 +12,7 @@ import { GameClock } from './GameClock';
 import { Ghost, Selection } from './Ghost';
 import { Nature } from './Nature';
 import { Parcels } from './Parcels';
+import { PartPools } from './PartPools';
 import { Smoke } from './Smoke';
 import { StatusAlerts } from './StatusAlerts';
 import { Table } from './Table';
@@ -22,6 +23,7 @@ import { Flood, Rain, Reinforcements, Snowfall, Storm } from './Weather';
 import { DevHook } from '../vr/DevHook';
 import { PerfMonitor } from '../vr/Perf';
 import { WristHelp } from '../vr/ui/WristHelp';
+import { UIBatch } from '../vr/ui/UIBatch';
 import { DragController } from '../vr/Drag';
 import { Placement } from '../vr/Placement';
 import { SessionControl } from '../vr/Session';
@@ -52,6 +54,12 @@ function XRSync() {
   return null;
 }
 
+/** Maillage unique de l'interface 3D : seulement en réalité mixte (ou aperçu ?ui3d) */
+function VRBatch() {
+  const vr = useVR((s) => s.active);
+  return vr ? <UIBatch /> : null;
+}
+
 function PcControls() {
   const inXR = useXR((s) => s.mode !== null);
   // Aperçu 3D sur PC : pas de rotation de caméra pendant qu'on tient un bâtiment
@@ -78,26 +86,28 @@ function World() {
   const buildings = useGame((s) => s.game.buildings);
   const plinthOnly = useVR((s) => s.active && !s.pcPreview);
   return (
-    // La clé sur la seed remonte tout le monde à chaque nouvelle partie
+    // La clé sur la seed remonte tout le monde à chaque nouvelle partie ; les groupes nommés servent
+    // aux mesures de performance (appels de dessin par élément de la scène)
     <group key={map.seed}>
-      <Table width={map.width} height={map.height} plinthOnly={plinthOnly} />
-      <Terrain map={map} />
-      <Nature map={map} />
-      <Parcels map={map} />
-      <Buildings buildings={buildings} map={map} />
-      <Villagers buildings={buildings} map={map} />
-      <Smoke buildings={buildings} map={map} />
-      <FireFx buildings={buildings} map={map} />
-      <StatusAlerts buildings={buildings} map={map} />
-      <Bandits map={map} />
-      <Flood map={map} />
-      <Storm map={map} />
-      <Reinforcements map={map} />
-      <Snowfall map={map} />
-      <Rain map={map} />
-      <Hints map={map} />
-      <Ghost />
-      <Selection />
+      <group name="Table"><Table width={map.width} height={map.height} plinthOnly={plinthOnly} /></group>
+      <group name="Terrain"><Terrain map={map} /></group>
+      <group name="Nature"><Nature map={map} /></group>
+      <group name="Parcels"><Parcels map={map} /></group>
+      <group name="Buildings"><Buildings buildings={buildings} map={map} /></group>
+      <group name="Villagers"><Villagers buildings={buildings} map={map} /></group>
+      <group name="Smoke"><Smoke buildings={buildings} map={map} /></group>
+      <group name="FireFx"><FireFx buildings={buildings} map={map} /></group>
+      <group name="StatusAlerts"><StatusAlerts buildings={buildings} map={map} /></group>
+      <group name="Bandits"><Bandits map={map} /></group>
+      <group name="Flood"><Flood map={map} /></group>
+      <group name="Storm"><Storm map={map} /></group>
+      <group name="Reinforcements"><Reinforcements map={map} /></group>
+      <group name="Snowfall"><Snowfall map={map} /></group>
+      <group name="Rain"><Rain map={map} /></group>
+      <group name="Hints"><Hints map={map} /></group>
+      <group name="Ghost"><Ghost /></group>
+      <group name="Selection"><Selection /></group>
+
     </group>
   );
 }
@@ -139,6 +149,8 @@ export function Scene() {
         <WristHelp />
         <GameClock />
         <Lights />
+        <PartPools />
+        <VRBatch />
         <WorldRoot>
           <World />
         </WorldRoot>
@@ -163,6 +175,22 @@ function Lights() {
   const shadowSize: number = VR_CONFIG.perf.shadowMap;
   const shadows = !(vr && (low || shadowSize === 0));
   const mapSize = vr ? shadowSize || 512 : 2048;
+  // Zone d'ombre : en VR, limitée au plateau (plus de détail pour la même taille de carte)
+  const ext = vr ? VR_CONFIG.perf.shadowExtent : { x: 15, y: 13 };
+  useEffect(() => {
+    const light = sun.current;
+    if (!light) return;
+    const cam = light.shadow.camera;
+    cam.left = -ext.x;
+    cam.right = ext.x;
+    cam.top = ext.y;
+    cam.bottom = -ext.y;
+    cam.updateProjectionMatrix();
+    // Nouvelle taille de carte : l'ancienne est libérée, three la recrée à la bonne taille
+    light.shadow.mapSize.set(mapSize, mapSize);
+    light.shadow.map?.dispose();
+    light.shadow.map = null;
+  }, [mapSize, ext.x, ext.y]);
   useFrame(() => {
     const g = useGame.getState().game;
     // Réalité mixte : la nuit n'assombrit que très peu (on garde la pièce lisible)
@@ -186,14 +214,9 @@ function Lights() {
         intensity={2.4}
         color="#ffd39b"
         castShadow={shadows}
-        shadow-mapSize={[mapSize, mapSize]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-radius={4}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={13}
-        shadow-camera-bottom={-13}
         shadow-camera-near={1}
         shadow-camera-far={60}
       />

@@ -26,18 +26,18 @@ export function VRUI() {
   if (phase !== 'playing') return null;
   return (
     <group>
-      <Hud3D z={hd + VR_CONFIG.ui.margin} />
-      <BuildBox />
-      <BuildingPanel3D />
-      <Cards3D />
-      <Threats3D />
-      <Bubbles3D />
-      <ParcelTags3D />
-      <ParcelPanel3D />
-      <FeaturePanel3D />
-      <TableObjects />
-      {!pcPreview && <BoardRig3D />}
-      <Tutorial3D />
+      <group name="UI:Hud3D"><Hud3D z={hd + VR_CONFIG.ui.margin} /></group>
+      <group name="UI:BuildBox"><BuildBox /></group>
+      <group name="UI:BuildingPanel3D"><BuildingPanel3D /></group>
+      <group name="UI:Cards3D"><Cards3D /></group>
+      <group name="UI:Threats3D"><Threats3D /></group>
+      <group name="UI:Bubbles3D"><Bubbles3D /></group>
+      <group name="UI:ParcelTags3D"><ParcelTags3D /></group>
+      <group name="UI:ParcelPanel3D"><ParcelPanel3D /></group>
+      <group name="UI:FeaturePanel3D"><FeaturePanel3D /></group>
+      <group name="UI:TableObjects"><TableObjects /></group>
+      {!pcPreview && <group name="UI:BoardRig3D"><BoardRig3D /></group>}
+      <group name="UI:Tutorial3D"><Tutorial3D /></group>
     </group>
   );
 }

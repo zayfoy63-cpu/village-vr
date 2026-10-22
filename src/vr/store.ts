@@ -80,6 +80,8 @@ interface VRStore {
   wristHelp: boolean;
   fps: number;
   lowQuality: boolean;
+  /** Mesures du rendu (dernière image) : appels de dessin, triangles, textures en mémoire */
+  stats: RenderStats;
 
   setActive: (active: boolean, pcPreview?: boolean) => void;
   setPhase: (phase: 'placing' | 'playing') => void;
@@ -96,7 +98,13 @@ interface VRStore {
   advanceTutorial: () => void;
   skipTutorial: () => void;
   setWristHelp: (v: boolean) => void;
-  setFps: (fps: number, low: boolean) => void;
+  setFps: (fps: number, low: boolean, stats?: RenderStats) => void;
+}
+
+export interface RenderStats {
+  calls: number;
+  triangles: number;
+  textures: number;
 }
 
 export const useVR = create<VRStore>((set, get) => ({
@@ -117,6 +125,7 @@ export const useVR = create<VRStore>((set, get) => ({
   wristHelp: false,
   fps: 72,
   lowQuality: false,
+  stats: { calls: 0, triangles: 0, textures: 0 },
 
   setActive: (active, pcPreview = false) => set({ active, pcPreview, phase: pcPreview ? 'playing' : 'placing', tableFound: false }),
   setPhase: (phase) => set({ phase }),
@@ -141,7 +150,7 @@ export const useVR = create<VRStore>((set, get) => ({
   },
   skipTutorial: () => get().setPrefs({ tutorialDone: true }),
   setWristHelp: (wristHelp) => (get().wristHelp === wristHelp ? undefined : set({ wristHelp })),
-  setFps: (fps, lowQuality) => set({ fps, lowQuality }),
+  setFps: (fps, lowQuality, stats) => set(stats ? { fps, lowQuality, stats } : { fps, lowQuality }),
 }));
 
 /** Conversion case du jeu → mètres (repère du plateau, origine au centre) */

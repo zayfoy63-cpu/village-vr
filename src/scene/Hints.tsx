@@ -16,6 +16,9 @@ import { nightLevel } from '../game/seasons';
 import type { GameMap, Point } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, TILE } from './shared';
+import { useSmallShadows } from './quality';
+import { useVR } from '../vr/store';
+import { VR_CONFIG } from '../vr/config';
 
 const MAX_RATS = 18;
 const MAX_SPARKS = 90;
@@ -35,9 +38,10 @@ const glintMat = new THREE.MeshBasicMaterial({ color: '#fff3b0' });
 const chaserMat = new THREE.MeshStandardMaterial({ color: '#2f6fd0', flatShading: true });
 const wolfMat = new THREE.MeshStandardMaterial({ color: '#5f6266', flatShading: true });
 const eyeMat = new THREE.MeshBasicMaterial({ color: '#ffe066' });
-const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
 export function Hints({ map }: { map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const rats = useRef<THREE.InstancedMesh>(null);
   const sparks = useRef<THREE.InstancedMesh>(null);
   const dust = useRef<THREE.InstancedMesh>(null);
@@ -89,14 +93,19 @@ export function Hints({ map }: { map: GameMap }) {
       rats.current.instanceMatrix.needsUpdate = true;
     }
 
+    // Plafonds de particules plus bas en réalité mixte
+    const vr = useVR.getState().active;
+    const maxSparks = vr ? Math.min(MAX_SPARKS, VR_CONFIG.perf.sparks) : MAX_SPARKS;
+    const maxDust = vr ? Math.min(MAX_DUST, VR_CONFIG.perf.dust) : MAX_DUST;
+
     // Escarbilles : l'été, des braises montent des habitations entassées sans puits
     if (sparks.current) {
       let n = 0;
       if (seasonOf(g.day).id === FIRE.hint.season) {
         for (const h of exposedHouses(g)) {
-          if (n >= MAX_SPARKS) break;
+          if (n >= maxSparks) break;
           const c = center(h);
-          for (let k = 0; k < 8 && n < MAX_SPARKS; k++) {
+          for (let k = 0; k < 8 && n < maxSparks; k++) {
             const life = (t * 0.5 + k / 8 + h.id * 0.31) % 1;
             // Elles montent en dérivant, brillent puis s'éteignent
             put(sparks.current, n++, wx(c) + Math.sin(t * 2.6 + k * 1.3 + h.id) * 0.16, 0.6 + life * 0.9, wz(c) + Math.cos(t * 2.1 + k) * 0.12, 0.13 * Math.sin(life * Math.PI));
@@ -116,7 +125,7 @@ export function Hints({ map }: { map: GameMap }) {
         if (b.type !== 'mine' || inst < MINE.hint.tremorFrom) continue;
         const c = center(b);
         const puffs = 5 + Math.round(inst * 4);
-        for (let k = 0; k < puffs && n < MAX_DUST; k++) {
+        for (let k = 0; k < puffs && n < maxDust; k++) {
           const life = (t * 0.4 + k / puffs + b.id * 0.17) % 1;
           put(dust.current, n++, wx(c) - 0.05 + Math.sin(k * 2.1 + t) * 0.16 * life, 0.12 + life * 0.55, wz(c) + 0.12 + life * 0.18, (0.14 + 0.26 * life) * (1 - 0.4 * life));
         }
@@ -193,17 +202,17 @@ export function Hints({ map }: { map: GameMap }) {
 
   return (
     <group>
-      <instancedMesh ref={rats} args={[GEO.ball, ratMat, MAX_RATS]} frustumCulled={false} />
-      <instancedMesh ref={sparks} args={[GEO.ball, sparkMat, MAX_SPARKS]} frustumCulled={false} />
-      <instancedMesh ref={dust} args={[GEO.ball, dustMat, MAX_DUST]} frustumCulled={false} />
-      <instancedMesh ref={pebbles} args={[GEO.rock, pebbleMat, MAX_PEBBLES]} frustumCulled={false} />
-      <instancedMesh ref={wolves} args={[GEO.box, wolfMat, MAX_WOLVES]} castShadow frustumCulled={false} />
-      <instancedMesh ref={eyes} args={[GEO.ball, eyeMat, MAX_EYES * 2 + MAX_WOLVES * 2]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={rats} args={[GEO.ball, ratMat, MAX_RATS]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={sparks} args={[GEO.ball, sparkMat, MAX_SPARKS]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={dust} args={[GEO.ball, dustMat, MAX_DUST]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={pebbles} args={[GEO.rock, pebbleMat, MAX_PEBBLES]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={wolves} args={[GEO.box, wolfMat, MAX_WOLVES]} castShadow={smallShadows} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={eyes} args={[GEO.ball, eyeMat, MAX_EYES * 2 + MAX_WOLVES * 2]} frustumCulled={false} />
       {/* Éclaireur : silhouette encapuchonnée, immobile ; un clic envoie quelqu'un l'attraper */}
       <group ref={scout} visible={false}>
         <group ref={scoutBody}>
-          <mesh geometry={GEO.cone6} material={cloakMat} position={[0, 0.34, 0]} scale={[0.38, 0.68, 0.38]} castShadow />
-          <mesh geometry={GEO.ball} material={hoodMat} position={[0, 0.74, 0]} scale={0.26} castShadow />
+          <mesh geometry={GEO.cone6} material={cloakMat} position={[0, 0.34, 0]} scale={[0.38, 0.68, 0.38]} castShadow={smallShadows} />
+          <mesh geometry={GEO.ball} material={hoodMat} position={[0, 0.74, 0]} scale={0.26} castShadow={smallShadows} />
           <mesh ref={glint} geometry={GEO.ball} material={glintMat} position={[0, 0.64, 0.2]} scale={0.06} visible={false} />
         </group>
         {hasScout && (

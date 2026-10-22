@@ -7,7 +7,7 @@ import type { Building, Resources } from '../../game/types';
 import { useGame } from '../../store/gameStore';
 import { feedback } from '../feedback';
 import { useVR } from '../store';
-import { Button3D, FacePlayer, Label, Panel, THEME, useAutoClose } from './kit';
+import { Button3D, FacePlayer, Label, Panel, THEME, textWidth, useAutoClose } from './kit';
 
 const costText = (c: Partial<Resources>) => RESOURCE_KEYS.filter((k) => c[k]).map((k) => `${c[k]}${RESOURCE_META[k].icon}`).join(' ');
 
@@ -88,14 +88,23 @@ function Content({ building: b }: { building: Building }) {
     buttons.push(
       <Button3D key="pause" width={0.15} height={0.065} icon={b.paused ? '▶️' : '⏸'} label={b.paused ? 'Relancer' : 'Arrêter'} onActivate={() => togglePause(b.id)} />,
     );
-  const w = Math.max(0.34, buttons.length * 0.16 + 0.06);
-  const h = 0.2 + (status ? 0.045 : 0);
+  const title = `${def.icon} ${def.name} · niv. ${b.level}`;
+  // Largeur : les boutons, et le titre entre la croix (à gauche) et les travailleurs (à droite)
+  const w = Math.max(0.34, buttons.length * 0.16 + 0.06, textWidth(title, 0.034) + 0.24);
+  // Lignes longues : elles passent à la ligne, le panneau grandit d'autant (aucun chevauchement)
+  const lines = (text: string, size: number) => Math.max(1, Math.ceil(textWidth(text, size) / (w - 0.05)));
+  const curLines = lines(current, 0.026);
+  const stLines = status ? lines(status.text, 0.024) : 0;
+  const extraCur = (curLines - 1) * 0.032;
+  const h = 0.2 + extraCur + (status ? 0.045 + (stLines - 1) * 0.029 : 0);
   return (
     <Panel width={w} height={h}>
-      <Label text={`${def.icon} ${def.name} · niv. ${b.level}`} size={0.034} position={[0, h / 2 - 0.035, 0]} />
-      <Label text={current} size={0.026} color={THEME.accent} position={[0, h / 2 - 0.075, 0]} maxWidth={w - 0.05} />
+      <Label text={title} size={0.034} position={[0, h / 2 - 0.035, 0]} />
+      <Label text={current} size={0.026} color={THEME.accent} position={[0, h / 2 - 0.075 - extraCur / 2, 0]} maxWidth={w - 0.05} />
       {stats.workers ? <Label text={`👷 ${b.workers}/${stats.workers}`} size={0.026} position={[w / 2 - 0.06, h / 2 - 0.035, 0]} /> : null}
-      {status && <Label text={status.text} size={0.024} color={status.color} position={[0, h / 2 - 0.112, 0]} maxWidth={w - 0.05} />}
+      {status && (
+        <Label text={status.text} size={0.024} color={status.color} position={[0, h / 2 - 0.112 - extraCur - ((stLines - 1) * 0.029) / 2, 0]} maxWidth={w - 0.05} />
+      )}
       <group position={[0, -h / 2 + 0.05, 0.004]}>
         {buttons.map((btn, i) => (
           <group key={i} position={[(i - (buttons.length - 1) / 2) * 0.16, 0, 0]}>

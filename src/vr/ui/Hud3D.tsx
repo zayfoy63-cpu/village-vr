@@ -27,6 +27,7 @@ export function Hud3D({ z }: { z: number }) {
   const showFps = useVR((s) => s.prefs.showFps);
   const fps = useVR((s) => s.fps);
   const low = useVR((s) => s.lowQuality);
+  const stats = useVR((s) => s.stats);
   const chips = [...h.base, ...h.advanced];
   const w = Math.max(0.56, chips.length * 0.112 + 0.04);
   const half = w / 2;
@@ -46,7 +47,15 @@ export function Hud3D({ z }: { z: number }) {
           <Label text={`${h.seasonIcon} ${h.seasonName} ${h.dayInSeason}/${h.daysPerSeason}`} size={TXT * 0.72} align="right" position={[half - 0.02, 0.014, 0]} />
           <Label text={`Jour ${h.day}`} size={TXT * 0.62} align="right" color={THEME.dim} position={[half - 0.02, -0.014, 0]} />
         </group>
-        {showFps && <Label text={`${fps} fps${low ? ' · qualité réduite' : ''}`} size={0.018} color={fps < 60 ? THEME.bad : THEME.dim} position={[0, -0.108, 0]} weight={600} />}
+        {showFps && (
+          <Label
+            text={`${fps} fps · ${stats.calls} appels · ${Math.round(stats.triangles / 1000)}k tri · ${stats.textures} tex${low ? ' · qualité réduite' : ''}`}
+            size={0.018}
+            color={fps < 60 ? THEME.bad : THEME.dim}
+            position={[0, -0.108, 0]}
+            weight={600}
+          />
+        )}
       </Panel>
     </FacePlayer>
   );

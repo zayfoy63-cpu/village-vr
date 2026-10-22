@@ -26,22 +26,23 @@ function rectCenter(r: ParcelRect, map: GameMap): [number, number] {
 /** Brouillard léger au-dessus des parcelles verrouillées (1 draw call) */
 function Fog({ locked, map }: { locked: ParcelRect[]; map: GameMap }) {
   const ref = useRef<THREE.InstancedMesh>(null);
+  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() }), []);
   useFrame(({ clock }) => {
     const mesh = ref.current;
     if (!mesh) return;
-    const m = new THREE.Matrix4();
+    const { m, p, q, s } = tmp;
     locked.forEach((r, i) => {
       const [cx, cz] = rectCenter(r, map);
       // Le brouillard "respire" doucement
       const h = 0.9 + Math.sin(clock.elapsedTime * 0.6 + i) * 0.08;
-      m.compose(new THREE.Vector3(cx, h / 2, cz), new THREE.Quaternion(), new THREE.Vector3((r.x1 - r.x0) * 0.995, h, (r.z1 - r.z0) * 0.995));
+      m.compose(p.set(cx, h / 2, cz), q, s.set((r.x1 - r.x0) * 0.995, h, (r.z1 - r.z0) * 0.995));
       mesh.setMatrixAt(i, m);
     });
     mesh.count = locked.length;
     mesh.instanceMatrix.needsUpdate = true;
   });
   if (!locked.length) return null;
-  return <instancedMesh ref={ref} args={[GEO.box, fogMat, 12]} frustumCulled={false} />;
+  return <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.box, fogMat, 12]} frustumCulled={false} />;
 }
 
 /** Contour doré de la parcelle survolée (ou ouverte) */

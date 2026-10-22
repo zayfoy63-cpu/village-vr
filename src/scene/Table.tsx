@@ -18,8 +18,8 @@ export function Table({ width, height, plinthOnly = false }: { width: number; he
   return (
     <group>
       {/* Socle du plateau */}
-      <mesh geometry={GEO.box} material={plateauSide} position={[0, -0.45, 0]} scale={[width + 0.3, 0.3, height + 0.3]} castShadow receiveShadow />
-      <mesh geometry={GEO.box} material={plateauRim} position={[0, -0.6, 0]} scale={[width + 0.7, 0.12, height + 0.7]} castShadow receiveShadow />
+      <mesh geometry={GEO.box} material={plateauSide} position={[0, -0.45, 0]} scale={[width + 0.3, 0.3, height + 0.3]} castShadow={!plinthOnly} receiveShadow />
+      <mesh geometry={GEO.box} material={plateauRim} position={[0, -0.6, 0]} scale={[width + 0.7, 0.12, height + 0.7]} castShadow={!plinthOnly} receiveShadow />
       {/* Plateau de table en planches, pieds et sol (réalité mixte : on garde la vraie table) */}
       {!plinthOnly && Array.from({ length: plankCount }, (_, i) => (
         <mesh

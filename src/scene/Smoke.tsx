@@ -19,6 +19,8 @@ const LEVEL_CHIMNEYS: Partial<Record<BuildingTypeId, Record<number, [number, num
   forge: FORGE_CHIMNEYS,
 };
 import { GEO, tileToWorld } from './shared';
+import { VR_CONFIG } from '../vr/config';
+import { useVR } from '../vr/store';
 
 const PUFFS = 4;
 
@@ -66,11 +68,17 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
     const t = clock.elapsedTime;
     // Plus de bois de chauffage : les foyers s'éteignent (indice du froid)
     const cold = useGame.getState().game.mech.cold > 0;
+    // Réalité mixte : moins de bouffées par cheminée, et un nombre de cheminées plafonné
+    const vr = useVR.getState().active;
+    const puffs = vr ? Math.min(PUFFS, VR_CONFIG.perf.smokePuffs) : PUFFS;
+    const maxChimneys = vr ? VR_CONFIG.perf.smokeChimneys : MAX_CHIMNEYS;
     let i = 0;
+    let lit = 0;
     chimneys.forEach(({ p: c, home }, ci) => {
-      if (cold && home) return;
-      for (let k = 0; k < PUFFS; k++) {
-        const life = (t * 0.28 + k / PUFFS + ci * 0.137) % 1;
+      if ((cold && home) || lit >= maxChimneys) return;
+      lit++;
+      for (let k = 0; k < puffs; k++) {
+        const life = (t * 0.28 + k / puffs + ci * 0.137) % 1;
         const size = Math.sin(life * Math.PI) * (0.09 + life * 0.14);
         tmp.p.set(c.x + Math.sin(t + ci + k) * 0.04 + life * 0.18, c.y + life * 0.9, c.z + life * 0.05);
         tmp.m.compose(tmp.p, tmp.q, tmp.s.setScalar(Math.max(0.001, size)));
@@ -82,7 +90,7 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
   });
 
   return (
-    <instancedMesh ref={ref} args={[GEO.ball, undefined, MAX_CHIMNEYS * PUFFS]} frustumCulled={false}>
+    <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.ball, undefined, MAX_CHIMNEYS * PUFFS]} frustumCulled={false}>
       <meshStandardMaterial color="#d9d4cc" flatShading transparent opacity={0.75} depthWrite={false} />
     </instancedMesh>
   );

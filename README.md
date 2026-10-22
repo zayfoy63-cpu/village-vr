@@ -105,6 +105,8 @@ sans danger) ; la v6 reçoit une forêt intacte, des sols neufs et une météo v
 2. Ajouter une entrée dans `BUILDINGS` (`game/buildings.ts`) : niveaux (coût, places, travailleurs, production,
    défense, condition de déblocage), contraintes de terrain…
 3. Créer son modèle dans `scene/models/` (il reçoit `id` et `level`) et l'enregistrer dans `scene/models/index.tsx`.
+   Le modèle s'assemble **uniquement avec `<Part>`** (primitives partagées de `GEO`, matériaux de `MAT`) : c'est ce
+   qui le fait entrer dans le regroupement d'instances (voir « Performances VR »). Pas de `<mesh>` direct.
 
 ### Imprévus (`game/events.ts`)
 Tous les réglages sont dans l'objet `TUNING` en tête de fichier (fréquence, sévérité par saison, délais,
@@ -226,6 +228,28 @@ Bascule mains ↔ manettes automatique. Retrait du casque ou fin de session : pa
 - `?ui3d` affiche l'interface 3D VR sur PC (aperçu à la souris, sans casque).
 - En mode dev, `window.__xrDevice` pilote le casque et les contrôleurs émulés (voir les scripts de test du dépôt de travail :
   visée, gâchette, pincement, doigt posé sur un point).
+
+### Performances VR (objectif Quest 3 : 72 images/s)
+Mesure de référence (émulateur, même partie de 35 bâtiments, pluie + nuit + bandits + 2 incendies) :
+2 072 appels de dessin et 101 textures (environ 310 après quelques jours de jeu : les textures de texte n'étaient pas
+libérées) **→ 116 appels (passe d'ombre comprise) et 2 textures, stables en jeu**.
+- **Modèles regroupés** (`scene/partPool.ts`, `scene/PartPools.tsx`) : chaque `<Part>` ne rend qu'un repère invisible
+  (aucun dessin, mais toujours cible des clics, rayons et doigts) ; toutes les pièces de tous les bâtiments, miniatures
+  et décors sont dessinées par quelques `InstancedMesh` partagés, un par (forme, famille de matériau, ombre). Les
+  matériaux standard opaques ne diffèrent que par la couleur : un seul matériau blanc, couleur par instance. Les
+  matrices sont recopiées juste avant chaque rendu (après le calcul des matrices) : animations et plateau suivent.
+- **Interface en un seul maillage** (`vr/ui/uiBatch.ts`, `vr/ui/atlas.ts`) : tous les fonds de panneaux, boutons, textes
+  et emojis de l'interface 3D sont des triangles d'un même maillage, dessinés en un appel avec **un atlas de caractères
+  unique** (couleur du texte = couleur de sommet). Ordre de dessin : du plus loin au plus proche, panneau par panneau.
+  Les éléments du kit (`Label`, `Plate`, `Panel`, `Button3D`) gardent la même interface : rien à changer pour s'en servir.
+- **Zones de clic** : matériau `visible: false` (jamais dessinées, toujours touchées). Un élément fermé est démonté ou caché.
+- **Ombres** : une seule lumière en projette ; en VR, carte de `perf.shadowMap` limitée au plateau (`perf.shadowExtent`) ;
+  les petits objets (villageois, bandits, cultures, rochers, planches) n'en projettent pas (`scene/quality.ts`).
+- **Particules** : un système instancié par type (pluie, neige, fumée, flammes, escarbilles, poussière), plafonné en VR
+  (`perf.rainDrops`, `snowFlakes`, `smokePuffs`, `smokeChimneys`, `sparks`, `dust`).
+- **Divers** : rendu fovéal fixe (`perf.foveation`), résolution `perf.frameBufferScaling`, `matrixAutoUpdate = false`
+  sur les objets immobiles, aucun objet ni matériau recréé à chaque image (textures et géométries stables en jeu).
+- **Compteur** (Paramètres → « Compteur de perf. ») : FPS, appels de dessin, triangles et textures, sur le présentoir.
 
 ## Déploiement
 `vercel.json` est configuré pour Vite (build `npm run build`, sortie `dist/`).

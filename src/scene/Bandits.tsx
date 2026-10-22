@@ -8,6 +8,7 @@ import { feedback } from '../vr/feedback';
 import { useVR } from '../vr/store';
 import { banditScreen } from './badgeAnchors';
 import { GEO, TILE } from './shared';
+import { useSmallShadows } from './quality';
 
 const MAX = 40;
 const MAX_DOTS = 600;
@@ -29,13 +30,14 @@ const helmMat = new THREE.MeshStandardMaterial({ color: '#c9ccd2', flatShading: 
 const dotMat = new THREE.MeshBasicMaterial({ color: '#ff4a3d', transparent: true, opacity: 0.8, depthWrite: false });
 const burstMat = new THREE.MeshBasicMaterial({ color: '#ffd23f' });
 /** Zone de clic invisible, plus large que le personnage pour être facile à viser */
-const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
 /**
  * Bandits rouges qui courent du bord vers leur cible, volent, puis s'enfuient avec un sac.
  * Trajet en pointillés rouges. Clic sur un bandit : un garde (bleu) ou un villageois (brun) part l'intercepter.
  */
 export function Bandits({ map }: { map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const active = useGame((s) => !!s.game.raid);
   const chase = useGame((s) => s.chase);
   const seize = useGame((s) => s.seize);
@@ -191,13 +193,13 @@ export function Bandits({ map }: { map: GameMap }) {
   if (!active) return null;
   return (
     <group>
-      <instancedMesh ref={body} args={[GEO.cylinderLow, bodyMat, MAX]} castShadow frustumCulled={false} />
-      <instancedMesh ref={hood} args={[GEO.ball, hoodMat, MAX]} castShadow frustumCulled={false} />
-      <instancedMesh ref={sack} args={[GEO.ball, sackMat, MAX]} frustumCulled={false} />
-      <instancedMesh ref={guards} args={[GEO.cylinderLow, guardBodyMat, MAX]} castShadow frustumCulled={false} />
-      <instancedMesh ref={helms} args={[GEO.ball, helmMat, MAX]} frustumCulled={false} />
-      <instancedMesh ref={dots} args={[GEO.cylinderLow, dotMat, MAX_DOTS]} frustumCulled={false} renderOrder={1} />
-      <instancedMesh ref={burst} args={[GEO.ball, burstMat, MAX * 8]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={body} args={[GEO.cylinderLow, bodyMat, MAX]} castShadow={smallShadows} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={hood} args={[GEO.ball, hoodMat, MAX]} castShadow={smallShadows} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={sack} args={[GEO.ball, sackMat, MAX]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={guards} args={[GEO.cylinderLow, guardBodyMat, MAX]} castShadow={smallShadows} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={helms} args={[GEO.ball, helmMat, MAX]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={dots} args={[GEO.cylinderLow, dotMat, MAX_DOTS]} frustumCulled={false} renderOrder={1} />
+      <instancedMesh matrixAutoUpdate={false} ref={burst} args={[GEO.ball, burstMat, MAX * 8]} frustumCulled={false} />
       <instancedMesh
         ref={hit}
         args={[GEO.cylinderLow, hitMat, MAX]}

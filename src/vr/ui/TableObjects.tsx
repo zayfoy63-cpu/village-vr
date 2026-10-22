@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { MECHANICS } from '../../game/mechanics';
+import { Part } from '../../scene/models/Part';
 import { score } from '../../game/rules';
 import { useGame, type Speed } from '../../store/gameStore';
 import { VR_CONFIG } from '../config';
@@ -15,8 +16,8 @@ import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME } from './kit';
 
 const glass = new THREE.MeshStandardMaterial({ color: '#cfe9ff', transparent: true, opacity: 0.38, roughness: 0.1 });
-const sand = new THREE.MeshStandardMaterial({ color: '#f0c457', roughness: 0.9 });
-const frameMat = new THREE.MeshStandardMaterial({ color: '#7a4f2b', roughness: 0.8, flatShading: true });
+const sand = new THREE.MeshStandardMaterial({ color: '#f0c457', roughness: 0.9, flatShading: true });
+const frameMat = new THREE.MeshStandardMaterial({ color: '#7a4f2b', roughness: 0.9, flatShading: true });
 
 const SPEEDS: { v: Speed; icon: string; label: string }[] = [
   { v: 0.5, icon: '🐢', label: '×½' },
@@ -35,7 +36,7 @@ export function Hourglass({ x, z }: { x: number; z: number }) {
   const grip = useRef<{ id: number; y0: number | null; done: boolean } | null>(null);
   const lastFlip = useRef(0);
   const turn = useRef<THREE.Group>(null);
-  const sandTop = useRef<THREE.Mesh>(null);
+  const sandTop = useRef<THREE.Group>(null);
   const last = useRef<Speed>(1);
   if (speed > 0) last.current = speed;
 
@@ -81,22 +82,14 @@ export function Hourglass({ x, z }: { x: number; z: number }) {
     <group position={[x, 0, z]}>
       <group ref={turn} position={[0, 0.075, 0]}>
         {[0.075, -0.075].map((y) => (
-          <mesh key={y} material={frameMat} position={[0, y, 0]}>
-            <cylinderGeometry args={[0.04, 0.04, 0.012, 10]} />
-          </mesh>
+          <Part key={y} g="cylinder" m={frameMat} p={[0, y, 0]} s={[0.08, 0.012, 0.08]} shadow={false} />
         ))}
-        <mesh material={glass} position={[0, 0.035, 0]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[0.03, 0.065, 10]} />
-        </mesh>
-        <mesh material={glass} position={[0, -0.035, 0]}>
-          <coneGeometry args={[0.03, 0.065, 10]} />
-        </mesh>
-        <mesh ref={sandTop} material={sand} position={[0, 0.04, 0]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[0.02, 0.04, 8]} />
-        </mesh>
-        <mesh material={sand} position={[0, -0.06, 0]}>
-          <coneGeometry args={[0.024, 0.03, 8]} />
-        </mesh>
+        <Part g="cone" m={glass} p={[0, 0.035, 0]} r={[Math.PI, 0, 0]} s={[0.06, 0.065, 0.06]} shadow={false} />
+        <Part g="cone" m={glass} p={[0, -0.035, 0]} s={[0.06, 0.065, 0.06]} shadow={false} />
+        <group ref={sandTop} position={[0, 0.04, 0]} rotation={[Math.PI, 0, 0]}>
+          <Part g="cone" m={sand} s={[0.04, 0.04, 0.04]} shadow={false} />
+        </group>
+        <Part g="cone" m={sand} p={[0, -0.06, 0]} s={[0.048, 0.03, 0.048]} shadow={false} />
       </group>
       {/* Zone de toucher agrandie : tapoter = pause / reprise */}
       <mesh
@@ -114,7 +107,7 @@ export function Hourglass({ x, z }: { x: number; z: number }) {
         }}
       >
         <cylinderGeometry args={[0.055, 0.055, 0.17, 10]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <meshBasicMaterial visible={false} />
       </mesh>
       <FacePlayer position={[0, 0.19, 0]} tilt={0.3}>
         <Label text={speed === 0 ? '⏸ Pause' : SPEEDS.find((s) => s.v === speed)?.label ?? ''} size={0.03} color={speed === 0 ? THEME.warn : THEME.text} />
@@ -276,7 +269,7 @@ export function Settings3D({ z }: { z: number }) {
             <Button3D width={0.28} height={0.065} icon="⏸" label={autoPause ? 'Oui' : 'Non'} active={autoPause} position={[0.175, 0, 0]} onActivate={() => setSettings({ autoPause: !autoPause })} />
           </Row>
           <Row i={4}>
-            <Label text="Compteur d'images" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
+            <Label text="Compteur de perf." size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
             <Button3D width={0.28} height={0.065} icon="📈" label={prefs.showFps ? 'Affiché' : 'Masqué'} active={prefs.showFps} position={[0.175, 0, 0]} onActivate={() => setPrefs({ showFps: !prefs.showFps })} />
           </Row>
           <group position={[0, -h / 2 + 0.05, 0.004]}>

@@ -91,6 +91,7 @@ export function Terrain({ map }: { map: GameMap }) {
   return (
     <instancedMesh
       ref={ref}
+      matrixAutoUpdate={false}
       args={[GEO.box, undefined, count]}
       receiveShadow
       onPointerMove={(e) => {

@@ -101,10 +101,10 @@ export function FireFx({ buildings, map }: { buildings: Building[]; map: GameMap
   if (!fires.length) return null;
   return (
     <group>
-      <instancedMesh ref={flames} args={[GEO.cone6, flameMat, MAX_FIRES * FLAMES]} frustumCulled={false} />
-      <instancedMesh ref={cores} args={[GEO.cone6, coreMat, MAX_FIRES * FLAMES]} frustumCulled={false} />
-      <instancedMesh ref={smoke} args={[GEO.ball, smokeMat, MAX_FIRES * SMOKE]} frustumCulled={false} />
-      <instancedMesh ref={drops} args={[GEO.ball, dropMat, MAX_FIRES * DROPS]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={flames} args={[GEO.cone6, flameMat, MAX_FIRES * FLAMES]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={cores} args={[GEO.cone6, coreMat, MAX_FIRES * FLAMES]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={smoke} args={[GEO.ball, smokeMat, MAX_FIRES * SMOKE]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={drops} args={[GEO.ball, dropMat, MAX_FIRES * DROPS]} frustumCulled={false} />
     </group>
   );
 }

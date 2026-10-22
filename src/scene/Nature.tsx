@@ -6,6 +6,7 @@ import { hash2 } from '../game/rng';
 import type { GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
+import { useSmallShadows } from './quality';
 
 interface TreeSpot {
   x: number;
@@ -80,6 +81,7 @@ function layout(map: GameMap) {
 
 /** Arbres (cônes / boules) et rochers, entièrement instanciés : 5 draw calls au total */
 export function Nature({ map }: { map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const { trees, rocks, flowers } = useMemo(() => layout(map), [map]);
   const pines = trees.filter((t) => t.pine);
   const rounds = trees.filter((t) => !t.pine);
@@ -159,19 +161,19 @@ export function Nature({ map }: { map: GameMap }) {
 
   return (
     <group>
-      <instancedMesh ref={trunkRef} args={[GEO.cylinderLow, undefined, trees.length]} castShadow>
+      <instancedMesh matrixAutoUpdate={false} ref={trunkRef} args={[GEO.cylinderLow, undefined, trees.length]} castShadow>
         <meshStandardMaterial color="#6b4428" flatShading />
       </instancedMesh>
-      <instancedMesh ref={coneRef} args={[GEO.cone6, undefined, pines.length * 2]} castShadow receiveShadow>
+      <instancedMesh matrixAutoUpdate={false} ref={coneRef} args={[GEO.cone6, undefined, pines.length * 2]} castShadow receiveShadow>
         <meshStandardMaterial flatShading roughness={0.9} />
       </instancedMesh>
-      <instancedMesh ref={ballRef} args={[GEO.ball, undefined, rounds.length]} castShadow receiveShadow>
+      <instancedMesh matrixAutoUpdate={false} ref={ballRef} args={[GEO.ball, undefined, rounds.length]} castShadow receiveShadow>
         <meshStandardMaterial flatShading roughness={0.9} />
       </instancedMesh>
-      <instancedMesh ref={rockRef} args={[GEO.rock, undefined, rocks.length]} castShadow receiveShadow>
+      <instancedMesh matrixAutoUpdate={false} ref={rockRef} args={[GEO.rock, undefined, rocks.length]} castShadow={smallShadows} receiveShadow>
         <meshStandardMaterial flatShading roughness={1} />
       </instancedMesh>
-      <instancedMesh ref={flowerRef} args={[GEO.ball, undefined, flowers.length]}>
+      <instancedMesh matrixAutoUpdate={false} ref={flowerRef} args={[GEO.ball, undefined, flowers.length]}>
         <meshStandardMaterial flatShading roughness={0.8} />
       </instancedMesh>
     </group>

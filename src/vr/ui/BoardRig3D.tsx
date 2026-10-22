@@ -4,6 +4,7 @@
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import * as THREE from 'three';
+import { Part } from '../../scene/models/Part';
 import { VR_CONFIG } from '../config';
 import { feedback } from '../feedback';
 import { boardHalf } from '../layout';
@@ -12,7 +13,7 @@ import { useVR } from '../store';
 import { Button3D } from './kit';
 
 const rimMat = new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0, depthWrite: false });
-const woodMat = new THREE.MeshStandardMaterial({ color: '#a8743f', roughness: 0.7, flatShading: true });
+const woodMat = new THREE.MeshStandardMaterial({ color: '#a8743f', roughness: 0.9, flatShading: true });
 
 interface Grip {
   kind: 'rim' | 'handle';
@@ -39,6 +40,8 @@ export function BoardRig3D() {
     // Matière de la bordure : s'illumine au survol ou pendant la saisie
     const active = grips.size > 0 || hot;
     rimMat.opacity += ((active ? 0.35 : 0) - rimMat.opacity) * 0.2;
+    // Bordure éteinte : cachée (aucun dessin) mais toujours saisissable
+    rimMat.visible = rimMat.opacity > 0.01;
     if (grips.size === 0 || vr.phase !== 'playing') return;
     const topY = vr.board.y + 0.033;
     const samples: { id: number; g: Grip; p: THREE.Vector3 }[] = [];
@@ -124,9 +127,7 @@ export function BoardRig3D() {
       </group>
       {/* Poignée : attraper pour déplacer le plateau, taper pour le replacer sur la table */}
       <group position={[-hw - 0.06, 0, hd + 0.06]}>
-        <mesh material={woodMat} position={[0, 0.03, 0]}>
-          <cylinderGeometry args={[0.03, 0.036, 0.06, 10]} />
-        </mesh>
+        <Part g="cylinder" m={woodMat} p={[0, 0.03, 0]} s={[0.066, 0.06, 0.066]} shadow={false} />
         <mesh
           position={[0, 0.035, 0]}
           onPointerDown={down('handle')}
@@ -137,7 +138,7 @@ export function BoardRig3D() {
           }}
         >
           <cylinderGeometry args={[0.055, 0.055, 0.09, 10]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          <meshBasicMaterial visible={false} />
         </mesh>
         <Button3D width={0.06} height={0.06} icon="▲" position={[-0.07, 0.07, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.min(VR_CONFIG.board.maxHeight, useVR.getState().board.y + 0.05) })} />
         <Button3D width={0.06} height={0.06} icon="▼" position={[-0.07, 0.005, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.max(VR_CONFIG.board.minHeight, useVR.getState().board.y - 0.05) })} />

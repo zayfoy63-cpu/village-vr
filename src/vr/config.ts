@@ -88,8 +88,15 @@ export const VR_CONFIG = {
     /** Particules : nombre maximum en VR (pluie, neige) */
     rainDrops: 120,
     snowFlakes: 90,
-    /** Taille de la carte d'ombre en VR (0 = pas d'ombre) */
+    /** Fumée : bouffées par cheminée et cheminées qui fument au plus ; escarbilles et poussière */
+    smokePuffs: 3,
+    smokeChimneys: 30,
+    sparks: 50,
+    dust: 24,
+    /** Taille de la carte d'ombre en VR (0 = pas d'ombre) ; une seule lumière projette des ombres */
     shadowMap: 1024,
+    /** Demi-étendue de la zone d'ombre en VR (unités du jeu, repère de la lumière) : le plateau seul */
+    shadowExtent: { x: 13, y: 12 },
     /** Passage en qualité réduite si la moyenne glissante passe sous ce FPS */
     lowFps: 60,
     /** Pas de dimming de nuit en réalité mixte (on garde la pièce lisible) */

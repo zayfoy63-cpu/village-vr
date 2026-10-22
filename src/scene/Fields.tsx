@@ -5,6 +5,7 @@ import type { Building, GameMap } from '../game/types';
 import { SOIL } from '../game/mechanics/soil';
 import { useGame } from '../store/gameStore';
 import { GEO, MAT, tileToWorld } from './shared';
+import { useSmallShadows } from './quality';
 
 const MAX_FIELDS = 200;
 const MAX_ROWS = 6;
@@ -26,6 +27,7 @@ const CROP_COLORS: Record<SeasonId, string> = {
 
 /** Tous les champs en 3 draw calls : terre labourée, rangées de cultures, bottes de foin */
 export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const soilRef = useRef<THREE.InstancedMesh>(null);
   const rowRef = useRef<THREE.InstancedMesh>(null);
   const baleRef = useRef<THREE.InstancedMesh>(null);
@@ -94,11 +96,11 @@ export function Fields({ fields, map }: { fields: Building[]; map: GameMap }) {
 
   return (
     <group>
-      <instancedMesh ref={soilRef} args={[GEO.box, MAT.soil, MAX_FIELDS]} receiveShadow />
-      <instancedMesh ref={rowRef} args={[GEO.box, undefined, MAX_FIELDS * MAX_ROWS]} castShadow receiveShadow>
+      <instancedMesh matrixAutoUpdate={false} ref={soilRef} args={[GEO.box, MAT.soil, MAX_FIELDS]} receiveShadow />
+      <instancedMesh matrixAutoUpdate={false} ref={rowRef} args={[GEO.box, undefined, MAX_FIELDS * MAX_ROWS]} castShadow={smallShadows} receiveShadow>
         <meshStandardMaterial flatShading roughness={0.9} />
       </instancedMesh>
-      <instancedMesh ref={baleRef} args={[GEO.cylinderLow, MAT.hay, MAX_FIELDS * 2]} castShadow receiveShadow />
+      <instancedMesh matrixAutoUpdate={false} ref={baleRef} args={[GEO.cylinderLow, MAT.hay, MAX_FIELDS * 2]} castShadow={smallShadows} receiveShadow />
     </group>
   );
 }

@@ -6,6 +6,7 @@ import { RESOURCE_KEYS, RESOURCE_META } from '../../game/config';
 import { canAfford, conditionLabel, effectLabel, isUnlocked, workersLabel } from '../../game/rules';
 import type { BuildingTypeId, Resources } from '../../game/types';
 import { MODELS } from '../../scene/models';
+import { Part } from '../../scene/models/Part';
 import { useGame } from '../../store/gameStore';
 import { VR_CONFIG } from '../config';
 import { beginNew, dragState } from '../Drag';
@@ -14,11 +15,12 @@ import { BOX, boxCenter } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME, textWidth } from './kit';
 
-const woodMat = new THREE.MeshStandardMaterial({ color: '#8a5d38', roughness: 0.85, flatShading: true });
+// Rugosité commune aux bâtiments : ces pièces rejoignent les mêmes regroupements d'instances
+const woodMat = new THREE.MeshStandardMaterial({ color: '#8a5d38', roughness: 0.9, flatShading: true });
 const woodDark = new THREE.MeshStandardMaterial({ color: '#5f3d24', roughness: 0.9, flatShading: true });
-const feltMat = new THREE.MeshStandardMaterial({ color: '#2f4a3a', roughness: 1, flatShading: true });
+const feltMat = new THREE.MeshStandardMaterial({ color: '#2f4a3a', roughness: 0.9, flatShading: true });
 const dimMat = new THREE.MeshBasicMaterial({ color: '#59606b', transparent: true, opacity: 0.42, depthWrite: false });
-const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 const trashMat = new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0.35, depthWrite: false });
 
 const costText = (c: Partial<Resources>) => RESOURCE_KEYS.filter((k) => c[k]).map((k) => `${c[k]}${RESOURCE_META[k].icon}`).join(' ') || 'gratuit';
@@ -54,9 +56,7 @@ function Mini({ type, x, z, onHover }: { type: BuildingTypeId; x: number; z: num
       </group>
       {!unlocked && (
         <>
-          <mesh position={[0, BOX.h + size * 0.45, 0]} material={dimMat}>
-            <boxGeometry args={[size * 0.95, size * 0.9, size * 0.95]} />
-          </mesh>
+          <Part g="box" m={dimMat} p={[0, BOX.h + size * 0.45, 0]} s={[size * 0.95, size * 0.9, size * 0.95]} shadow={false} />
           <Label text="🔒" size={0.03} position={[0, BOX.h + size * 1.05, size * 0.2]} />
         </>
       )}
@@ -152,20 +152,12 @@ export function BuildBox() {
   return (
     <group position={[c.x, 0, c.z]}>
       {/* Plateau de la boîte : bois, fond de feutre, rebords */}
-      <mesh material={woodMat} position={[0, BOX.h / 2 - 0.004, 0]}>
-        <boxGeometry args={[BOX.w, BOX.h - 0.008, BOX.d]} />
-      </mesh>
-      <mesh material={feltMat} position={[0, BOX.h - 0.003, -0.02]}>
-        <boxGeometry args={[BOX.w - 0.03, 0.004, BOX.d - 0.1]} />
-      </mesh>
+      <Part g="box" m={woodMat} p={[0, BOX.h / 2 - 0.004, 0]} s={[BOX.w, BOX.h - 0.008, BOX.d]} shadow={false} />
+      <Part g="box" m={feltMat} p={[0, BOX.h - 0.003, -0.02]} s={[BOX.w - 0.03, 0.004, BOX.d - 0.1]} shadow={false} />
       {[-1, 1].map((s) => (
-        <mesh key={s} material={woodDark} position={[s * (BOX.w / 2 - 0.006), BOX.h + 0.008, 0]}>
-          <boxGeometry args={[0.012, 0.024, BOX.d]} />
-        </mesh>
+        <Part key={s} g="box" m={woodDark} p={[s * (BOX.w / 2 - 0.006), BOX.h + 0.008, 0]} s={[0.012, 0.024, BOX.d]} shadow={false} />
       ))}
-      <mesh material={woodDark} position={[0, BOX.h + 0.008, -BOX.d / 2 + 0.006]}>
-        <boxGeometry args={[BOX.w, 0.024, 0.012]} />
-      </mesh>
+      <Part g="box" m={woodDark} p={[0, BOX.h + 0.008, -BOX.d / 2 + 0.006]} s={[BOX.w, 0.024, 0.012]} shadow={false} />
       {/* Zone « détruire » : s'illumine quand on y tient un bâtiment déjà posé */}
       <mesh ref={trash} material={trashMat} position={[0, BOX.h + 0.006, -0.02]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
         <planeGeometry args={[BOX.w - 0.03, BOX.d - 0.1]} />

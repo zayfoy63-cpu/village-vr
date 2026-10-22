@@ -7,6 +7,7 @@ import { statsOf } from '../game/rules';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
+import { useSmallShadows } from './quality';
 
 const MAX_VILLAGERS = 150;
 const WALK_SPEED = 0.55;
@@ -47,6 +48,7 @@ function jitter(v: THREE.Vector3, r: number): THREE.Vector3 {
 
 /** Petits villageois (corps cylindre + tête) qui vont et viennent entre maison et travail */
 export function Villagers({ buildings, map }: { buildings: Building[]; map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const population = useGame((s) => s.game.population);
   const bodyRef = useRef<THREE.InstancedMesh>(null);
   const headRef = useRef<THREE.InstancedMesh>(null);
@@ -123,10 +125,10 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
 
   return (
     <group>
-      <instancedMesh ref={bodyRef} args={[GEO.cylinderLow, undefined, MAX_VILLAGERS]} castShadow frustumCulled={false}>
+      <instancedMesh matrixAutoUpdate={false} ref={bodyRef} args={[GEO.cylinderLow, undefined, MAX_VILLAGERS]} castShadow={smallShadows} frustumCulled={false}>
         <meshStandardMaterial flatShading />
       </instancedMesh>
-      <instancedMesh ref={headRef} args={[GEO.ball, undefined, MAX_VILLAGERS]} castShadow frustumCulled={false}>
+      <instancedMesh matrixAutoUpdate={false} ref={headRef} args={[GEO.ball, undefined, MAX_VILLAGERS]} castShadow={smallShadows} frustumCulled={false}>
         <meshStandardMaterial ref={headMat} color="#f0c8a0" flatShading />
       </instancedMesh>
     </group>

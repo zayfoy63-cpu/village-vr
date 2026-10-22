@@ -1,17 +1,16 @@
-// Kit d'interface 3D : tout est dessiné sur canvas (emojis et accents sans police externe), donc
-// lisible sur fond de passthrough. Un seul jeu de composants pour tous les modes : chaque élément
+// Kit d'interface 3D : textes, emojis et fonds viennent d'un atlas de caractères unique et sont
+// dessinés en un seul maillage (uiBatch) ; lisible sur fond de passthrough. Un seul jeu de composants pour tous les modes : chaque élément
 // réagit pareil au clic souris, au rayon de manette, au pincement et au toucher du doigt.
 
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { feedback } from '../feedback';
 import { VR_CONFIG } from '../config';
 import { useVR } from '../store';
+import { lineWidth } from './atlas';
+import { Builder, addItem, removeItem, rgba, type Tris, type UIItem } from './uiBatch';
 
-/** Résolution des textures : pixels par mètre d'interface */
-const PX_PER_M = 1600;
-const FONT = "system-ui, 'Segoe UI', Roboto, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
 
 /** Palette très contrastée (lisible sur passthrough clair comme sombre) */
 export const THEME = {
@@ -31,59 +30,45 @@ export const THEME = {
 };
 
 // ---------------------------------------------------------------------------
-// Textures
+// Éléments de base : tout passe par le maillage unique de l'interface (uiBatch) et l'atlas de
+// caractères partagé. Chaque élément ne rend ici qu'un repère invisible (groupe vide).
 // ---------------------------------------------------------------------------
 
-const cache = new Map<string, THREE.CanvasTexture>();
-const MAX_CACHE = 400;
+/** Panneau englobant : son repère sert de profondeur commune à tout son contenu */
+type RootRef = { current: unknown };
+const PanelRoot = createContext<RootRef | null>(null);
 
-type Draw = (g: CanvasRenderingContext2D, w: number, h: number) => void;
-
-function texture(key: string, w: number, h: number, draw: Draw): THREE.CanvasTexture {
-  const hit = cache.get(key);
-  if (hit) return hit;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(2, Math.min(2048, Math.ceil(w)));
-  canvas.height = Math.max(2, Math.min(2048, Math.ceil(h)));
-  const g = canvas.getContext('2d')!;
-  draw(g, canvas.width, canvas.height);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  if (cache.size >= MAX_CACHE) {
-    const first = cache.keys().next().value as string;
-    cache.get(first)?.dispose();
-    cache.delete(first);
-  }
-  cache.set(key, tex);
-  return tex;
+/** Déclare les triangles d'un élément (reconstruits quand `build` change) ; renvoie le repère */
+function useUIItem(layer: 0 | 1, build: () => Tris, ownRoot?: RootRef) {
+  const ref = useRef<THREE.Group>(null);
+  const item = useRef<UIItem | null>(null);
+  const parentRoot = useContext(PanelRoot);
+  const root = ownRoot ?? parentRoot;
+  useLayoutEffect(() => {
+    const it = addItem(ref.current as never, layer, build, root as never);
+    item.current = it;
+    return () => {
+      removeItem(it);
+      item.current = null;
+    };
+    // L'élément est créé une fois ; `build` est mis à jour ci-dessous
+  }, [layer, root]);
+  useLayoutEffect(() => {
+    const it = item.current;
+    if (!it || it.build === build) return;
+    it.build = build;
+    it.dirty = true;
+  }, [build]);
+  return ref;
 }
 
-function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.min(r, w / 2, h / 2);
-  g.beginPath();
-  g.moveTo(x + rr, y);
-  g.arcTo(x + w, y, x + w, y + h, rr);
-  g.arcTo(x + w, y + h, x, y + h, rr);
-  g.arcTo(x, y + h, x, y, rr);
-  g.arcTo(x, y, x + w, y, rr);
-  g.closePath();
-}
-
-let measureCtx: CanvasRenderingContext2D | null = null;
-function measure(font: string, text: string): number {
-  measureCtx ??= document.createElement('canvas').getContext('2d')!;
-  measureCtx.font = font;
-  return measureCtx.measureText(text).width;
-}
-
-function wrap(font: string, text: string, maxPx: number): string[] {
+function wrap(text: string, size: number, weight: number, maxWidth: number): string[] {
   const out: string[] = [];
   for (const para of text.split('\n')) {
     let line = '';
     for (const word of para.split(' ')) {
       const test = line ? `${line} ${word}` : word;
-      if (line && measure(font, test) > maxPx) {
+      if (line && lineWidth(test, weight) * size > maxWidth) {
         out.push(line);
         line = word;
       } else line = test;
@@ -93,17 +78,7 @@ function wrap(font: string, text: string, maxPx: number): string[] {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Éléments de base
-// ---------------------------------------------------------------------------
-
-const RENDER = { bg: 10, text: 11 };
-
-function basic(tex: THREE.Texture, opacity = 1) {
-  return <meshBasicMaterial map={tex} transparent opacity={opacity} toneMapped={false} depthWrite={false} side={THREE.DoubleSide} />;
-}
-
-/** Texte (ou icône emoji) dessiné sur un plan. `size` = hauteur de police en mètres. */
+/** Texte (ou icône emoji). `size` = hauteur de police en mètres. Fin liseré sombre : lisible sur tout fond. */
 export function Label({
   text,
   size = VR_CONFIG.ui.text,
@@ -124,48 +99,33 @@ export function Label({
   position?: [number, number, number];
   opacity?: number;
 }) {
-  const { tex, w, h } = useMemo(() => {
-    const px = size * PX_PER_M;
-    const font = `${weight} ${px}px ${FONT}`;
-    const lines = maxWidth ? wrap(font, text, maxWidth * PX_PER_M) : text.split('\n');
-    const lineH = px * 1.22;
-    const width = Math.max(...lines.map((l) => measure(font, l))) + px * 0.3;
-    const height = lines.length * lineH + px * 0.2;
-    const tex = texture(`L|${text}|${px}|${color}|${weight}|${align}|${maxWidth ?? 0}`, width, height, (g, cw, ch) => {
-      g.font = font;
-      g.fillStyle = color;
-      g.textBaseline = 'middle';
-      g.textAlign = align;
-      const x = align === 'left' ? px * 0.15 : align === 'right' ? cw - px * 0.15 : cw / 2;
-      // Fin liseré sombre : lisible sur fond clair comme sombre
-      g.lineJoin = 'round';
-      g.lineWidth = px * 0.14;
-      g.strokeStyle = 'rgba(15,10,5,0.75)';
+  const build = useMemo(
+    () => () => {
+      const b = new Builder();
+      const lines = maxWidth ? wrap(text, size, weight, maxWidth) : text.split('\n');
+      const lineH = size * 1.22;
+      const total = lines.length * lineH + size * 0.2;
+      const c = rgba(color, opacity);
       lines.forEach((l, i) => {
-        const y = px * 0.1 + lineH * (i + 0.5);
-        g.strokeText(l, x, y);
-        g.fillText(l, x, y);
+        const y = total / 2 - (size * 0.1 + lineH * (i + 0.5));
+        // Ancrage comme avant : bord gauche / droit du texte à `position` (marge de 0.15 em)
+        const x = align === 'left' ? size * 0.15 : align === 'right' ? -size * 0.15 : 0;
+        b.text(l, { size, color: c, weight, outline: true, x, y, align, emojiAlpha: opacity });
       });
-      void ch;
-    });
-    return { tex, w: tex.image.width / PX_PER_M, h: tex.image.height / PX_PER_M };
-  }, [text, size, color, weight, align, maxWidth]);
-  // Le plan est décalé pour que `align` colle au bord gauche / droit de la position donnée
-  const dx = align === 'left' ? w / 2 : align === 'right' ? -w / 2 : 0;
-  return (
-    <mesh position={[(position?.[0] ?? 0) + dx, position?.[1] ?? 0, position?.[2] ?? 0]} renderOrder={RENDER.text}>
-      <planeGeometry args={[w, h]} />
-      {basic(tex, opacity)}
-    </mesh>
+      return b.done();
+    },
+    [text, size, color, weight, align, maxWidth, opacity],
   );
+  const ref = useUIItem(1, build);
+  return <group ref={ref} position={position} />;
 }
 
 /** Mesure du texte d'un Label (largeur en mètres) : pour dimensionner les panneaux */
 export function textWidth(text: string, size: number = VR_CONFIG.ui.text, weight = 700): number {
-  return (measure(`${weight} ${size * PX_PER_M}px ${FONT}`, text) + size * PX_PER_M * 0.3) / PX_PER_M;
+  return (lineWidth(text, weight) + 0.3) * size;
 }
 
-/** Plaque arrondie (fond de panneau, bouton…) */
+/** Plaque arrondie (fond de panneau) */
 export function Plate({
   width,
   height,
@@ -175,6 +135,7 @@ export function Plate({
   borderWidth = 0.003,
   position,
   opacity = 1,
+  root,
 }: {
   width: number;
   height: number;
@@ -184,29 +145,19 @@ export function Plate({
   borderWidth?: number;
   position?: [number, number, number];
   opacity?: number;
+  /** Panneau auquel appartient ce fond (tri de profondeur commun) */
+  root?: RootRef;
 }) {
-  const tex = useMemo(() => {
-    const w = Math.min(1024, width * PX_PER_M);
-    const h = (w * height) / width;
-    const k = w / width;
-    return texture(`P|${width.toFixed(3)}|${height.toFixed(3)}|${color}|${border}|${radius}|${borderWidth}`, w, h, (g, cw, ch) => {
-      g.fillStyle = color;
-      roundRect(g, 0, 0, cw, ch, radius * k);
-      g.fill();
-      if (border) {
-        g.lineWidth = borderWidth * k;
-        g.strokeStyle = border;
-        roundRect(g, g.lineWidth / 2, g.lineWidth / 2, cw - g.lineWidth, ch - g.lineWidth, radius * k);
-        g.stroke();
-      }
-    });
-  }, [width, height, color, border, radius, borderWidth]);
-  return (
-    <mesh position={position} renderOrder={RENDER.bg}>
-      <planeGeometry args={[width, height]} />
-      {basic(tex, opacity)}
-    </mesh>
+  const build = useMemo(
+    () => () => {
+      const b = new Builder();
+      b.plate(width, height, radius, rgba(color, opacity), border ? rgba(border, opacity) : null, borderWidth);
+      return b.done();
+    },
+    [width, height, color, border, radius, borderWidth, opacity],
   );
+  const ref = useUIItem(0, build, root);
+  return <group ref={ref} position={position} />;
 }
 
 /** Panneau : plaque + contenu posé devant (z croissant) */
@@ -225,10 +176,13 @@ export function Panel({
   position?: [number, number, number];
   rotation?: [number, number, number];
 }) {
+  const self = useRef<THREE.Group>(null);
   return (
-    <group position={position} rotation={rotation}>
-      <Plate width={width} height={height} border={border} />
-      <group position={[0, 0, 0.002]}>{children}</group>
+    <group ref={self} position={position} rotation={rotation}>
+      <PanelRoot.Provider value={self}>
+        <Plate width={width} height={height} border={border} root={self} />
+        <group position={[0, 0, 0.002]}>{children}</group>
+      </PanelRoot.Provider>
     </group>
   );
 }
@@ -239,6 +193,7 @@ export function Panel({
 
 const _p = new THREE.Vector3();
 const _c = new THREE.Vector3();
+const _look = new THREE.Vector3();
 
 /**
  * Pivote toujours vers le joueur autour de la verticale (jamais accroché à la tête : le groupe
@@ -302,49 +257,36 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
   const input = useVR((s) => s.input);
   const pad = input === 'hand' ? VR_CONFIG.ui.handPadding : 0.004;
 
-  const tex = useMemo(() => {
-    const w = Math.min(768, width * PX_PER_M);
-    const h = (w * height) / width;
-    const k = w / width;
-    const bg = disabled ? THEME.disabled : danger ? (hover ? '#8a2f25' : '#5e211b') : active ? THEME.buttonActive : hover ? THEME.buttonHover : THEME.button;
-    const border = disabled ? '#5a4d3d' : active || hover ? THEME.accent : danger ? THEME.bad : '#c9a24e';
-    return texture(`B|${width}|${height}|${icon}|${label}|${sub}|${bg}|${border}|${locked}`, w, h, (g, cw, ch) => {
-      g.fillStyle = bg;
-      roundRect(g, 0, 0, cw, ch, 0.014 * k);
-      g.fill();
-      g.lineWidth = 0.004 * k;
-      g.strokeStyle = border;
-      roundRect(g, g.lineWidth / 2, g.lineWidth / 2, cw - g.lineWidth, ch - g.lineWidth, 0.014 * k);
-      g.stroke();
-      g.textBaseline = 'middle';
-      g.textAlign = 'center';
-      const fg = disabled ? '#8a7d6a' : THEME.text;
+  const build = useMemo(
+    () => () => {
+      const w = width;
+      const h = height;
+      const bg = disabled ? THEME.disabled : danger ? (hover ? '#8a2f25' : '#5e211b') : active ? THEME.buttonActive : hover ? THEME.buttonHover : THEME.button;
+      const border = disabled ? '#5a4d3d' : active || hover ? THEME.accent : danger ? THEME.bad : '#c9a24e';
+      const b = new Builder();
+      b.plate(w, h, 0.014, rgba(bg), rgba(border), 0.004);
+      // Mise en page en proportions du bouton (positions mesurées depuis le haut)
+      const fg = rgba(disabled ? '#8a7d6a' : THEME.text);
       const hasText = !!label;
-      const iconSize = Math.min(ch * (hasText ? (sub ? 0.46 : 0.5) : 0.62), cw * 0.6);
+      const top = (k: number) => h / 2 - h * k;
       if (icon) {
-        g.font = `${iconSize}px ${FONT}`;
-        g.fillStyle = fg;
-        g.globalAlpha = disabled ? 0.55 : 1;
-        g.fillText(icon, cw / 2, hasText ? ch * (sub ? 0.3 : 0.34) : ch / 2);
-        g.globalAlpha = 1;
+        const size = Math.min(h * (hasText ? (sub ? 0.46 : 0.5) : 0.62), w * 0.6);
+        b.text(icon, { size, color: fg, weight: 400, outline: false, x: 0, y: hasText ? top(sub ? 0.3 : 0.34) : 0, align: 'center', emojiAlpha: disabled ? 0.55 : 1 });
       }
       if (label) {
-        const fs = Math.min(ch * (icon ? 0.24 : 0.4), cw * 0.16);
-        g.font = `700 ${fs}px ${FONT}`;
-        g.fillStyle = fg;
-        g.fillText(label, cw / 2, icon ? ch * (sub ? 0.65 : 0.76) : sub ? ch * 0.38 : ch / 2, cw * 0.92);
+        const size = Math.min(h * (icon ? 0.24 : 0.4), w * 0.16);
+        const y = icon ? top(sub ? 0.65 : 0.76) : sub ? top(0.38) : 0;
+        b.text(label, { size, color: fg, weight: 700, outline: false, x: 0, y, align: 'center', squeeze: w * 0.92 });
       }
       if (sub) {
-        g.font = `600 ${ch * 0.17}px ${FONT}`;
-        g.fillStyle = disabled ? '#8a7d6a' : THEME.dim;
-        g.fillText(sub, cw / 2, ch * 0.88, cw * 0.94);
+        b.text(sub, { size: h * 0.17, color: rgba(disabled ? '#8a7d6a' : THEME.dim), weight: 600, outline: false, x: 0, y: top(0.88), align: 'center', squeeze: w * 0.94 });
       }
-      if (locked) {
-        g.font = `${ch * 0.34}px ${FONT}`;
-        g.fillText('🔒', cw * 0.8, ch * 0.28);
-      }
-    });
-  }, [width, height, icon, label, sub, disabled, active, danger, locked, hover]);
+      if (locked) b.text('🔒', { size: h * 0.34, color: fg, weight: 400, outline: false, x: w * 0.3, y: top(0.28), align: 'center' });
+      return b.done();
+    },
+    [width, height, icon, label, sub, disabled, active, danger, locked, hover],
+  );
+  const visual = useUIItem(1, build);
 
   useFrame((_, dt) => {
     const g = group.current;
@@ -370,10 +312,7 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
   return (
     <group position={position}>
       <group ref={group}>
-        <mesh renderOrder={RENDER.bg + 1}>
-          <planeGeometry args={[width, height]} />
-          {basic(tex)}
-        </mesh>
+        <group ref={visual} />
         {/* Zone sensible agrandie (invisible) */}
         <mesh
           position={[0, 0, 0.003]}
@@ -392,7 +331,7 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
           }}
         >
           <planeGeometry args={[width + pad * 2, height + pad * 2]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
         </mesh>
       </group>
     </group>
@@ -412,7 +351,7 @@ export function useAutoClose(open: boolean, close: () => void, anchor: React.Ref
     a.getWorldPosition(_p);
     camera.getWorldPosition(_c);
     const toAnchor = _p.sub(_c).normalize();
-    const look = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const look = _look.set(0, 0, -1).applyQuaternion(camera.quaternion);
     // Le regard est « ailleurs » au-delà de ~60° du panneau
     away.current = look.dot(toAnchor) < 0.5 ? away.current + dt : 0;
     if (away.current > VR_CONFIG.ui.panelAutoCloseSec) {

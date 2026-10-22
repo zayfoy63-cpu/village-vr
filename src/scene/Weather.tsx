@@ -12,6 +12,7 @@ import { useGame } from '../store/gameStore';
 import { VR_CONFIG } from '../vr/config';
 import { useVR } from '../vr/store';
 import { GEO, TILE, tileToWorld } from './shared';
+import { useSmallShadows } from './quality';
 
 const floodMat = new THREE.MeshStandardMaterial({
   color: '#3f8fd0',
@@ -59,7 +60,7 @@ export function Flood({ map }: { map: GameMap }) {
   });
 
   if (!active) return null;
-  return <instancedMesh ref={ref} args={[GEO.box, floodMat, Math.max(1, tiles.length)]} frustumCulled={false} />;
+  return <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.box, floodMat, Math.max(1, tiles.length)]} frustumCulled={false} />;
 }
 
 const cloudMat = new THREE.MeshStandardMaterial({
@@ -165,8 +166,8 @@ export function Storm({ map }: { map: GameMap }) {
         ))}
       </group>
       <mesh ref={shadow} geometry={shadowGeo} material={shadowMat} renderOrder={1} />
-      <instancedMesh ref={rain} args={[GEO.box, rainMat, MAX_RAIN]} frustumCulled={false} />
-      <instancedMesh ref={bolts} args={[GEO.box, boltMat, 24]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={rain} args={[GEO.box, rainMat, MAX_RAIN]} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={bolts} args={[GEO.box, boltMat, 24]} frustumCulled={false} />
       <pointLight ref={flash} intensity={0} color="#dfe8ff" distance={14} />
     </group>
   );
@@ -181,6 +182,7 @@ const ringGeo = new THREE.RingGeometry(0.42, 0.5, 20).rotateX(-Math.PI / 2);
  * (anneau bleu pulsant tant qu'ils ne sont pas protégés).
  */
 export function Reinforcements({ map }: { map: GameMap }) {
+  const smallShadows = useSmallShadows();
   const show = useGame((s) => !!s.game.storm || !!s.game.flood);
   const planks = useRef<THREE.InstancedMesh>(null);
   const rings = useRef<THREE.InstancedMesh>(null);
@@ -217,8 +219,8 @@ export function Reinforcements({ map }: { map: GameMap }) {
   if (!show) return null;
   return (
     <group>
-      <instancedMesh ref={planks} args={[GEO.box, plankMat, 400]} castShadow frustumCulled={false} />
-      <instancedMesh ref={rings} args={[ringGeo, ringMat, 100]} frustumCulled={false} renderOrder={1} />
+      <instancedMesh matrixAutoUpdate={false} ref={planks} args={[GEO.box, plankMat, 400]} castShadow={smallShadows} frustumCulled={false} />
+      <instancedMesh matrixAutoUpdate={false} ref={rings} args={[ringGeo, ringMat, 100]} frustumCulled={false} renderOrder={1} />
     </group>
   );
 }
@@ -263,7 +265,7 @@ export function Snowfall({ map }: { map: GameMap }) {
   });
 
   if (!count) return null;
-  return <instancedMesh ref={ref} args={[GEO.box, snowMat, MAX_FLAKES]} frustumCulled={false} />;
+  return <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.box, snowMat, MAX_FLAKES]} frustumCulled={false} />;
 }
 
 const MAX_SHOWER = 320;
@@ -300,5 +302,5 @@ export function Rain({ map }: { map: GameMap }) {
   });
 
   if (!raining) return null;
-  return <instancedMesh ref={ref} args={[GEO.box, showerMat, MAX_SHOWER]} frustumCulled={false} />;
+  return <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.box, showerMat, MAX_SHOWER]} frustumCulled={false} />;
 }

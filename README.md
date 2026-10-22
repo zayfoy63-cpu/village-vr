@@ -17,7 +17,8 @@ npm run build     # vérification TypeScript + build de production dans dist/
 | --- | --- |
 | Tourner la caméra | clic gauche + glisser |
 | Zoom | molette |
-| Choisir un bâtiment | barre du bas ou touches 1 à 9 |
+| Choisir un bâtiment | barre du bas (onglets), touches 1 à 6 dans l'onglet actif |
+| Changer d'onglet | Tab (Maj+Tab : onglet précédent) |
 | Détails / amélioration | clic sur un bâtiment existant |
 | Construire | clic sur une case (aperçu vert = possible, rouge = impossible) |
 | Annuler la sélection | clic droit ou Échap |

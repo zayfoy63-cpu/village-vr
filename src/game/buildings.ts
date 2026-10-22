@@ -26,14 +26,23 @@ export interface LevelDef {
   defense?: number;
 }
 
-export type BuildingCategory = 'special' | 'housing' | 'production';
+/** Onglets de la barre de construction (l'ordre ici = l'ordre affiché) */
+export type BuildTab = 'housing' | 'production' | 'commerce' | 'defense';
+
+export const BUILD_TABS: { id: BuildTab; label: string; icon: string }[] = [
+  { id: 'housing', label: 'Habitations', icon: '🏠' },
+  { id: 'production', label: 'Production', icon: '🌾' },
+  { id: 'commerce', label: 'Commerce', icon: '⚖️' },
+  { id: 'defense', label: 'Défense', icon: '🛡️' },
+];
 
 export interface BuildingDef {
   id: BuildingTypeId;
   name: string;
   icon: string;
   description: string;
-  category: BuildingCategory;
+  /** Onglet de la barre de construction (absent = non constructible) */
+  tab?: BuildTab;
   /** false = bâtiment de départ, absent de la barre de construction */
   buildable: boolean;
   /** Côté de l'emprise au sol en cases */
@@ -50,8 +59,6 @@ export interface BuildingDef {
   priority: number;
   /** Cases sur lesquelles on peut construire */
   allowedTiles: TileType[];
-  /** Raccourci clavier dans la barre de construction */
-  hotkey?: string;
 }
 
 const LAND: TileType[] = ['grass', 'fertile'];
@@ -67,7 +74,6 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Château',
     icon: '🏰',
     description: 'Le cœur du village.',
-    category: 'special',
     buildable: false,
     size: 2,
     levels: [{ cost: {}, housing: 4 }],
@@ -79,7 +85,6 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Moulin',
     icon: '🌬️',
     description: 'Le vieux moulin du village.',
-    category: 'special',
     buildable: false,
     size: 1,
     levels: [{ cost: {} }],
@@ -93,52 +98,48 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Cabane',
     icon: '🛖',
     description: 'Un abri modeste en bois et chaume.',
-    category: 'housing',
+    tab: 'housing',
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 6 }, housing: 2 }],
     priority: 99,
     allowedTiles: LAND,
-    hotkey: '1',
   },
   {
     id: 'house',
     name: 'Maison',
     icon: '🏠',
     description: 'Maison à colombages.',
-    category: 'housing',
+    tab: 'housing',
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 12 }, housing: 3, unlock: { population: 6 } }],
     priority: 99,
     allowedTiles: LAND,
-    hotkey: '2',
   },
   {
     id: 'townhouse',
     name: 'Maison bourgeoise',
     icon: '🏘️',
     description: 'Deux étages, rez-de-chaussée en pierre.',
-    category: 'housing',
+    tab: 'housing',
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 22, stone: 12 }, housing: 5, unlock: { population: 15, buildings: { market: 1 } } }],
     priority: 99,
     allowedTiles: LAND,
-    hotkey: '3',
   },
   {
     id: 'manor',
     name: 'Manoir',
     icon: '🏛️',
     description: 'Grande demeure avec tourelle et jardin.',
-    category: 'housing',
+    tab: 'housing',
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 35, stone: 30, gold: 12 }, housing: 8, unlock: { population: 30, buildings: { tower: 1 } } }],
     priority: 99,
     allowedTiles: LAND,
-    hotkey: '4',
   },
 
   // ---------- Production (améliorables niveaux 1 → 3) ----------
@@ -147,7 +148,7 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Champ',
     icon: '🌾',
     description: 'Produit de la nourriture (x1,75 sur zone fertile). Rien en hiver.',
-    category: 'production',
+    tab: 'production',
     buildable: true,
     size: 1,
     levels: [
@@ -159,14 +160,13 @@ export const BUILDINGS: BuildingDef[] = [
     seasonal: true,
     priority: 1,
     allowedTiles: LAND,
-    hotkey: '5',
   },
   {
     id: 'lumber',
     name: 'Cabane de bûcheron',
     icon: '🪓',
     description: 'Produit du bois. Doit toucher une forêt.',
-    category: 'production',
+    tab: 'production',
     buildable: true,
     size: 1,
     levels: [
@@ -177,14 +177,13 @@ export const BUILDINGS: BuildingDef[] = [
     requiresAdjacent: 'forest',
     priority: 2,
     allowedTiles: LAND,
-    hotkey: '6',
   },
   {
     id: 'quarry',
     name: 'Carrière',
     icon: '⛏️',
     description: 'Produit de la pierre. Doit toucher des rochers.',
-    category: 'production',
+    tab: 'production',
     buildable: true,
     size: 1,
     levels: [
@@ -195,14 +194,13 @@ export const BUILDINGS: BuildingDef[] = [
     requiresAdjacent: 'rock',
     priority: 3,
     allowedTiles: LAND,
-    hotkey: '7',
   },
   {
     id: 'market',
     name: 'Marché',
     icon: '⚖️',
     description: 'Produit de l\'or.',
-    category: 'production',
+    tab: 'commerce',
     buildable: true,
     size: 1,
     levels: [
@@ -212,14 +210,13 @@ export const BUILDINGS: BuildingDef[] = [
     ],
     priority: 4,
     allowedTiles: LAND,
-    hotkey: '8',
   },
   {
     id: 'tower',
     name: 'Tour de garde',
     icon: '🗼',
     description: 'Réduit les vols des bandits.',
-    category: 'production',
+    tab: 'defense',
     buildable: true,
     size: 1,
     levels: [
@@ -229,7 +226,6 @@ export const BUILDINGS: BuildingDef[] = [
     ],
     priority: 5,
     allowedTiles: LAND,
-    hotkey: '9',
   },
 ];
 
@@ -238,6 +234,10 @@ export const BUILDING_BY_ID: Record<BuildingTypeId, BuildingDef> = Object.fromEn
 ) as Record<BuildingTypeId, BuildingDef>;
 
 export const BUILDABLE = BUILDINGS.filter((b) => b.buildable);
+
+export function buildingsInTab(tab: BuildTab): BuildingDef[] {
+  return BUILDABLE.filter((b) => b.tab === tab);
+}
 
 export function maxLevel(type: BuildingTypeId): number {
   return BUILDING_BY_ID[type].levels.length;

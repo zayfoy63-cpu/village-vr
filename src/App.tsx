@@ -40,7 +40,7 @@ export function App() {
         <EventCards key={seed} />
         <BuildBar />
         <BuildingPanel />
-        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails / amélioration · 1-9 : construire · Espace : pause</div>
+        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause</div>
         <GameOver />
       </div>
     </div>

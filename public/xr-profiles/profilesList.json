@@ -1,0 +1,17 @@
+{
+ "generic-trigger-squeeze-thumbstick": {
+  "path": "generic-trigger-squeeze-thumbstick/profile.json"
+ },
+ "generic-trigger-squeeze": {
+  "path": "generic-trigger-squeeze/profile.json"
+ },
+ "generic-trigger": {
+  "path": "generic-trigger/profile.json"
+ },
+ "oculus-touch-v2": {
+  "path": "oculus-touch-v2/profile.json"
+ },
+ "oculus-touch": {
+  "path": "oculus-touch/profile.json"
+ }
+}

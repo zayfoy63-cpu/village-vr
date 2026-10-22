@@ -1,5 +1,6 @@
 import { Scene } from './scene/Scene';
 import { useGame } from './store/gameStore';
+import { useVR } from './vr/store';
 import { BuildBar } from './ui/BuildBar';
 import { BuildingPanel } from './ui/BuildingPanel';
 import { BanditMarkers } from './ui/BanditMarkers';
@@ -38,8 +39,10 @@ function SeedPanel() {
 
 export function App() {
   const seed = useGame((s) => s.game.seed);
+  // Aperçu de l'interface 3D sur PC (?ui3d) : l'interface HTML est masquée
+  const ui3d = useVR((s) => s.pcPreview);
   return (
-    <div className="app">
+    <div className={`app ${ui3d ? 'ui3d' : ''}`}>
       <Scene />
       <ParcelBadges />
       <BanditMarkers />

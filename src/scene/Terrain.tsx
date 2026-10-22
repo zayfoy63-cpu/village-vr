@@ -1,4 +1,4 @@
-import type { ThreeEvent } from '@react-three/fiber';
+import { useThree, type ThreeEvent } from '@react-three/fiber';
 import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { seasonOf, type SeasonId } from '../game/config';
@@ -7,6 +7,9 @@ import { featureAt, ownsParcel, parcelOf } from '../game/parcels';
 import { buildingAt, hasModifier } from '../game/rules';
 import type { GameMap, TileType } from '../game/types';
 import { reinforceCost } from '../game/hazards';
+import { wasCameraDrag } from '../vr/clicks';
+import { lastDragEnd } from '../vr/Drag';
+import { onBuildingPointerDown } from '../vr/grab';
 import { FLOOD } from '../game/mechanics/flood';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
@@ -39,6 +42,7 @@ export function Terrain({ map }: { map: GameMap }) {
   const season = useGame((s) => seasonOf(s.game.day).id);
   const harsh = useGame((s) => hasModifier(s.game, 'harshWinter'));
   const owned = useGame((s) => s.game.parcels.owned);
+  const get = useThree((s) => s.get);
   // Rivière qui gonfle après des jours de pluie : plus sombre, un peu plus haute (indice de crue)
   const swell = useGame((s) => {
     const r = s.game.mech.river;
@@ -94,9 +98,15 @@ export function Terrain({ map }: { map: GameMap }) {
         setHover(toTile(e));
       }}
       onPointerOut={() => setHover(null)}
+      onPointerDown={(e) => {
+        // VR : saisir un champ (instancié, donc sans groupe propre) pour le déplacer
+        const t = toTile(e);
+        const b = t ? buildingAt(useGame.getState().game, t.x, t.z) : undefined;
+        if (b?.type === 'field') onBuildingPointerDown(e, b.id, get);
+      }}
       onClick={(e) => {
-        // Ignore les clics qui terminent un glisser de caméra
-        if (e.delta > 6) return;
+        // Ignore les clics qui terminent un glisser de caméra (ou un glisser-déposer VR)
+        if (wasCameraDrag(e) || performance.now() - lastDragEnd < 400) return;
         e.stopPropagation();
         const t = toTile(e);
         if (!t) return;

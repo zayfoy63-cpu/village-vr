@@ -1,3 +1,4 @@
+import { wasCameraDrag } from '../vr/clicks';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -139,7 +140,7 @@ function Feature({ f, map }: { f: ParcelFeature; map: GameMap }) {
       position={[x, 0, z]}
       scale={[f.w / 2, 1, f.h / 2 + (f.h === 1 ? 0.5 : 0)]}
       onClick={(e) => {
-        if (e.delta > 6) return;
+        if (wasCameraDrag(e)) return;
         e.stopPropagation();
         inspectFeature(f.id);
       }}

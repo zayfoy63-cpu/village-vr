@@ -37,7 +37,12 @@ export function migrate(data: GameState): GameState | null {
   // Bâtiments : types inconnus retirés, niveau borné
   s.buildings = data.buildings
     .filter((b) => b && BUILDING_BY_ID[b.type])
-    .map((b) => ({ ...b, level: Math.max(1, Math.min(maxLevel(b.type), Number(b.level) || 1)) }));
+    .map((b) => {
+      // Un bâtiment soulevé (VR) quand la partie s'est arrêtée est reposé là où il était
+      const { moving: _moving, ...rest } = b;
+      void _moving;
+      return { ...rest, level: Math.max(1, Math.min(maxLevel(b.type), Number(b.level) || 1)) };
+    });
   const defaults = { maxPopulation: 0, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0, banditsKilled: 0, firesPutOut: 0 };
   s.stats = { ...defaults, ...(data.stats as Partial<GameState['stats']>) };
   // Les anciennes cartes "trade" (v2) ne sont plus interactives : on les garde comme simple historique

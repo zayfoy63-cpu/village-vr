@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { xrStore } from '../scene/xr';
 
-/** Bouton "Entrer en VR" : actif uniquement si un casque WebXR est disponible */
+/** Bouton « Réalité mixte » : actif uniquement si un casque WebXR (immersive-ar) est disponible */
 export function VRButton() {
   const [supported, setSupported] = useState(false);
 
   useEffect(() => {
     let alive = true;
     const xr = (navigator as Navigator & { xr?: XRSystem }).xr;
-    xr?.isSessionSupported('immersive-vr')
+    xr?.isSessionSupported('immersive-ar')
       .then((ok) => alive && setSupported(ok))
       .catch(() => alive && setSupported(false));
     return () => {
@@ -20,10 +20,10 @@ export function VRButton() {
     <button
       className="vr-btn"
       disabled={!supported}
-      onClick={() => xrStore.enterVR()}
-      title={supported ? 'Passer en réalité virtuelle' : 'Aucun casque VR détecté (Meta Quest 3 requis)'}
+      onClick={() => xrStore.enterAR()}
+      title={supported ? 'Jouer sur votre table en réalité mixte' : 'Aucun casque détecté (Meta Quest 3 requis)'}
     >
-      🥽 Entrer en VR
+      🥽 Réalité mixte
     </button>
   );
 }

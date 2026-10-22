@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { banditAt, guardAt } from '../game/realtime';
 import type { GameMap, Point } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { feedback } from '../vr/feedback';
+import { useVR } from '../vr/store';
 import { banditScreen } from './badgeAnchors';
 import { GEO, TILE } from './shared';
 
@@ -36,6 +38,7 @@ const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, dept
 export function Bandits({ map }: { map: GameMap }) {
   const active = useGame((s) => !!s.game.raid);
   const chase = useGame((s) => s.chase);
+  const seize = useGame((s) => s.seize);
   const body = useRef<THREE.InstancedMesh>(null);
   const hood = useRef<THREE.InstancedMesh>(null);
   const sack = useRef<THREE.InstancedMesh>(null);
@@ -198,6 +201,14 @@ export function Bandits({ map }: { map: GameMap }) {
       <instancedMesh
         ref={hit}
         args={[GEO.cylinderLow, hitMat, MAX]}
+        onPointerDown={(e) => {
+          // VR : saisir le bandit entre deux doigts (pincement proche) ou à la main (grip) le capture sur-le-champ
+          const type = (e as unknown as { pointerType?: string }).pointerType;
+          if (type !== 'grab' || !useVR.getState().active) return;
+          e.stopPropagation();
+          const id = e.instanceId !== undefined ? hitIds.current[e.instanceId] : undefined;
+          if (id !== undefined && seize(id)) feedback('grab', e);
+        }}
         onClick={(e) => {
           e.stopPropagation();
           const id = e.instanceId !== undefined ? hitIds.current[e.instanceId] : undefined;

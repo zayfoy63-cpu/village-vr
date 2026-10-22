@@ -216,7 +216,7 @@ export function isCapped(state: GameState, b: Building): boolean {
  * avant 8 habitants). Il n'emploie personne et ne produit rien.
  */
 export function isIdle(state: GameState, b: Building): boolean {
-  return !!b.paused || isCapped(state, b) || !isUnlocked(state, b.type, b.level);
+  return !!b.paused || !!b.moving || isCapped(state, b) || !isUnlocked(state, b.type, b.level);
 }
 
 /** Répartit la population sur les bâtiments selon leur priorité (mutation) */

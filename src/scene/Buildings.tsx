@@ -1,9 +1,12 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useRef } from 'react';
 import type * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, GameMap } from '../game/types';
 import { reinforceCost } from '../game/hazards';
+import { wasCameraDrag } from '../vr/clicks';
+import { lastDragEnd } from '../vr/Drag';
+import { onBuildingPointerDown } from '../vr/grab';
 import { MINE } from '../game/mechanics/mine';
 import { useGame } from '../store/gameStore';
 import { Fields } from './Fields';
@@ -72,11 +75,14 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
   // Seuls les bâtiments construits ou améliorés après le montage s'animent (pas ceux d'une sauvegarde)
   const firstNewId = useRef(Math.max(0, ...buildings.map((b) => b.id)) + 1);
   const initialLevels = useRef(new Map(buildings.map((b) => [b.id, b.level])));
-  const fields = buildings.filter((b) => b.type === 'field');
+  // Un bâtiment soulevé (VR) disparaît de la carte : il est dans la main du joueur
+  const shown = buildings.filter((b) => !b.moving);
+  const fields = shown.filter((b) => b.type === 'field');
+  const get = useThree((s) => s.get);
   return (
     <group>
       <Fields fields={fields} map={map} />
-      {buildings.map((b) => {
+      {shown.map((b) => {
         const Model = MODELS[b.type];
         if (!Model) return null;
         const pos = tileToWorld(b.x, b.z, map.width, map.height, BUILDING_BY_ID[b.type].size);
@@ -90,8 +96,9 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
                 document.body.style.cursor = 'pointer';
             }}
             onPointerOut={() => (document.body.style.cursor = '')}
+            onPointerDown={(e) => onBuildingPointerDown(e, b.id, get)}
             onClick={(e) => {
-              if (e.delta > 6) return;
+              if (wasCameraDrag(e) || performance.now() - lastDragEnd < 400) return;
               const state = useGame.getState();
               // Priorité : éteindre un incendie, puis renforcer ; sinon, sans construction en cours, ouvrir le panneau
               if (b.fire && b.fire.extinguishEnd === undefined) {

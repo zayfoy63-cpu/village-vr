@@ -9,6 +9,8 @@ import { floodLevel, stormCenter } from '../game/realtime';
 import { hasModifier } from '../game/rules';
 import type { GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { VR_CONFIG } from '../vr/config';
+import { useVR } from '../vr/store';
 import { GEO, TILE, tileToWorld } from './shared';
 
 const floodMat = new THREE.MeshStandardMaterial({
@@ -121,13 +123,15 @@ export function Storm({ map }: { map: GameMap }) {
     // Pluie légère : traits obliques sous le nuage
     const H = 3.2;
     const time = clock.elapsedTime;
-    for (let i = 0; i < MAX_RAIN; i++) {
+    const nRain = useVR.getState().active ? Math.min(MAX_RAIN, VR_CONFIG.perf.rainDrops) : MAX_RAIN;
+    for (let i = 0; i < nRain; i++) {
       const d = drops[i];
       const y = H - ((time * 9 + d.phase * H) % H);
       tmp.q.setFromAxisAngle(tmp.p.set(storm.dir.z, 0, -storm.dir.x), 0.25);
       tmp.m.compose(tmp.p.set(x + Math.cos(d.a) * d.r * R * 0.95, y, z + Math.sin(d.a) * d.r * R * 0.95), tmp.q, tmp.s.set(0.015, 0.3, 0.015));
       rain.current.setMatrixAt(i, tmp.m);
     }
+    rain.current.count = nRain;
     rain.current.instanceMatrix.needsUpdate = true;
     // Éclairs récents : colonne lumineuse en zigzag + flash
     let n = 0;
@@ -148,7 +152,8 @@ export function Storm({ map }: { map: GameMap }) {
     }
     bolts.current.count = n;
     bolts.current.instanceMatrix.needsUpdate = true;
-    flash.current.intensity = lit * 80;
+    // Pas d'éclair lumineux en réalité mixte (aucune lumière qui clignote)
+    flash.current.intensity = useVR.getState().active ? 0 : lit * 80;
   });
 
   if (!active) return null;
@@ -237,7 +242,9 @@ export function Snowfall({ map }: { map: GameMap }) {
     [],
   );
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3() }), []);
-  const count = harsh ? MAX_FLAKES : winter ? 140 : 0;
+  const vr = useVR((s) => s.active);
+  const cap = vr ? VR_CONFIG.perf.snowFlakes : MAX_FLAKES;
+  const count = harsh ? cap : winter ? Math.min(cap, 140) : 0;
 
   useFrame(({ clock }) => {
     const mesh = ref.current;
@@ -282,7 +289,9 @@ export function Rain({ map }: { map: GameMap }) {
     if (!mesh) return;
     const H = 6;
     const t = clock.elapsedTime;
-    for (let i = 0; i < MAX_SHOWER; i++) {
+    const nShower = useVR.getState().active ? Math.min(MAX_SHOWER, VR_CONFIG.perf.rainDrops) : MAX_SHOWER;
+    mesh.count = nShower;
+    for (let i = 0; i < nShower; i++) {
       const d = drops[i];
       const y = H - ((t * 6 + d.phase * H) % H);
       mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(d.x * (map.width + 2), y, d.z * (map.height + 2)), tmp.q, tmp.s));

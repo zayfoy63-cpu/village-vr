@@ -48,8 +48,13 @@ src/
 ├─ store/gameStore.ts Zustand : relie logique, rendu et UI
 ├─ scene/           Rendu React Three Fiber (low-poly, flat shading, instancing)
 │  ├─ models/         Un modèle par bâtiment + registre MODELS
-│  └─ xr.ts           Store WebXR (bouton "Entrer en VR")
-└─ ui/              HUD, barre de construction, notifications, fin de partie
+│  └─ xr.ts           Store WebXR (réalité mixte immersive-ar)
+├─ vr/              ⭐ Mode VR / réalité mixte (Quest 3) : interface 100 % 3D, voir « Passage en VR »
+│  ├─ config.ts       ⭐ Tous les réglages VR (tailles, tolérances, vitesses, coûts de déplacement, perf)
+│  ├─ store.ts        État VR (plateau, entrée mains/manettes, panneaux, préférences)
+│  ├─ ui/             Éléments d'interface en 3D (HUD, boîte de construction, cartes, panneaux…) + kit.tsx
+│  └─ …               Placement (hit-test), glisser-déposer, entrées, session, perf, émulateur
+└─ ui/              HUD, barre de construction, notifications, fin de partie (version PC)
 ```
 
 ### Progression
@@ -176,12 +181,51 @@ Le cimetière apparaît de lui-même après les premiers décès, une stèle par
 et nuage (position = fonction du temps), puis traite vols, captures, fuites et dégâts dans l'ordre chronologique,
 de façon déterministe (le PRNG est dans l'état). Le rendu ne fait que lire ces positions à chaque image.
 
-## Passage en VR (Meta Quest 3)
-- `@react-three/xr` est déjà branché : le `<Canvas>` est enveloppé dans `<XR store={xrStore}>`.
-- Le bouton **Entrer en VR** n'est actif que si `navigator.xr.isSessionSupported('immersive-vr')` répond oui.
-- En VR, `WorldRoot` (`scene/Scene.tsx`) réduit le monde à l'échelle d'une maquette sur table (`VR_WORLD_SCALE`).
-- Les événements pointeur R3F (survol, clic) fonctionnent aussi avec les rayons des manettes XR.
-- Prochaines étapes : barre de construction et HUD en 3D (panneaux flottants), réglage des ombres pour l'échelle VR.
+## Passage en VR (Meta Quest 3, réalité mixte)
+
+Le plateau se pose sur une vraie table (passthrough, `immersive-ar`) ; tout se joue en 3D, aux mains ou aux manettes.
+La version PC reste inchangée (souris, interface DOM).
+
+### Règle d'architecture : une seule couche d'interaction
+Toute l'interface VR (HUD, boîte de construction, panneaux de bâtiment, cartes d'événement, menaces, Chronique, fin de
+partie, paramètres, tutoriel…) est faite d'éléments de la scène (`src/vr/ui/*`, briques dans `kit.tsx` : `Button3D`,
+`Panel`, `Label`, `FacePlayer`…). Ces éléments ne réagissent **qu'aux événements pointeur R3F** (`onClick`,
+`onPointerDown`, `onPointerOver`…) : `@react-three/xr` les émet à l'identique pour la souris, le rayon d'une manette,
+le pincement à distance, la saisie directe (`pointerType: 'grab'`) et le bout du doigt (`'touch'`).
+
+> **Toute nouvelle fonctionnalité passe par cette couche** : un nouvel élément 3D avec des gestionnaires pointeur, jamais
+> un composant qui lit la manette ou la main directement. Ainsi elle marche d'office à la souris, au rayon, au pincement
+> et au toucher. Les actions de jeu passent toujours par le store (`useGame`), comme à la souris.
+> Les rares entrées « hors pointeur » (boutons A/B/X/Y, sticks, retrait du casque) sont centralisées dans `vr/Session.tsx`.
+
+### Réglages
+Tout est dans **`src/vr/config.ts`** : taille et hauteur du plateau, zoom, rotation, tolérances de saisie, durée de maintien,
+coûts / délais de déplacement (`moves`), durée de l'annulation, seuils de confort, qualité visuelle VR (`perf`), étapes du
+tutoriel, vibrations. Les préférences du joueur (main dominante, assis/debout, son, FPS…) sont sauvées à part
+(`village-vr-xr-prefs`) ; les parties gardent leur format (SAVE_VERSION inchangée par la VR).
+
+### Commandes
+| | Mains | Manettes |
+|-|-|-|
+| Choisir / valider | toucher du doigt ou pincer à distance | gâchette (main dominante) |
+| Attraper un bâtiment, un bandit, le bord du plateau | pincer près de l'objet | grip |
+| Poser un bâtiment | pincer dans la boîte, déposer sur une case (aperçu vert / rouge) | idem |
+| Détruire | remettre le bâtiment dans la boîte (remboursement partiel) | idem |
+| Annuler (30 s) | bouton « Annuler » près du plateau | B |
+| Tourner / zoom du plateau | bord du plateau : une main = tourner, deux mains = zoom | stick de la main dominante |
+| Monter / descendre le plateau | poignée du bord | stick de l'autre main |
+| Boîte de construction | toujours là | A |
+| Pause / menu | sablier (toucher), engrenage | X / Y |
+| Aide | regarder l'intérieur du poignet gauche | regarder la manette gauche |
+
+Bascule mains ↔ manettes automatique. Retrait du casque ou fin de session : pause + sauvegarde.
+
+### Tester sans casque (Immersive Web Emulator / IWER)
+- `npm run dev` puis ouvrir `http://localhost:5173/?emulate=controller` (ou `?emulate=hands`) : un Quest 3 virtuel est
+  installé dans la page (`src/vr/emulator.ts`, salon simulé avec table). Cliquer sur **🥽 Réalité mixte**.
+- `?ui3d` affiche l'interface 3D VR sur PC (aperçu à la souris, sans casque).
+- En mode dev, `window.__xrDevice` pilote le casque et les contrôleurs émulés (voir les scripts de test du dépôt de travail :
+  visée, gâchette, pincement, doigt posé sur un point).
 
 ## Déploiement
 `vercel.json` est configuré pour Vite (build `npm run build`, sortie `dist/`).

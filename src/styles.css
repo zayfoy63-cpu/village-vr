@@ -1350,3 +1350,10 @@ button.primary:hover {
 .chronicle .primary {
   align-self: flex-end;
 }
+
+/* Aperçu de l'interface 3D sur PC (?ui3d) : seule la scène est affichée */
+.app.ui3d .ui-layer,
+.app.ui3d .parcel-badges,
+.app.ui3d .bandit-markers {
+  display: none;
+}

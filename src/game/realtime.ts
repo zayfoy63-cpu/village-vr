@@ -242,6 +242,16 @@ function steal(state: GameState, b: Bandit) {
   b.looted = true;
 }
 
+/** VR : le joueur saisit un bandit à la main. Capture immédiate (butin rendu + récompense), sans garde. */
+export function seizeBandit(state: GameState, id: number, t: number, rng: Rng): boolean {
+  const raid = state.raid;
+  const b = raid?.bandits.find((x) => x.id === id);
+  if (!raid || !b || b.status !== 'active' || t < b.startT) return false;
+  b.chasedBy = undefined;
+  catchBandit(state, b, { villager: false } as Guard, t, rng);
+  return true;
+}
+
 function catchBandit(state: GameState, b: Bandit, g: Guard, at: number, rng: Rng) {
   const raid = state.raid!;
   b.status = 'caught';

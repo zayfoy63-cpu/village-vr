@@ -6,7 +6,8 @@ import { loadSettings, saveSettings, type Settings } from './settings';
 import { DAY_DURATION_SEC } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
-import { catchScout, extinguishFire, protectCrops, reinforceBuilding, sendGuard, shelterVillagers } from '../game/hazards';
+import { beginMove, cancelMove, demolishBuilding, moveBuilding, undoAction, type UndoRecord } from '../game/moves';
+import { grabBandit, catchScout, extinguishFire, protectCrops, reinforceBuilding, sendGuard, shelterVillagers } from '../game/hazards';
 import {
   attackCamp as attackCampSim,
   buyParcel as buyParcelSim,
@@ -19,6 +20,7 @@ import {
   resolveChoice,
   upgradeBuilding,
 } from '../game/simulation';
+import { buildCost } from '../game/buildings';
 import type { BuildingTypeId, GameState } from '../game/types';
 
 export type Speed = 0 | 0.5 | 1 | 2;
@@ -60,6 +62,8 @@ interface GameStore {
   /** Clic sur un bandit : un garde part l'intercepter */
   chase: (banditId: number) => boolean;
   reinforce: (buildingId: number) => boolean;
+  /** VR : saisir un bandit à la main */
+  seize: (banditId: number) => boolean;
   /** Clic sur la silhouette au bord de la carte */
   catchScout: () => boolean;
   shelter: () => boolean;
@@ -67,6 +71,14 @@ interface GameStore {
   /** Petit message éphémère (action impossible, etc.) */
   toast: { text: string; at: number } | null;
   showToast: (text: string) => void;
+  /** Dernière action annulable (poser, déplacer, détruire) : hors sauvegarde */
+  undo: UndoRecord | null;
+  undoLast: () => boolean;
+  /** VR : soulever, reposer, annuler le geste, détruire (remettre dans la boîte) */
+  lift: (buildingId: number) => boolean;
+  drop: (buildingId: number, x: number, z: number) => boolean;
+  cancelLift: (buildingId: number) => void;
+  demolish: (buildingId: number) => boolean;
   newGame: (seed?: number) => void;
 }
 
@@ -132,7 +144,41 @@ export const useGame = create<GameStore>((set, get) => {
       const next = placeBuilding(game, selected, x, z);
       if (!next) return false;
       saveGame(next);
-      set({ game: next });
+      const placed = next.buildings[next.buildings.length - 1];
+      set({ game: next, undo: { kind: 'place', id: placed.id, cost: buildCost(placed.type), at: Date.now() } });
+      return true;
+    },
+
+    undo: null,
+    undoLast: () => {
+      const rec = get().undo;
+      if (!rec) return false;
+      const next = undoAction(get().game, rec);
+      if (!next) {
+        get().showToast('Impossible d\'annuler maintenant');
+        set({ undo: null });
+        return false;
+      }
+      saveGame(next);
+      set({ game: next, undo: null });
+      return true;
+    },
+    lift: (buildingId) => apply(beginMove(get().game, buildingId)),
+    cancelLift: (buildingId) => {
+      apply(cancelMove(get().game, buildingId));
+    },
+    drop: (buildingId, x, z) => {
+      const res = moveBuilding(get().game, buildingId, x, z);
+      if (!res) return false;
+      saveGame(res.state);
+      set({ game: res.state, undo: res.record });
+      return true;
+    },
+    demolish: (buildingId) => {
+      const res = demolishBuilding(get().game, buildingId);
+      if (!res) return false;
+      saveGame(res.state);
+      set({ game: res.state, undo: res.record, inspected: get().inspected === buildingId ? null : get().inspected });
       return true;
     },
 
@@ -192,6 +238,7 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return apply(res.state);
     },
+    seize: (banditId) => apply(grabBandit(get().game, banditId)),
     reinforce: (buildingId) => {
       const ok = apply(reinforceBuilding(get().game, buildingId));
       if (!ok) get().showToast('Impossible de renforcer : pas assez de bois ?');
@@ -223,6 +270,7 @@ export const useGame = create<GameStore>((set, get) => {
         inspectedFeature: null,
         speed: 1,
         resumeSpeed: null,
+        undo: null,
       });
     },
   };

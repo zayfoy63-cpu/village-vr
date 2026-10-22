@@ -70,6 +70,10 @@ export interface Building {
   reinforced?: boolean;
   /** Incendie en cours */
   fire?: Fire;
+  /** Temps de jeu de la pose (déplacement gratuit juste après) */
+  placedT?: number;
+  /** Soulevé par le joueur (VR) : production en pause jusqu'à la repose */
+  moving?: boolean;
   /** Champ : épuisement du sol, 0 (sol neuf) → 1 (épuisé) */
   fatigue?: number;
   /** Mine : instabilité des galeries, 0 → 1 (effondrement) */
@@ -315,6 +319,8 @@ export interface Notice {
   choice?: NoticeChoice;
   /** Menace annoncée : jour d'arrivée (la carte reste affichée jusque-là) */
   threat?: { arriveDay: number; done: boolean };
+  /** Case concernée (la bulle VR s'affiche au-dessus du bâtiment) */
+  at?: { x: number; z: number };
 }
 
 /** Danger posé sur une parcelle : camp de bandits ou ruines (occupe des cases tant qu'il n'est pas réglé) */

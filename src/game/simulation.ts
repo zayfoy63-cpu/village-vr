@@ -162,7 +162,7 @@ export function placeBuilding(state: GameState, type: BuildingTypeId, x: number,
   const s = cloneState(state);
   const cost = buildCost(type);
   for (const k of RESOURCE_KEYS) s.resources[k] -= cost[k] ?? 0;
-  s.buildings.push({ id: s.nextBuildingId++, type, x, z, level: 1, workers: 0, builtDay: s.day });
+  s.buildings.push({ id: s.nextBuildingId++, type, x, z, level: 1, workers: 0, builtDay: s.day, placedT: gameTime(s) });
   s.stats.buildingsBuilt++;
   assignWorkers(s);
   applyUnlocks(s, true);

@@ -8,7 +8,7 @@ import { TUNING, addMorale, applyChoice, loseVillagers } from './events';
 import { mechanicsDue, updateMechanics } from './mechanics';
 import { extinguishFactor, onFireEnd, onFireSpread, spreadChance } from './mechanics/fire';
 import { chaseScout } from './mechanics/scout';
-import { dispatchGuard, realtimeDue, updateRealtime } from './realtime';
+import { dispatchGuard, realtimeDue, seizeBandit, updateRealtime } from './realtime';
 import { Rng } from './rng';
 import { assignWorkers, canAfford } from './rules';
 import { cloneState, gameTime, pushNotice } from './stateUtils';
@@ -86,7 +86,7 @@ function updateFires(s: GameState, t: number, rng: Rng) {
       onFireSpread(s, b);
       target.fire = { start: at, nextSpread: at + F.spreadEvery, destroyAt: at + F.destroyAfter };
       addMorale(s, TUNING.morale.fireStarted);
-      pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Le feu se propage', text: `${name} → ${BUILDING_BY_ID[target.type].name}. Cliquez dessus pour l'éteindre !` });
+      pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Le feu se propage', text: `${name} → ${BUILDING_BY_ID[target.type].name}. Cliquez dessus pour l'éteindre !`, at: { x: target.x, z: target.z } });
     }
     if (t >= f.destroyAt) {
       onFireEnd(s, b);
@@ -99,6 +99,7 @@ function updateFires(s: GameState, t: number, rng: Rng) {
         addMorale(s, TUNING.morale.buildingLost);
         const victims = b.type === 'field' ? 0 : loseVillagers(s, rng.chance(0.3) ? 1 : 0, 1);
         pushNotice(s, {
+          at: { x: b.x, z: b.z },
           kind: 'bad',
           icon: '🔥',
           title: 'Bâtiment réduit en cendres',
@@ -132,6 +133,16 @@ export function catchScout(state: GameState): { state: GameState | null; reason?
   const s = cloneState(state);
   const reason = chaseScout(s, gameTime(s));
   return reason ? { state: null, reason } : { state: s };
+}
+
+/** Action joueur (VR) : saisir un bandit à la main */
+export function grabBandit(state: GameState, banditId: number): GameState | null {
+  if (!state.raid || state.gameOver) return null;
+  const s = cloneState(state);
+  const rng = new Rng(s.rngState);
+  if (!seizeBandit(s, banditId, gameTime(s), rng)) return null;
+  s.rngState = rng.state;
+  return s;
 }
 
 /** Action joueur : clic sur un bandit → un garde (ou des villageois) part l'intercepter */

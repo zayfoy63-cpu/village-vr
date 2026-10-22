@@ -193,6 +193,8 @@ export interface ChoiceSpec {
 
 export interface EventOutcome {
   text: string;
+  /** Case concernée (bulle VR au-dessus du bâtiment) */
+  at?: { x: number; z: number };
   choice?: ChoiceSpec;
   kind?: NoticeKind;
 }
@@ -651,7 +653,11 @@ export const EVENTS: EventDef[] = [
         startFire(state, b, now);
         names.push(BUILDING_BY_ID[b.type].name);
       }
-      return { text: `Le feu prend : ${names.join(', ')}. Cliquez sur les bâtiments en feu pour les éteindre (${TUNING.fire.crew} villageois mobilisés) !` };
+      const first = state.buildings.find((b) => b.fire);
+      return {
+        text: `Le feu prend : ${names.join(', ')}. Cliquez sur les bâtiments en feu pour les éteindre (${TUNING.fire.crew} villageois mobilisés) !`,
+        at: first ? { x: first.x, z: first.z } : undefined,
+      };
     },
   },
   {
@@ -840,6 +846,7 @@ function showOutcome(state: GameState, ev: EventDef, out: EventOutcome, params: 
     icon: ev.icon,
     title: ev.title,
     text: out.text,
+    at: out.at,
     choice: out.choice
       ? {
           eventId: ev.id,

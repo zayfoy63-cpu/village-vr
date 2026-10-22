@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { XR, useXR } from '@react-three/xr';
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { nightLevel } from '../game/seasons';
 import { useGame } from '../store/gameStore';
@@ -19,28 +19,48 @@ import { Terrain } from './Terrain';
 import { Villagers } from './Villagers';
 import { Hints } from './Hints';
 import { Flood, Rain, Reinforcements, Snowfall, Storm } from './Weather';
-import { VR_WORLD_SCALE, xrStore } from './xr';
+import { DevHook } from '../vr/DevHook';
+import { PerfMonitor } from '../vr/Perf';
+import { WristHelp } from '../vr/ui/WristHelp';
+import { DragController } from '../vr/Drag';
+import { Placement } from '../vr/Placement';
+import { SessionControl } from '../vr/Session';
+import { VRRig } from '../vr/VRRig';
+import { VR_CONFIG } from '../vr/config';
+import { useVR } from '../vr/store';
+import { xrStore } from './xr';
 
 const BG = '#2a1e17';
 
-/** Groupe racine du monde : taille réelle sur PC, maquette sur table en VR */
+/**
+ * Groupe racine du monde : taille réelle sur PC ; en réalité mixte (ou en aperçu ?ui3d), le plateau et
+ * toute l'interface 3D vivent dans VRRig.
+ */
 function WorldRoot({ children }: { children: ReactNode }) {
-  const inVR = useXR((s) => s.mode === 'immersive-vr');
-  return inVR ? (
-    <group scale={VR_WORLD_SCALE} position={[0, 0.95, -0.7]}>
-      {children}
-    </group>
-  ) : (
-    <group>{children}</group>
-  );
+  const vr = useVR((s) => s.active);
+  return vr ? <VRRig world={children} /> : <group>{children}</group>;
+}
+
+/** Tient le store VR au courant de la session XR (mode, pause quand le casque est retiré) */
+function XRSync() {
+  const mode = useXR((s) => s.mode);
+  const pc = useVR((s) => s.pcPreview);
+  const setActive = useVR((s) => s.setActive);
+  useEffect(() => {
+    if (!pc) setActive(mode !== null);
+  }, [mode, pc, setActive]);
+  return null;
 }
 
 function PcControls() {
-  const inVR = useXR((s) => s.mode !== null);
-  if (inVR) return null;
+  const inXR = useXR((s) => s.mode !== null);
+  // Aperçu 3D sur PC : pas de rotation de caméra pendant qu'on tient un bâtiment
+  const holding = useVR((s) => s.held !== null);
+  if (inXR) return null;
   return (
     <OrbitControls
       makeDefault
+      enabled={!holding}
       target={[0, 0, 0]}
       enablePan={false}
       enableDamping
@@ -56,10 +76,11 @@ function PcControls() {
 function World() {
   const map = useGame((s) => s.game.map);
   const buildings = useGame((s) => s.game.buildings);
+  const plinthOnly = useVR((s) => s.active && !s.pcPreview);
   return (
     // La clé sur la seed remonte tout le monde à chaque nouvelle partie
     <group key={map.seed}>
-      <Table width={map.width} height={map.height} />
+      <Table width={map.width} height={map.height} plinthOnly={plinthOnly} />
       <Terrain map={map} />
       <Nature map={map} />
       <Parcels map={map} />
@@ -81,6 +102,22 @@ function World() {
   );
 }
 
+/** Fond sombre et brouillard sur PC ; rien en réalité mixte (on voit la vraie pièce) */
+function Backdrop() {
+  const ar = useXR((s) => s.mode === 'immersive-ar');
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    if (ar) {
+      scene.background = null;
+      scene.fog = null;
+    } else {
+      scene.background = new THREE.Color(BG);
+      scene.fog = new THREE.Fog(BG, 45, 110);
+    }
+  }, [ar, scene]);
+  return null;
+}
+
 export function Scene() {
   return (
     <Canvas
@@ -91,9 +128,15 @@ export function Scene() {
       onContextMenu={(e) => e.preventDefault()}
       onPointerMissed={() => useGame.getState().setHover(null)}
     >
-      <color attach="background" args={[BG]} />
-      <fog attach="fog" args={[BG, 45, 110]} />
       <XR store={xrStore}>
+        <Backdrop />
+        <XRSync />
+        <SessionControl />
+        <Placement />
+        <DragController />
+        <DevHook />
+        <PerfMonitor />
+        <WristHelp />
         <GameClock />
         <Lights />
         <WorldRoot>
@@ -114,9 +157,17 @@ function Lights() {
   const sun = useRef<THREE.DirectionalLight>(null);
   const sky = useRef<THREE.HemisphereLight>(null);
   const warm = useRef<THREE.PointLight>(null);
+  // Ombres : carte plus petite en réalité mixte, supprimées si le rythme tombe sous le seuil
+  const vr = useVR((s) => s.active);
+  const low = useVR((s) => s.lowQuality);
+  const shadowSize: number = VR_CONFIG.perf.shadowMap;
+  const shadows = !(vr && (low || shadowSize === 0));
+  const mapSize = vr ? shadowSize || 512 : 2048;
   useFrame(() => {
     const g = useGame.getState().game;
-    const night = nightLevel(g.day, g.dayProgress);
+    // Réalité mixte : la nuit n'assombrit que très peu (on garde la pièce lisible)
+    const vrOn = useVR.getState().active;
+    const night = nightLevel(g.day, g.dayProgress) * (vrOn ? VR_CONFIG.perf.nightDim : 1);
     const grey = g.mech.rain || g.storm ? 1 : 0;
     if (sun.current) {
       sun.current.intensity = 2.4 * (1 - 0.75 * night) * (1 - 0.35 * grey);
@@ -134,8 +185,8 @@ function Lights() {
         position={[10, 18, 9]}
         intensity={2.4}
         color="#ffd39b"
-        castShadow
-        shadow-mapSize={[2048, 2048]}
+        castShadow={shadows}
+        shadow-mapSize={[mapSize, mapSize]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-radius={4}

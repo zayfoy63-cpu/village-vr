@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import * as THREE from 'three';
 import { BUILDING_BY_ID } from '../game/buildings';
+import { canMoveTo } from '../game/moves';
 import { canPlace } from '../game/rules';
 import { useGame } from '../store/gameStore';
 import { MODELS } from './models';
@@ -17,7 +18,13 @@ export function Ghost() {
   const hover = useGame((s) => s.hover);
   const selected = useGame((s) => s.selected);
   // Sélecteur booléen : pas de re-rendu à chaque image
-  const ok = useGame((s) => (s.hover && s.selected ? canPlace(s.game, s.selected, s.hover.x, s.hover.z).ok : false));
+  const ok = useGame((s) => {
+    if (!s.hover || !s.selected) return false;
+    // Déplacement VR : on teste le terrain en ignorant le bâtiment soulevé lui-même
+    const lifted = s.game.buildings.find((b) => b.moving);
+    if (lifted) return canMoveTo(s.game, lifted, s.hover.x, s.hover.z).ok;
+    return canPlace(s.game, s.selected, s.hover.x, s.hover.z).ok;
+  });
   const pulse = useRef<THREE.Group>(null);
 
   useFrame(({ clock }) => {

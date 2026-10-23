@@ -107,7 +107,8 @@ function FingerTouch() {
       }
       // Un modèle est fait de plusieurs maillages : au retrait du doigt le plus proche a pu changer.
       // Le relâchement est donc adressé à l'objet touché à l'appui (un tap = appui puis retrait au même endroit).
-      if (pressed && hit && pressed.point.distanceTo(hit.point) < 0.05) {
+      // Tap : le bout du doigt a peu bougé depuis l'appui (le retrait vertical compris)
+      if (pressed && hit && pressed.pointerPosition.distanceTo(hit.pointerPosition) < VR_CONFIG.interact.tapSlop) {
         ptr.setIntersection(pressed);
         ptr.up(ev as never);
         ptr.setIntersection(hit);

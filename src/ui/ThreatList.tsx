@@ -1,4 +1,6 @@
 import { useGame } from '../store/gameStore';
+import { Icon, RichText } from './icons/Icon';
+import { plainText } from './icons';
 
 function countdown(arriveDay: number, day: number): string {
   const d = arriveDay - day;
@@ -16,15 +18,15 @@ export function ThreatList() {
   const sorted = [...threats].sort((a, b) => a.threat!.arriveDay - b.threat!.arriveDay);
   return (
     <div className="threat-list">
-      <div className="threat-head">⚠️ Menaces à venir</div>
+      <div className="threat-head"><Icon id="warning" /> Menaces à venir</div>
       {sorted.map((n) => {
         const d = n.threat!.arriveDay - day;
         return (
-          <div key={n.id} className={`threat-item ${d <= 1 ? 'soon' : ''}`} title={n.text}>
-            <span className="threat-icon">{n.icon}</span>
-            <span className="threat-title">{n.title}</span>
+          <div key={n.id} className={`threat-item ${d <= 1 ? 'soon' : ''}`} title={plainText(n.text)}>
+            <span className="threat-icon"><RichText text={n.icon} /></span>
+            <span className="threat-title"><RichText text={n.title} /></span>
             <span className="threat-time">{countdown(n.threat!.arriveDay, day)}</span>
-            {n.choice && !n.choice.resolved && <span className="threat-prep" title="Une préparation est possible">🛠️</span>}
+            {n.choice && !n.choice.resolved && <span className="threat-prep" title="Une préparation est possible"><Icon id="tools" /></span>}
           </div>
         );
       })}

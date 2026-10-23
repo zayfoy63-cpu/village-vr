@@ -1,4 +1,4 @@
-// Vie de la session XR : bascule manettes ↔ mains, mains perdues, pause quand le casque est retiré,
+// Vie de la session XR : bascule manettes / mains, mains perdues, pause quand le casque est retiré,
 // boutons et joysticks des manettes.
 
 import { useFrame } from '@react-three/fiber';
@@ -46,7 +46,7 @@ export function SessionControl() {
   const left = useXRInputSourceState('controller', 'left');
   const right = useXRInputSourceState('controller', 'right');
 
-  // Manettes ↔ mains : automatique, sans menu
+  // Manettes / mains : automatique, sans menu
   useEffect(() => {
     const first = states[0];
     setInput(first ? (first.type === 'hand' ? 'hand' : first.type === 'controller' ? 'controller' : 'none') : 'none');

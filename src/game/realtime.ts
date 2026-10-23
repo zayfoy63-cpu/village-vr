@@ -21,6 +21,7 @@ import type { Rng } from './rng';
 import { statsOf } from './rules';
 import { clamp, pushNotice } from './stateUtils';
 import type { Bandit, Building, Flood, GameState, Guard, Point, Raid, Resources, Storm } from './types';
+import { I } from '../ui/icons';
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
 const lerp = (a: Point, b: Point, k: number): Point => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
@@ -286,12 +287,12 @@ function finishRaid(state: GameState) {
   const parts = [
     `${r.caught}/${total} ${r.caught > 1 ? 'attrapés' : 'attrapé'}`,
     r.escaped ? `${r.escaped} en fuite avec ${formatResources(r.lost)}` : '',
-    r.reward ? `récompense +${r.reward} 🪙` : '',
+    r.reward ? `récompense +${r.reward} ${I.gold}` : '',
     r.injured ? `${r.injured} villageois ${r.injured > 1 ? 'blessés' : 'blessé'}` : '',
   ].filter(Boolean);
   pushNotice(state, {
     kind: r.escaped === 0 ? 'good' : 'bad',
-    icon: r.escaped === 0 ? '🛡️' : '💰',
+    icon: r.escaped === 0 ? I.shield : I.moneyBag,
     title: r.escaped === 0 ? 'Bandits arrêtés' : 'Les bandits se sont enfuis',
     text: `${parts.join(' · ')}.`,
   });
@@ -471,7 +472,7 @@ export function updateStorm(state: GameState, t: number, rng: Rng) {
   if (t >= storm.endT) {
     pushNotice(state, {
       kind: hits.length ? 'bad' : 'good',
-      icon: '⛈️',
+      icon: I.storm,
       title: 'L\'orage est passé',
       text: hits.length ? `${hits.join(', ')}.` : 'Aucun dégât : bien joué !',
     });
@@ -533,7 +534,7 @@ export function updateFlood(state: GameState, t: number) {
     }
     pushNotice(state, {
       kind: lost.length ? 'bad' : 'good',
-      icon: '🌊',
+      icon: I.flood,
       title: 'La crue est au plus haut',
       text: f.protected
         ? 'Les berges tiennent bon !'

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { DAY_DURATION_SEC } from '../game/config';
-import { TUNING, formatResources } from '../game/events';
+import { TUNING, formatCost } from '../game/events';
 import { canAfford } from '../game/rules';
 import type { Notice } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { I } from './icons';
+import { Icon, RichText } from './icons/Icon';
 
 const VISIBLE_MS = 9000;
 const MAX_CARDS = 6;
@@ -75,10 +77,10 @@ export function EventCards() {
         return (
           <div key={n.id} className={`event-card ${n.kind} ${c ? 'has-choice' : ''}`}>
             <div className="event-head">
-              <span className="event-icon">{n.icon}</span>
-              <span className="event-title">{n.title}</span>
+              <span className="event-icon"><RichText text={n.icon} /></span>
+              <span className="event-title"><RichText text={n.title} /></span>
               {n.threat && !n.threat.done ? (
-                <span className="event-countdown">⏳ {countdownLabel(n.threat.arriveDay, day)}</span>
+                <span className="event-countdown"><Icon id="hourglass" /> {countdownLabel(n.threat.arriveDay, day)}</span>
               ) : (
                 <span className="event-day">Jour {n.day}</span>
               )}
@@ -88,11 +90,11 @@ export function EventCards() {
                 </button>
               )}
             </div>
-            <div className="event-text">{n.text}</div>
+            <div className="event-text"><RichText text={n.text} /></div>
             {c && (
               <div className="event-choice">
                 {c.realtime && (
-                  <div className="choice-realtime">⚡ En temps réel : le jeu continue. Cliquez sur les bandits pour les intercepter !</div>
+                  <div className="choice-realtime"><Icon id="lightning" /> En temps réel : le jeu continue. Cliquez sur les bandits pour les intercepter !</div>
                 )}
                 {!isPrepare && !c.realtime && (
                   <div className="choice-timer" title="Sans réponse, l'option par défaut s'applique">
@@ -101,11 +103,15 @@ export function EventCards() {
                       style={{ width: `${Math.min(100, (remaining / TUNING.choiceTimeout) * 100)}%` }}
                     />
                     <span>
-                      {autoPaused
-                        ? '⏸ Jeu en pause : prenez votre temps'
-                        : speed === 0
-                          ? '⏸ En pause'
-                          : `${Math.ceil((remaining * DAY_DURATION_SEC) / speed)} s pour décider`}
+                      <RichText
+                        text={
+                          autoPaused
+                            ? `${I.pause} Jeu en pause : prenez votre temps`
+                            : speed === 0
+                              ? `${I.pause} En pause`
+                              : `${Math.ceil((remaining * DAY_DURATION_SEC) / speed)} s pour décider`
+                        }
+                      />
                     </span>
                   </div>
                 )}
@@ -119,15 +125,19 @@ export function EventCards() {
                       onClick={() => choose(n.id, o.id)}
                     >
                       <span className="choice-label">
-                        {o.label}
-                        {o.cost && <span className={`choice-cost ${affordable ? '' : 'missing'}`}>{formatResources(o.cost)}</span>}
+                        <RichText text={o.label} />
+                        {o.cost && (
+                          <span className={`choice-cost ${affordable ? '' : 'missing'}`}>
+                            <RichText text={formatCost(o.cost)} />
+                          </span>
+                        )}
                       </span>
-                      {o.detail && <span className="choice-detail">{o.detail}</span>}
+                      {o.detail && <span className="choice-detail"><RichText text={o.detail} /></span>}
                       {o.effects && o.effects.length > 0 && (
                         <span className="choice-effects">
                           {o.effects.map((e, i) => (
                             <span key={i} className={`fx ${e.tone}`}>
-                              {e.icon} {e.text}
+                              <RichText text={`${e.icon} ${e.text}`} />
                             </span>
                           ))}
                         </span>

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MECHANICS } from '../game/mechanics';
 import { useGame } from '../store/gameStore';
+import { Icon, RichText } from './icons/Icon';
 
-/** Bouton 📜 + livre de la Chronique : une page par mécanique découverte, sans jamais donner la solution */
+/** Bouton parchemin + livre de la Chronique : une page par mécanique découverte, sans jamais donner la solution */
 export function ChronicleButton() {
   const [open, setOpen] = useState(false);
   const chronicle = useGame((s) => s.chronicle);
@@ -11,7 +12,7 @@ export function ChronicleButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} title="Ce que le village a appris, de partie en partie">
-        📜 Chronique {found}/{MECHANICS.length}
+        <Icon id="scroll" /> Chronique {found}/{MECHANICS.length}
       </button>
       {open &&
         createPortal(
@@ -28,7 +29,7 @@ export function ChronicleButton() {
                   if (!page?.struck)
                     return (
                       <div key={m.id} className="chronicle-page blank">
-                        <span className="cp-icon">❔</span>
+                        <span className="cp-icon"><Icon id="question" /></span>
                         <div>
                           <strong>Page blanche</strong>
                           <p>Le village n'a pas encore vécu ce chapitre.</p>
@@ -37,11 +38,11 @@ export function ChronicleButton() {
                     );
                   return (
                     <div key={m.id} className={`chronicle-page ${page.solved ? 'solved' : ''}`}>
-                      <span className="cp-icon">{m.icon}</span>
+                      <span className="cp-icon"><RichText text={m.icon} /></span>
                       <div>
-                        <strong>{m.title}</strong>
-                        <p>{m.page}</p>
-                        {page.solved ? <p className="cp-solved">{m.solvedPage}</p> : <p className="cp-missing">La suite de la page est restée blanche…</p>}
+                        <strong><RichText text={m.title} /></strong>
+                        <p><RichText text={m.page} /></p>
+                        {page.solved ? <p className="cp-solved"><RichText text={m.solvedPage} /></p> : <p className="cp-missing">La suite de la page est restée blanche…</p>}
                         <em>Écrit au jour {page.day} d'une partie (seed {page.seed}).</em>
                       </div>
                     </div>

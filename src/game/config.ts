@@ -1,4 +1,5 @@
 import type { Resources } from './types';
+import { I } from '../ui/icons';
 
 export const MAP_WIDTH = 20;
 export const MAP_HEIGHT = 14;
@@ -72,10 +73,10 @@ export interface SeasonDef {
 }
 
 export const SEASONS: SeasonDef[] = [
-  { id: 'spring', name: 'Printemps', icon: '🌱' },
-  { id: 'summer', name: 'Été', icon: '☀️' },
-  { id: 'autumn', name: 'Automne', icon: '🍂' },
-  { id: 'winter', name: 'Hiver', icon: '❄️' },
+  { id: 'spring', name: 'Printemps', icon: I.spring },
+  { id: 'summer', name: 'Été', icon: I.summer },
+  { id: 'autumn', name: 'Automne', icon: I.autumn },
+  { id: 'winter', name: 'Hiver', icon: I.winter },
 ];
 
 export function seasonOf(day: number): SeasonDef {
@@ -95,17 +96,18 @@ export function seasonIndex(day: number): number {
   return Math.floor((day - 1) / DAYS_PER_SEASON);
 }
 
-export const RESOURCE_META: Record<keyof Resources, { name: string; icon: string }> = {
-  food: { name: 'Blé (nourriture de base)', icon: '🌾' },
-  wood: { name: 'Bois', icon: '🪵' },
-  stone: { name: 'Pierre', icon: '🪨' },
-  gold: { name: 'Or', icon: '🪙' },
-  flour: { name: 'Farine', icon: '🥣' },
-  bread: { name: 'Pain', icon: '🍞' },
-  planks: { name: 'Planches', icon: '🪚' },
-  ironOre: { name: 'Minerai de fer', icon: '🔩' },
-  tools: { name: 'Outils', icon: '🛠️' },
-  weapons: { name: 'Armes', icon: '⚔️' },
+/** Nom complet, nom court (conséquences des choix : « −15 Bois ») et icône de chaque ressource */
+export const RESOURCE_META: Record<keyof Resources, { name: string; short: string; icon: string }> = {
+  food: { name: 'Blé (nourriture de base)', short: 'Blé', icon: I.wheat },
+  wood: { name: 'Bois', short: 'Bois', icon: I.wood },
+  stone: { name: 'Pierre', short: 'Pierre', icon: I.stone },
+  gold: { name: 'Or', short: 'Or', icon: I.gold },
+  flour: { name: 'Farine', short: 'Farine', icon: I.flour },
+  bread: { name: 'Pain', short: 'Pain', icon: I.bread },
+  planks: { name: 'Planches', short: 'Planches', icon: I.planks },
+  ironOre: { name: 'Minerai de fer', short: 'Minerai', icon: I.ironOre },
+  tools: { name: 'Outils', short: 'Outils', icon: I.tools },
+  weapons: { name: 'Armes', short: 'Armes', icon: I.weapons },
 };
 
 /** Ligne de base du HUD (toujours visible) */

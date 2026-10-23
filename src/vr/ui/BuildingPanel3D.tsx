@@ -8,6 +8,7 @@ import { useGame } from '../../store/gameStore';
 import { feedback } from '../feedback';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME, textWidth, useAutoClose } from './kit';
+import { I } from '../../ui/icons';
 
 const costText = (c: Partial<Resources>) => RESOURCE_KEYS.filter((k) => c[k]).map((k) => `${c[k]}${RESOURCE_META[k].icon}`).join(' ');
 
@@ -55,19 +56,19 @@ function Content({ building: b }: { building: Building }) {
 
   // Ligne d'état : feu, dégâts, arrêt, manque de matière ou de travailleurs
   let status: { text: string; color: string } | null = null;
-  if (b.fire) status = { text: '🔥 En feu ! Tapotez les flammes', color: THEME.bad };
-  else if (b.damaged) status = { text: `🔨 Endommagé (production x${DAMAGED_FACTOR})`, color: THEME.warn };
-  else if (b.paused) status = { text: '⏸ À l\'arrêt', color: THEME.dim };
-  else if (isCapped(game, b)) status = { text: '📦 Stock plein : en pause', color: THEME.dim };
-  else if (run?.blocked === 'input') status = { text: `⛔ Manque ${run.missing.map((k) => RESOURCE_META[k].icon).join(' ')}`, color: THEME.bad };
-  else if (stats.workers && b.workers < stats.workers) status = { text: `👷 Il manque ${stats.workers - b.workers} travailleur(s)`, color: THEME.warn };
+  if (b.fire) status = { text: `${I.fire} En feu ! Tapotez les flammes`, color: THEME.bad };
+  else if (b.damaged) status = { text: `${I.hammer} Endommagé (production x${DAMAGED_FACTOR})`, color: THEME.warn };
+  else if (b.paused) status = { text: `${I.pause} À l'arrêt`, color: THEME.dim };
+  else if (isCapped(game, b)) status = { text: `${I.box} Stock plein : en pause`, color: THEME.dim };
+  else if (run?.blocked === 'input') status = { text: `${I.forbidden} Manque ${run.missing.map((k) => RESOURCE_META[k].icon).join(' ')}`, color: THEME.bad };
+  else if (stats.workers && b.workers < stats.workers) status = { text: `${I.worker} Il manque ${stats.workers - b.workers} travailleur(s)`, color: THEME.warn };
 
   const buttons: React.ReactNode[] = [];
   if (b.fire && b.fire.extinguishEnd === undefined)
-    buttons.push(<Button3D key="fire" width={0.15} height={0.065} icon="💧" label="Éteindre" onActivate={() => extinguish(b.id)} />);
+    buttons.push(<Button3D key="fire" width={0.15} height={0.065} icon={I.drop} label="Éteindre" onActivate={() => extinguish(b.id)} />);
   if (b.damaged && !b.fire)
     buttons.push(
-      <Button3D key="rep" width={0.15} height={0.065} icon="🔨" label="Réparer" sub={costText(rc)} disabled={!canAfford(game.resources, rc)} onActivate={() => repair(b.id)} />,
+      <Button3D key="rep" width={0.15} height={0.065} icon={I.hammer} label="Réparer" sub={costText(rc)} disabled={!canAfford(game.resources, rc)} onActivate={() => repair(b.id)} />,
     );
   if (hasUpgrade && !b.fire)
     buttons.push(
@@ -75,9 +76,9 @@ function Content({ building: b }: { building: Building }) {
         key="up"
         width={0.15}
         height={0.065}
-        icon="⬆️"
+        icon={I.up}
         label="Améliorer"
-        sub={check.locked ? '🔒' : check.next ? costText(check.next.cost) : ''}
+        sub={check.locked ? I.lock : check.next ? costText(check.next.cost) : ''}
         disabled={!check.ok}
         onActivate={() => {
           if (upgrade(b.id)) feedback('drop');
@@ -86,11 +87,11 @@ function Content({ building: b }: { building: Building }) {
     );
   if (stats.workers && !b.fire)
     buttons.push(
-      <Button3D key="pause" width={0.15} height={0.065} icon={b.paused ? '▶️' : '⏸'} label={b.paused ? 'Relancer' : 'Arrêter'} onActivate={() => togglePause(b.id)} />,
+      <Button3D key="pause" width={0.15} height={0.065} icon={b.paused ? I.play : I.pause} label={b.paused ? 'Relancer' : 'Arrêter'} onActivate={() => togglePause(b.id)} />,
     );
   const title = `${def.icon} ${def.name} · niv. ${b.level}`;
   // Largeur : les boutons, et le titre entre la croix (à gauche) et les travailleurs (à droite)
-  const w = Math.max(0.34, buttons.length * 0.16 + 0.06, textWidth(title, 0.034) + 0.24);
+  const w = Math.max(0.34, buttons.length * 0.16 + 0.06, textWidth(title, 0.034) + (stats.workers ? 0.19 : 0.12));
   // Lignes longues : elles passent à la ligne, le panneau grandit d'autant (aucun chevauchement)
   const lines = (text: string, size: number) => Math.max(1, Math.ceil(textWidth(text, size) / (w - 0.05)));
   const curLines = lines(current, 0.026);
@@ -101,7 +102,7 @@ function Content({ building: b }: { building: Building }) {
     <Panel width={w} height={h}>
       <Label text={title} size={0.034} position={[0, h / 2 - 0.035, 0]} />
       <Label text={current} size={0.026} color={THEME.accent} position={[0, h / 2 - 0.075 - extraCur / 2, 0]} maxWidth={w - 0.05} />
-      {stats.workers ? <Label text={`👷 ${b.workers}/${stats.workers}`} size={0.026} position={[w / 2 - 0.06, h / 2 - 0.035, 0]} /> : null}
+      {stats.workers ? <Label text={`${I.worker} ${b.workers}/${stats.workers}`} size={0.026} position={[w / 2 - 0.06, h / 2 - 0.035, 0]} /> : null}
       {status && (
         <Label text={status.text} size={0.024} color={status.color} position={[0, h / 2 - 0.112 - extraCur - ((stLines - 1) * 0.029) / 2, 0]} maxWidth={w - 0.05} />
       )}
@@ -112,7 +113,7 @@ function Content({ building: b }: { building: Building }) {
           </group>
         ))}
       </group>
-      <Button3D width={0.045} height={0.045} icon="✖️" position={[-w / 2 + 0.03, h / 2 - 0.03, 0.004]} onActivate={() => inspect(null)} />
+      <Button3D width={0.045} height={0.045} icon={I.close} position={[-w / 2 + 0.03, h / 2 - 0.03, 0.004]} onActivate={() => inspect(null)} />
     </Panel>
   );
 }

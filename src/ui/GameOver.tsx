@@ -1,5 +1,6 @@
 import { score } from '../game/rules';
 import { useGame } from '../store/gameStore';
+import { Icon } from './icons/Icon';
 
 /** Écran récapitulatif de fin de partie */
 export function GameOver() {
@@ -13,32 +14,32 @@ export function GameOver() {
         <p>Le dernier habitant a quitté les lieux.</p>
         <div className="recap">
           <div>
-            <span>📅</span>
+            <span><Icon id="calendar" /></span>
             <strong>{game.day - 1}</strong>
             <em>jours survécus</em>
           </div>
           <div>
-            <span>👥</span>
+            <span><Icon id="people" /></span>
             <strong>{game.stats.maxPopulation}</strong>
             <em>population max</em>
           </div>
           <div>
-            <span>🏗️</span>
+            <span><Icon id="crane" /></span>
             <strong>{game.stats.buildingsBuilt}</strong>
             <em>bâtiments construits</em>
           </div>
           <div>
-            <span>🗡️</span>
+            <span><Icon id="dagger" /></span>
             <strong>{game.stats.banditsKilled}</strong>
             <em>bandits abattus</em>
           </div>
           <div>
-            <span>🧯</span>
+            <span><Icon id="extinguisher" /></span>
             <strong>{game.stats.firesPutOut}</strong>
             <em>incendies éteints</em>
           </div>
           <div>
-            <span>⭐</span>
+            <span><Icon id="star" /></span>
             <strong>{score(game)}</strong>
             <em>score</em>
           </div>

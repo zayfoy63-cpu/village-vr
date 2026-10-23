@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { useGame, type Speed } from '../store/gameStore';
+import { I } from './icons';
+import { Icon, RichText } from './icons/Icon';
 
 const SPEEDS: { value: Speed; label: string; title: string }[] = [
-  { value: 0, label: '⏸', title: 'Pause (Espace)' },
-  { value: 0.5, label: '🐢 x0,5', title: 'Ralenti : pour gérer les moments chauds' },
-  { value: 1, label: '▶ x1', title: 'Vitesse normale' },
-  { value: 2, label: '⏩ x2', title: 'Vitesse double' },
+  { value: 0, label: I.pause, title: 'Pause (Espace)' },
+  { value: 0.5, label: `${I.slow} x0,5`, title: 'Ralenti : pour gérer les moments chauds' },
+  { value: 1, label: `${I.play} x1`, title: 'Vitesse normale' },
+  { value: 2, label: `${I.fast} x2`, title: 'Vitesse double' },
 ];
 
 export function TimeControls() {
@@ -31,10 +33,10 @@ export function TimeControls() {
 
   return (
     <div className="time-controls">
-      {autoPaused && <span className="auto-pause" title="Le jeu reprendra après votre décision">⏸ Décision en attente</span>}
+      {autoPaused && <span className="auto-pause" title="Le jeu reprendra après votre décision"><Icon id="pause" /> Décision en attente</span>}
       {SPEEDS.map((s) => (
         <button key={s.value} className={speed === s.value ? 'active' : ''} onClick={() => setSpeed(s.value)} title={s.title}>
-          {s.label}
+          <RichText text={s.label} />
         </button>
       ))}
     </div>

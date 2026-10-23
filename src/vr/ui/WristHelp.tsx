@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { VR_CONFIG } from '../config';
 import { useVR } from '../store';
 import { FacePlayer, Label, Panel, THEME } from './kit';
+import { I } from '../../ui/icons';
 
 const _p = new THREE.Vector3();
 const _a = new THREE.Vector3();
@@ -20,20 +21,20 @@ function Rows({ input }: { input: 'hand' | 'controller' }) {
   const rows =
     input === 'hand'
       ? [
-          ['🤏', 'Attraper · poser'],
-          ['👆', 'Tapoter : détails'],
-          ['✋', 'Bord du plateau : tourner'],
-          ['🙌', 'Deux mains : zoom'],
-          ['⌛', 'Sablier : pause · vitesse'],
-          ['📦', 'Détruire : remettre dans la boîte'],
+          [I.pinch, 'Attraper · poser'],
+          [I.tap, 'Tapoter : détails'],
+          [I.hand, 'Bord du plateau : tourner'],
+          [I.twoHands, 'Deux mains : zoom'],
+          [I.hourglass, 'Sablier : pause · vitesse'],
+          [I.box, 'Détruire : remettre dans la boîte'],
         ]
       : [
-          ['🔫', 'Gâchette : choisir · poser'],
-          ['✊', 'Grip : attraper'],
-          ['🅰️', 'A : boîte   🅱️ B : annuler'],
-          ['❎', 'X : pause   Y : menu'],
-          ['🕹️', 'Stick : tourner · zoom'],
-          ['↕️', 'Autre stick : monter · descendre'],
+          [I.trigger, 'Gâchette : choisir · poser'],
+          [I.grip, 'Grip : attraper'],
+          [I.btnA, `A : boîte   ${I.btnB} B : annuler`],
+          [I.btnX, 'X : pause   Y : menu'],
+          [I.stick, 'Stick : tourner · zoom'],
+          [I.updown, 'Autre stick : monter · descendre'],
         ];
   const h = rows.length * 0.04 + 0.05;
   return (

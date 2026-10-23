@@ -141,6 +141,11 @@ button.active {
   font-size: 18px;
 }
 
+.hud-icon .ico {
+  width: 1.45em;
+  height: 1.45em;
+}
+
 .hud-value {
   font-weight: 600;
   font-size: 15px;
@@ -1356,4 +1361,20 @@ button.primary:hover {
 .app.ui3d .parcel-badges,
 .app.ui3d .bandit-markers {
   display: none;
+}
+
+/* Icônes dessinées (src/ui/icons) : SVG en ligne, à la taille du texte */
+.ico {
+  display: inline-block;
+  vertical-align: -0.24em;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.build-cost .ico,
+.build-effect .ico,
+.choice-cost .ico,
+.choice-effects .ico {
+  width: 1.4em;
+  height: 1.4em;
 }

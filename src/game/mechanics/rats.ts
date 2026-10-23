@@ -8,6 +8,7 @@ import { storageCapacity } from '../rules';
 import { pushNotice } from '../stateUtils';
 import type { GameState } from '../types';
 import { type Mechanic, solve, strike } from './common';
+import { I } from '../../ui/icons';
 
 export const RATS = {
   conditions: {
@@ -40,7 +41,7 @@ export function ratsExposure(state: GameState): number {
 
 export const rats: Mechanic<typeof RATS> = {
   id: 'rats',
-  icon: '🐀',
+  icon: I.rat,
   title: 'Les petites ombres grises',
   page: 'On a d\'abord vu de petites ombres filer le long des murs. Puis, un matin, une bonne part des réserves avait disparu.',
   solvedPage: 'Derrière des murs secs, sur un plancher surélevé, le grain dort tranquille. Les chats du village y veillent.',
@@ -60,9 +61,9 @@ export const rats: Mechanic<typeof RATS> = {
       strike(state, 'rats');
       pushNotice(state, {
         kind: 'bad',
-        icon: '🐀',
+        icon: I.rat,
         title: 'Réserves rongées',
-        text: `Au matin, ${lost} 🌾 ont disparu. On entend gratter sous les planchers.`,
+        text: `Au matin, ${lost} ${I.wheat} ont disparu. On entend gratter sous les planchers.`,
       });
     }
     const storage = storageCapacity(state);

@@ -22,6 +22,7 @@ import {
 } from '../game/simulation';
 import { buildCost } from '../game/buildings';
 import type { BuildingTypeId, GameState } from '../game/types';
+import { I } from '../ui/icons';
 
 export type Speed = 0 | 0.5 | 1 | 2;
 
@@ -283,5 +284,5 @@ useGame.subscribe((s, prev) => {
   if (!added.length && !completed.length) return;
   saveChronicle(next);
   useGame.setState({ chronicle: next });
-  s.showToast(added.length ? '📜 Une page s\'ajoute à la Chronique du village…' : '📜 Une page de la Chronique se complète.');
+  s.showToast(added.length ? `${I.scroll} Une page s'ajoute à la Chronique du village…` : `${I.scroll} Une page de la Chronique se complète.`);
 });

@@ -3,6 +3,7 @@
 // Pour équilibrer : modifier les valeurs de `levels` (index 0 = niveau 1 = construction).
 
 import type { BuildingTypeId, Resources, TileType } from './types';
+import { I } from '../ui/icons';
 
 /** Condition de déblocage : population actuelle minimale + bâtiments déjà construits */
 export interface UnlockCondition {
@@ -34,12 +35,12 @@ export interface LevelDef {
 export type BuildTab = 'housing' | 'production' | 'craft' | 'commerce' | 'defense';
 
 export const BUILD_TABS: { id: BuildTab; label: string; icon: string; hiddenUntilUnlocked?: boolean }[] = [
-  { id: 'housing', label: 'Habitations', icon: '🏠' },
-  { id: 'production', label: 'Production', icon: '🌾' },
+  { id: 'housing', label: 'Habitations', icon: I.house },
+  { id: 'production', label: 'Production', icon: I.wheat },
   // N'apparaît qu'une fois un premier bâtiment de transformation débloqué
-  { id: 'craft', label: 'Artisanat', icon: '⚒️', hiddenUntilUnlocked: true },
-  { id: 'commerce', label: 'Commerce', icon: '⚖️' },
-  { id: 'defense', label: 'Défense', icon: '🛡️' },
+  { id: 'craft', label: 'Artisanat', icon: I.craft, hiddenUntilUnlocked: true },
+  { id: 'commerce', label: 'Commerce', icon: I.scales },
+  { id: 'defense', label: 'Défense', icon: I.shield },
 ];
 
 /** Réglages des chaînes de production */
@@ -105,7 +106,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'castle',
     name: 'Château',
-    icon: '🏰',
+    icon: I.castle,
     description: 'Le cœur du village.',
     buildable: false,
     size: 2,
@@ -116,7 +117,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'mill',
     name: 'Moulin',
-    icon: '🌬️',
+    icon: I.windmill,
     tab: 'craft',
     description: 'Moud le blé en farine. Le moulin de départ se met en marche dès qu\'il est débloqué.',
     buildable: true,
@@ -130,7 +131,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'hut',
     name: 'Cabane',
-    icon: '🛖',
+    icon: I.hut,
     description: 'Un abri modeste en bois et chaume.',
     tab: 'housing',
     buildable: true,
@@ -142,7 +143,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'house',
     name: 'Maison',
-    icon: '🏠',
+    icon: I.house,
     description: 'Maison à colombages.',
     tab: 'housing',
     buildable: true,
@@ -154,7 +155,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'townhouse',
     name: 'Maison bourgeoise',
-    icon: '🏘️',
+    icon: I.townhouse,
     description: 'Deux étages, rez-de-chaussée en pierre.',
     tab: 'housing',
     buildable: true,
@@ -166,7 +167,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'manor',
     name: 'Manoir',
-    icon: '🏛️',
+    icon: I.manor,
     description: 'Grande demeure avec tourelle et jardin.',
     tab: 'housing',
     buildable: true,
@@ -180,7 +181,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'field',
     name: 'Champ',
-    icon: '🌾',
+    icon: I.wheat,
     description: 'Produit de la nourriture (x1,75 sur zone fertile).',
     tab: 'production',
     buildable: true,
@@ -198,7 +199,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'lumber',
     name: 'Cabane de bûcheron',
-    icon: '🪓',
+    icon: I.axe,
     description: 'Produit du bois. Doit toucher une forêt.',
     tab: 'production',
     buildable: true,
@@ -215,7 +216,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'quarry',
     name: 'Carrière',
-    icon: '⛏️',
+    icon: I.pickaxe,
     description: 'Produit de la pierre. Doit toucher des rochers.',
     tab: 'production',
     buildable: true,
@@ -232,7 +233,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'granary',
     name: 'Grenier',
-    icon: '🏚️',
+    icon: I.barn,
     tab: 'production',
     description: 'Des murs secs et un plancher surélevé. Les chats du village y ont élu domicile.',
     buildable: true,
@@ -249,7 +250,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'bakery',
     name: 'Boulangerie',
-    icon: '🥖',
+    icon: I.baguette,
     tab: 'craft',
     description: 'Cuit la farine en pain. Un pain nourrit 3 habitants !',
     buildable: true,
@@ -261,7 +262,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'sawmill',
     name: 'Scierie',
-    icon: '🪚',
+    icon: I.saw,
     tab: 'craft',
     description: 'Débite le bois en planches (maisons bourgeoises, manoirs, niveaux 3).',
     buildable: true,
@@ -273,7 +274,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'mine',
     name: 'Mine de fer',
-    icon: '⛏️',
+    icon: I.pickaxe,
     tab: 'craft',
     description: 'Extrait du minerai de fer. Doit toucher des rochers.',
     buildable: true,
@@ -290,7 +291,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'forge',
     name: 'Forge',
-    icon: '🔨',
+    icon: I.hammer,
     tab: 'craft',
     description: 'Forge des outils (+30 % de production des bâtiments équipés), puis des armes au niveau 2.',
     buildable: true,
@@ -305,7 +306,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'market',
     name: 'Marché',
-    icon: '⚖️',
+    icon: I.scales,
     description: 'Produit de l\'or.',
     tab: 'commerce',
     buildable: true,
@@ -321,7 +322,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'tower',
     name: 'Tour de garde',
-    icon: '🗼',
+    icon: I.tower,
     description: 'Réduit les vols des bandits.',
     tab: 'defense',
     buildable: true,
@@ -339,7 +340,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'well',
     name: 'Puits',
-    icon: '🪣',
+    icon: I.bucket,
     tab: 'housing',
     description: 'Une eau fraîche, à portée de seau.',
     buildable: true,
@@ -351,7 +352,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'herbalist',
     name: 'Herboriste',
-    icon: '🌿',
+    icon: I.herb,
     tab: 'housing',
     description: 'Elle connaît chaque plante des haies. On murmure qu\'elle n\'est jamais malade.',
     buildable: true,
@@ -363,7 +364,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'sheepfold',
     name: 'Bergerie',
-    icon: '🐑',
+    icon: I.sheep,
     tab: 'production',
     description: 'Quelques moutons, du lait, de la laine… et ce qu\'ils laissent derrière eux.',
     buildable: true,
@@ -375,7 +376,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'dike',
     name: 'Digue',
-    icon: '🧱',
+    icon: I.bricks,
     tab: 'defense',
     description: 'Les anciens disaient que l\'eau finit toujours par revenir.',
     buildable: true,
@@ -388,7 +389,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'palisade',
     name: 'Palissade',
-    icon: '🚧',
+    icon: I.palisade,
     tab: 'defense',
     description: 'Des pieux bien taillés. On dort mieux derrière.',
     buildable: true,
@@ -400,7 +401,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'torch',
     name: 'Torches',
-    icon: '🕯️',
+    icon: I.torch,
     tab: 'defense',
     description: 'Une flamme qui veille. Certains yeux ne l\'aiment pas.',
     buildable: true,
@@ -412,7 +413,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'cemetery',
     name: 'Cimetière',
-    icon: '🪦',
+    icon: I.tombstone,
     description: 'Ici reposent ceux qui ont bâti le village.',
     buildable: false,
     size: 1,

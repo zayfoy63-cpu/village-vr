@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import * as THREE from 'three';
 import * as frame from './frame';
 import * as layout from './layout';
+import { I, type IconId } from '../ui/icons';
 
 export function DevHook() {
   const get = useThree((s) => s.get);
@@ -17,8 +18,9 @@ export function DevHook() {
       frame,
       layout,
       get,
-      /** Position monde (centre) d'un bouton 3D par son libellé ou son icône ; null s'il est caché */
-      findUI: (id: string) => {
+      /** Position monde (centre) d'un bouton 3D par son libellé ou son icône (nom : 'gear', 'close'…) ; null s'il est caché */
+      findUI: (name: string) => {
+        const id = name in I ? I[name as IconId] : name;
         type Node = { userData?: Record<string, unknown>; visible: boolean; parent: Node | null; getWorldPosition: (v: THREE.Vector3) => THREE.Vector3 };
         let found: Node | null = null;
         get().scene.traverse((o) => {

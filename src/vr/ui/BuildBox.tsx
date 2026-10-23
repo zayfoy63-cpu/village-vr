@@ -2,9 +2,10 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { BUILD_TABS, BUILDING_BY_ID, buildCost, buildingsInTab, type BuildTab } from '../../game/buildings';
-import { RESOURCE_KEYS, RESOURCE_META } from '../../game/config';
+import { RESOURCE_KEYS } from '../../game/config';
 import { canAfford, conditionLabel, effectLabel, isUnlocked, workersLabel } from '../../game/rules';
 import type { BuildingTypeId, Resources } from '../../game/types';
+import { formatResources } from '../../game/events';
 import { MODELS } from '../../scene/models';
 import { Part } from '../../scene/models/Part';
 import { useGame } from '../../store/gameStore';
@@ -14,6 +15,7 @@ import { feedback } from '../feedback';
 import { BOX, boxCenter } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME, textWidth } from './kit';
+import { I } from '../../ui/icons';
 
 // Rugosité commune aux bâtiments : ces pièces rejoignent les mêmes regroupements d'instances
 const woodMat = new THREE.MeshStandardMaterial({ color: '#8a5d38', roughness: 0.9, flatShading: true });
@@ -23,7 +25,8 @@ const dimMat = new THREE.MeshBasicMaterial({ color: '#59606b', transparent: true
 const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 const trashMat = new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0.35, depthWrite: false });
 
-const costText = (c: Partial<Resources>) => RESOURCE_KEYS.filter((k) => c[k]).map((k) => `${c[k]}${RESOURCE_META[k].icon}`).join(' ') || 'gratuit';
+/** Coût en clair : « [icône] 12 Bois, [icône] 4 Pierre » */
+const costText = (c: Partial<Resources>) => (RESOURCE_KEYS.some((k) => c[k]) ? formatResources(c) : 'gratuit');
 
 /** Un bâtiment miniature de la boîte : à saisir (pincement / gâchette / grip / clic-glisser) */
 function Mini({ type, x, z, onHover }: { type: BuildingTypeId; x: number; z: number; onHover: (t: BuildingTypeId | null) => void }) {
@@ -57,10 +60,10 @@ function Mini({ type, x, z, onHover }: { type: BuildingTypeId; x: number; z: num
       {!unlocked && (
         <>
           <Part g="box" m={dimMat} p={[0, BOX.h + size * 0.45, 0]} s={[size * 0.95, size * 0.9, size * 0.95]} shadow={false} />
-          <Label text="🔒" size={0.03} position={[0, BOX.h + size * 1.05, size * 0.2]} />
+          <Label text={I.lock} size={0.03} position={[0, BOX.h + size * 1.05, size * 0.2]} />
         </>
       )}
-      {unlocked && !affordable && <Label text="⛔" size={0.022} position={[size * 0.5, BOX.h + size * 0.9, 0]} />}
+      {unlocked && !affordable && <Label text={I.forbidden} size={0.022} position={[size * 0.5, BOX.h + size * 0.9, 0]} />}
       {/* Zone de saisie généreuse (invisible) */}
       <mesh
         position={[0, BOX.h + size * 0.42, 0]}
@@ -97,7 +100,7 @@ function Info({ type, z }: { type: BuildingTypeId; z: number }) {
   const cost = buildCost(type);
   const lvl = def.levels[0];
   const lines = [effectLabel(lvl), workersLabel(lvl)].filter(Boolean).join('  ');
-  const sub = unlocked ? costText(cost) : `🔒 ${conditionLabel(lvl.unlock)}`;
+  const sub = unlocked ? costText(cost) : `${I.lock} ${conditionLabel(lvl.unlock)}`;
   const w = Math.max(0.3, textWidth(def.name, 0.034) + 0.12, textWidth(lines || def.description, 0.024) + 0.05);
   return (
     <FacePlayer position={[0, 0.16, z]} tilt={0.3}>
@@ -143,7 +146,7 @@ export function BuildBox() {
   if (!open) {
     return (
       <group position={[c.x, 0, c.z]}>
-        <Button3D width={0.12} height={0.12} icon="📦" label="Boîte" position={[0, 0.06, 0.05]} onActivate={() => toggle(true)} />
+        <Button3D width={0.12} height={0.12} icon={I.box} label="Boîte" position={[0, 0.06, 0.05]} onActivate={() => toggle(true)} />
       </group>
     );
   }
@@ -162,7 +165,7 @@ export function BuildBox() {
       <mesh ref={trash} material={trashMat} position={[0, BOX.h + 0.006, -0.02]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
         <planeGeometry args={[BOX.w - 0.03, BOX.d - 0.1]} />
       </mesh>
-      {held?.kind === 'move' && <Label text="↩️ Ici : remettre dans la boîte" size={0.022} position={[0, BOX.h + 0.03, -0.12]} color={THEME.warn} />}
+      {held?.kind === 'move' && <Label text={`${I.undo} Ici : remettre dans la boîte`} size={0.022} position={[0, BOX.h + 0.03, -0.12]} color={THEME.warn} />}
 
       {/* Onglets le long du bord avant, inclinés vers le joueur */}
       <group position={[0, BOX.h + 0.012, BOX.d / 2 - 0.03]} rotation={[-0.9, 0, 0]}>
@@ -177,7 +180,7 @@ export function BuildBox() {
             onActivate={() => setTab(t.id)}
           />
         ))}
-        <Button3D width={0.05} height={0.05} icon="✖️" position={[BOX.w / 2 - 0.035, 0.06, 0]} onActivate={() => toggle(false)} />
+        <Button3D width={0.05} height={0.05} icon={I.close} position={[BOX.w / 2 - 0.035, 0.06, 0]} onActivate={() => toggle(false)} />
       </group>
       <Label text={BUILD_TABS.find((t) => t.id === current)?.label ?? ''} size={0.02} color={THEME.dim} position={[0, BOX.h + 0.022, -BOX.d / 2 + 0.03]} />
 

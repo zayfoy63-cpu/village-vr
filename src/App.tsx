@@ -16,13 +16,14 @@ import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
 import { TimeControls } from './ui/TimeControls';
 import { VRButton } from './ui/VRButton';
+import { Icon } from './ui/icons/Icon';
 
 function SeedPanel() {
   const seed = useGame((s) => s.game.seed);
   const newGame = useGame((s) => s.newGame);
   return (
     <div className="seed-panel">
-      <span title="Chaque seed génère une carte unique">🎲 Seed : {seed}</span>
+      <span title="Chaque seed génère une carte unique"><Icon id="dice" /> Seed : {seed}</span>
       <button
         onClick={() => {
           if (confirm('Abandonner cette partie et en commencer une nouvelle ?')) newGame();
@@ -61,7 +62,7 @@ export function App() {
         <BuildingPanel />
         <ParcelPanel />
         <FeaturePanel />
-        <div className="help">🖱️ Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause · Clic sur un bandit : envoyer les gardes</div>
+        <div className="help"><Icon id="mouse" /> Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause · Clic sur un bandit : envoyer les gardes</div>
         <GameOver />
       </div>
     </div>

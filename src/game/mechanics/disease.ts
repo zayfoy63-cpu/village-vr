@@ -11,6 +11,7 @@ import { buildingAt, housingCapacity } from '../rules';
 import { pushNotice } from '../stateUtils';
 import type { GameState } from '../types';
 import { HOUSING, type Mechanic, center, dist, memo, solve, strike, touching, within } from './common';
+import { I } from '../../ui/icons';
 
 export const DISEASE = {
   conditions: {
@@ -75,7 +76,7 @@ function placeCemetery(state: GameState) {
 
 export const disease: Mechanic<typeof DISEASE> = {
   id: 'disease',
-  icon: '🤒',
+  icon: I.sick,
   title: 'La fièvre lente',
   page: 'Les gens traînaient le pas, le teint gris. Puis la fièvre a éclaté et le cimetière s\'est agrandi.',
   solvedPage: 'La fièvre a reculé. De l\'air entre les maisons, une eau propre et une femme qui connaît les plantes : le village respire.',
@@ -101,7 +102,7 @@ export const disease: Mechanic<typeof DISEASE> = {
       strike(state, 'disease');
       pushNotice(state, {
         kind: 'bad',
-        icon: '🤒',
+        icon: I.sick,
         title: 'La fièvre',
         text: `Une fièvre lente emporte ${lost} villageois.`,
       });

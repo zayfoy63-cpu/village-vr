@@ -3,6 +3,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { ALL_PARCELS, canBuyParcel, isAdjacentToOwned, parcelContents } from '../game/parcels';
 import { parcelScreen } from '../scene/badgeAnchors';
 import { useGame } from '../store/gameStore';
+import { I } from './icons';
+import { Icon, RichText } from './icons/Icon';
 
 /** Pastille d'une parcelle verrouillée : prix (ou cadenas si trop loin) et aperçu du contenu */
 function Badge({ id, setRef }: { id: number; setRef: (id: number, el: HTMLButtonElement | null) => void }) {
@@ -34,16 +36,16 @@ function Badge({ id, setRef }: { id: number; setRef: (id: number, el: HTMLButton
       title={info.adjacent ? 'Voir la parcelle' : 'Trop loin : achetez d\'abord une parcelle voisine'}
     >
       <span className="pb-price">
-        {info.adjacent ? `🪙 ${info.price}` : '🔒'}
-        {info.adjacent && info.minPop > 0 && <span className={info.popOk ? '' : 'missing'}> · 👥 {info.minPop}</span>}
+        <RichText text={info.adjacent ? `${I.gold} ${info.price}` : I.lock} />
+        {info.adjacent && info.minPop > 0 && <span className={info.popOk ? '' : 'missing'}> · <Icon id="people" /> {info.minPop}</span>}
       </span>
       <span className="pb-content">
-        {info.forest > 0 && <span>🌲{info.forest}</span>}
-        {info.rock > 0 && <span>🪨{info.rock}</span>}
-        {info.fertile > 0 && <span>🌼{info.fertile}</span>}
-        {info.water > 0 && <span>🌊</span>}
-        {info.camp && <span className="danger">⛺</span>}
-        {info.ruins && <span>🏛️</span>}
+        {info.forest > 0 && <span><Icon id="tree" />{info.forest}</span>}
+        {info.rock > 0 && <span><Icon id="stone" />{info.rock}</span>}
+        {info.fertile > 0 && <span><Icon id="flower" />{info.fertile}</span>}
+        {info.water > 0 && <span><Icon id="flood" /></span>}
+        {info.camp && <span className="danger"><Icon id="camp" /></span>}
+        {info.ruins && <span><Icon id="manor" /></span>}
       </span>
     </button>
   );

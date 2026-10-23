@@ -26,6 +26,7 @@ import type {
   NoticeKind,
   Resources,
 } from './types';
+import { I } from '../ui/icons';
 
 // ============================================================================
 // RÉGLAGES
@@ -270,9 +271,17 @@ export function loseResource(state: GameState, key: keyof Resources, ratio: numb
   return lost;
 }
 
+/** Quantités de ressources lisibles sans ambiguïté : « [icône] 15 Bois, [icône] 4 Pierre » */
 export function formatResources(r: Partial<Resources>): string {
-  const parts = RESOURCE_KEYS.filter((k) => (r[k] ?? 0) > 0).map((k) => `${fmt(r[k]!)} ${RESOURCE_META[k].icon}`);
+  const parts = RESOURCE_KEYS.filter((k) => (r[k] ?? 0) > 0).map((k) => `${RESOURCE_META[k].icon} ${fmt(r[k]!)} ${RESOURCE_META[k].short}`);
   return parts.length ? parts.join(', ') : 'rien';
+}
+
+/** Coût d'un choix, en dépense : « [icône] −15 Bois  [icône] −4 Pierre » */
+export function formatCost(r: Partial<Resources>): string {
+  return RESOURCE_KEYS.filter((k) => (r[k] ?? 0) > 0)
+    .map((k) => `${RESOURCE_META[k].icon} ${signed(-r[k]!)} ${RESOURCE_META[k].short}`)
+    .join('  ');
 }
 
 /** Bâtiments construits par le joueur (hors château et moulin) */
@@ -334,6 +343,13 @@ export function scheduleEvent(state: GameState, ev: EventDef, days: number, para
 // ============================================================================
 
 const fx = (icon: string, text: string, tone: ChoiceEffect['tone'] = 'neutral'): ChoiceEffect => ({ icon, text, tone });
+/** Nombre signé (vrai signe moins) : « +15 », « −15 » */
+export const signed = (n: number) => (n > 0 ? `+${fmt(n)}` : n < 0 ? `\u2212${fmt(-n)}` : '0');
+/** Conséquence sur une ressource, sans ambiguïté : icône + chiffre + nom (« −15 Bois ») */
+const fxRes = (k: keyof Resources, n: number, tone: ChoiceEffect['tone'], extra = ''): ChoiceEffect =>
+  fx(RESOURCE_META[k].icon, `${signed(n)} ${RESOURCE_META[k].short}${extra ? ` ${extra}` : ''}`, tone);
+/** Conséquence sur le moral (« −5 Moral ») */
+const fxMorale = (n: number): ChoiceEffect => fx(n >= 0 ? I.happy : I.worried, `${signed(n)} Moral`, n >= 0 ? 'good' : 'bad');
 
 /**
  * Carte en temps réel des bandits (ne met pas le jeu en pause) : ils courent déjà vers leurs cibles.
@@ -357,8 +373,8 @@ function banditChoice(state: GameState, count: number, ransom: number): ChoiceSp
         label: 'Les intercepter',
         detail: 'Cliquez sur un bandit : un garde sort d\'une tour pour l\'attraper (sinon des villageois, qui peuvent être blessés).',
         effects: [
-          fx('🛡️', guards ? `${guards} garde(s) disponible(s)` : 'aucune tour : villageois', guards ? 'good' : 'bad'),
-          fx('🪙', `+${Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state.day) - 1))} par bandit attrapé`, 'good'),
+          fx(I.shield, guards ? `${guards} garde(s) disponible(s)` : 'aucune tour : villageois', guards ? 'good' : 'bad'),
+          fxRes('gold', Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state.day) - 1)), 'good', 'par bandit attrapé'),
         ],
       },
       {
@@ -366,15 +382,15 @@ function banditChoice(state: GameState, count: number, ransom: number): ChoiceSp
         label: 'Payer la rançon',
         detail: 'Ils font demi-tour sans rien voler de plus.',
         cost: { gold: ransom },
-        effects: [fx('🪙', `-${ransom}`, 'bad'), fx('😟', `moral ${TUNING.morale.ransom}`, 'bad')],
+        effects: [fxRes('gold', -ransom, 'bad'), fxMorale(TUNING.morale.ransom)],
       },
       {
         id: 'fight',
         label: 'Charger en masse',
         detail: `Tout le village attaque les ${count} bandits d'un coup (force : ${power.toFixed(1)}).`,
         effects: [
-          fx('🎲', `victoire ~${Math.round(win * 100)} %`, win >= 0.6 ? 'good' : win >= 0.3 ? 'neutral' : 'bad'),
-          fx('💀', `si défaite : ~${lossIfLost} morts et ils s'enfuient`, 'bad'),
+          fx(I.dice, `victoire ~${Math.round(win * 100)} %`, win >= 0.6 ? 'good' : win >= 0.3 ? 'neutral' : 'bad'),
+          fx(I.skull, `si défaite : ~${lossIfLost} morts et ils s'enfuient`, 'bad'),
         ],
       },
     ],
@@ -423,17 +439,17 @@ function epidemicOptions(state: GameState, p: EventParams, doctorCost: number, q
       label: q,
       detail: 'On isole les malades.',
       effects: [
-        fx('⚙️', `production -40 % (${p.quarantineDays} j)`, 'bad'),
-        fx('💀', '0 à 1 mort', 'neutral'),
-        fx('😟', `moral ${TUNING.morale.quarantine}`, 'bad'),
+        fx(I.gear, `\u221240 % de production (${p.quarantineDays} j)`, 'bad'),
+        fx(I.skull, '0 à 1 mort', 'neutral'),
+        fxMorale(TUNING.morale.quarantine),
       ],
     },
-    { id: 'doctor', label: d, detail: 'Personne ne meurt.', cost: { gold: doctorCost }, effects: [fx('🪙', `-${doctorCost}`, 'bad'), fx('💀', 'aucun mort', 'good')] },
+    { id: 'doctor', label: d, detail: 'Personne ne meurt.', cost: { gold: doctorCost }, effects: [fxRes('gold', -doctorCost, 'bad'), fx(I.skull, 'aucun mort', 'good')] },
     {
       id: 'ignore',
       label: i,
       detail: 'La maladie suit son cours.',
-      effects: [fx('💀', `~${deaths} morts`, 'bad'), fx('🤢', `2e vague dans 2 j (~${Math.ceil(deaths * 1.2)})`, 'bad')],
+      effects: [fx(I.skull, `~${deaths} morts`, 'bad'), fx(I.sick, `2e vague dans 2 j (~${Math.ceil(deaths * 1.2)})`, 'bad')],
     },
   ];
 }
@@ -443,7 +459,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'bandits',
     title: 'Bandits',
-    icon: '🗡️',
+    icon: I.dagger,
     kind: 'bad',
     // Les camps de bandits proches (parcelles) rendent les attaques plus fréquentes
     weight: (s) => (s.day >= 6 ? (2.5 + 0.3 * seasonIndex(s.day)) * (1 + PARCELS.camp.banditWeightBonus * activeCamps(s).length) : 0),
@@ -465,7 +481,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'storm',
     title: 'Orage',
-    icon: '⛈️',
+    icon: I.storm,
     kind: 'bad',
     weight: (s) => (playerBuildings(s).length >= 2 ? 2 : 0),
     roll: ({ rng }) => ({ edge: rng.int(0, 3) }),
@@ -483,7 +499,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'harshWinter',
     title: 'Hiver rude',
-    icon: '🥶',
+    icon: I.cold,
     kind: 'bad',
     scheduled: true,
     weight: () => 0,
@@ -499,7 +515,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'epidemicWave',
     title: 'La maladie se propage',
-    icon: '🤢',
+    icon: I.sick,
     kind: 'bad',
     scheduled: true,
     weight: () => 0,
@@ -514,7 +530,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'epidemic',
     title: 'Épidémie',
-    icon: '🤒',
+    icon: I.sick,
     kind: 'bad',
     weight: (s) => (s.population >= 5 ? 1.5 + 0.2 * seasonIndex(s.day) : 0),
     roll: ({ severity: sev }) => ({ rate: Math.min(0.4, 0.07 * sev), quarantineDays: 4 }),
@@ -541,7 +557,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'refugees',
     title: 'Réfugiés',
-    icon: '🧳',
+    icon: I.luggage,
     kind: 'trade',
     weight: (s) => (s.day >= 8 ? 1.2 : 0),
     roll: ({ rng, severity: sev }) => ({ n: 2 + rng.int(0, 2) + Math.floor(sev) }),
@@ -555,16 +571,16 @@ export const EVENTS: EventDef[] = [
             label: 'Les accueillir',
             detail: 'Plus de bras, plus de bouches à nourrir (même sans logement).',
             effects: [
-              fx('👥', `+${p.n} habitants`, 'good'),
-              fx('🌾', `-${p.n} nourriture/jour`, 'bad'),
-              fx('😄', `moral +${TUNING.morale.welcomeRefugees}`, 'good'),
+              fx(I.people, `+${p.n} Habitants`, 'good'),
+              fxRes('food', -p.n, 'bad', 'par jour'),
+              fxMorale(TUNING.morale.welcomeRefugees),
             ],
           },
           {
             id: 'refuse',
             label: 'Les refuser',
             detail: 'Le village a mauvaise conscience.',
-            effects: [fx('😟', `moral ${TUNING.morale.refuseRefugees}`, 'bad')],
+            effects: [fxMorale(TUNING.morale.refuseRefugees)],
           },
         ],
       },
@@ -583,7 +599,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'merchant',
     title: 'Un marchand passe',
-    icon: '🐴',
+    icon: I.horse,
     kind: 'trade',
     weight: () => 1.6,
     roll: ({ state, rng }) => {
@@ -622,8 +638,8 @@ export const EVENTS: EventDef[] = [
           detail: `contre ${formatResources(give)}`,
           cost: give,
           effects: [
-            ...RESOURCE_KEYS.filter((k) => get[k]).map((k) => fx(RESOURCE_META[k].icon, `+${get[k]}`, 'good')),
-            ...RESOURCE_KEYS.filter((k) => give[k]).map((k) => fx(RESOURCE_META[k].icon, `-${give[k]}`, 'bad')),
+            ...RESOURCE_KEYS.filter((k) => get[k]).map((k) => fxRes(k, get[k]!, 'good')),
+            ...RESOURCE_KEYS.filter((k) => give[k]).map((k) => fxRes(k, -give[k]!, 'bad')),
           ],
         };
       };
@@ -640,7 +656,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'fire',
     title: 'Incendie !',
-    icon: '🔥',
+    icon: I.fire,
     kind: 'bad',
     weight: (s) => (playerBuildings(s).length >= 2 ? 2 + 0.25 * seasonIndex(s.day) : 0),
     roll: ({ severity: sev }) => ({ n: 1 + (sev >= 2.4 ? 1 : 0) + (sev >= 3.8 ? 1 : 0) }),
@@ -663,7 +679,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'drought',
     title: 'Sécheresse',
-    icon: '🌵',
+    icon: I.cactus,
     kind: 'bad',
     weight: (s) => (seasonOf(s.day).id === 'winter' ? 0 : s.buildings.some((b) => b.type === 'field') ? 2 : 0.5),
     trigger: ({ state }) => {
@@ -677,7 +693,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'goodHarvest',
     title: 'Bonne récolte',
-    icon: '🌻',
+    icon: I.sunflower,
     kind: 'good',
     weight: (s) => (seasonOf(s.day).id === 'winter' ? 0 : 2),
     trigger: ({ state }) => {
@@ -686,13 +702,13 @@ export const EVENTS: EventDef[] = [
       state.resources.food += bonus;
       addModifier(state, 'goodHarvest', 3);
       addMorale(state, TUNING.morale.harvest);
-      return { text: `+${bonus} 🌾 et les champs produisent +50 % pendant 3 jours.` };
+      return { text: `+${bonus} ${I.wheat} et les champs produisent +50 % pendant 3 jours.` };
     },
   },
   {
     id: 'newcomers',
     title: 'Nouveaux arrivants',
-    icon: '🧑‍🌾',
+    icon: I.farmer,
     kind: 'good',
     weight: (s) => (s.morale >= 40 ? 1.2 : 0),
     trigger: ({ state, rng }) => {
@@ -700,7 +716,7 @@ export const EVENTS: EventDef[] = [
       const n = Math.min(free, rng.int(1, 3));
       if (n <= 0) {
         state.resources.food += 6;
-        return { text: 'Faute de place, des voyageurs repartent en laissant 6 🌾.' };
+        return { text: `Faute de place, des voyageurs repartent en laissant 6 ${I.wheat}.` };
       }
       state.population += n;
       return { text: `${n} ${plural(n, 'villageois s\'installe', 'villageois s\'installent')} au village.` };
@@ -711,7 +727,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'invasion',
     title: 'Invasion',
-    icon: '⚔️',
+    icon: I.weapons,
     kind: 'bad',
     major: true,
     weight: () => 1,
@@ -733,7 +749,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'greatFamine',
     title: 'Grande famine',
-    icon: '🥀',
+    icon: I.wilted,
     kind: 'bad',
     major: true,
     weight: () => 1,
@@ -749,9 +765,9 @@ export const EVENTS: EventDef[] = [
             label: 'Sceller les réserves',
             detail: 'Pertes de stock divisées par deux.',
             cost: { wood: fmt(10 + 5 * sev), gold: fmt(4 * sev) },
-            effects: [fx('🌾', '-20 % du stock', 'neutral')],
+            effects: [fx(I.wheat, '\u221220 % du Blé en stock', 'neutral')],
           },
-          { id: 'none', label: 'Ne rien faire', detail: '', effects: [fx('🌾', '-40 % du stock', 'bad')] },
+          { id: 'none', label: 'Ne rien faire', detail: '', effects: [fx(I.wheat, '\u221240 % du Blé en stock', 'bad')] },
         ],
       }),
       onPrepare: (_ctx, id, p) => {
@@ -763,13 +779,13 @@ export const EVENTS: EventDef[] = [
       const lost = loseResource(state, 'food', p.loss);
       addModifier(state, 'blight', p.days);
       addMorale(state, -10);
-      return { text: `-${lost} 🌾 gâtés, et les champs produisent 60 % de moins pendant ${p.days} jours.` };
+      return { text: `-${lost} ${I.wheat} gâtés, et les champs produisent 60 % de moins pendant ${p.days} jours.` };
     },
   },
   {
     id: 'plague',
     title: 'Grande épidémie',
-    icon: '☠️',
+    icon: I.skull,
     kind: 'bad',
     major: true,
     weight: () => 1,

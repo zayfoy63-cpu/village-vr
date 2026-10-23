@@ -1,4 +1,4 @@
-// Kit d'interface 3D : textes, emojis et fonds viennent d'un atlas de caractères unique et sont
+// Kit d'interface 3D : textes, icônes et fonds viennent d'un atlas de caractères unique et sont
 // dessinés en un seul maillage (uiBatch) ; lisible sur fond de passthrough. Un seul jeu de composants pour tous les modes : chaque élément
 // réagit pareil au clic souris, au rayon de manette, au pincement et au toucher du doigt.
 
@@ -10,6 +10,7 @@ import { VR_CONFIG } from '../config';
 import { useVR } from '../store';
 import { lineWidth } from './atlas';
 import { Builder, addItem, removeItem, rgba, type Tris, type UIItem } from './uiBatch';
+import { I } from '../../ui/icons';
 
 
 /** Palette très contrastée (lisible sur passthrough clair comme sombre) */
@@ -78,7 +79,7 @@ function wrap(text: string, size: number, weight: number, maxWidth: number): str
   return out;
 }
 
-/** Texte (ou icône emoji). `size` = hauteur de police en mètres. Fin liseré sombre : lisible sur tout fond. */
+/** Texte (avec icônes du jeu). `size` = hauteur de police en mètres. Fin liseré sombre : lisible sur tout fond. */
 export function Label({
   text,
   size = VR_CONFIG.ui.text,
@@ -110,7 +111,7 @@ export function Label({
         const y = total / 2 - (size * 0.1 + lineH * (i + 0.5));
         // Ancrage comme avant : bord gauche / droit du texte à `position` (marge de 0.15 em)
         const x = align === 'left' ? size * 0.15 : align === 'right' ? -size * 0.15 : 0;
-        b.text(l, { size, color: c, weight, outline: true, x, y, align, emojiAlpha: opacity });
+        b.text(l, { size, color: c, weight, outline: true, x, y, align, iconAlpha: opacity });
       });
       return b.done();
     },
@@ -271,7 +272,7 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
       const top = (k: number) => h / 2 - h * k;
       if (icon) {
         const size = Math.min(h * (hasText ? (sub ? 0.46 : 0.5) : 0.62), w * 0.6);
-        b.text(icon, { size, color: fg, weight: 400, outline: false, x: 0, y: hasText ? top(sub ? 0.3 : 0.34) : 0, align: 'center', emojiAlpha: disabled ? 0.55 : 1 });
+        b.text(icon, { size, color: fg, weight: 400, outline: false, x: 0, y: hasText ? top(sub ? 0.3 : 0.34) : 0, align: 'center', iconAlpha: disabled ? 0.55 : 1 });
       }
       if (label) {
         const size = Math.min(h * (icon ? 0.24 : 0.4), w * 0.16);
@@ -281,7 +282,7 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
       if (sub) {
         b.text(sub, { size: h * 0.17, color: rgba(disabled ? '#8a7d6a' : THEME.dim), weight: 600, outline: false, x: 0, y: top(0.88), align: 'center', squeeze: w * 0.94 });
       }
-      if (locked) b.text('🔒', { size: h * 0.34, color: fg, weight: 400, outline: false, x: w * 0.3, y: top(0.28), align: 'center' });
+      if (locked) b.text(I.lock, { size: h * 0.34, color: fg, weight: 400, outline: false, x: w * 0.3, y: top(0.28), align: 'center' });
       return b.done();
     },
     [width, height, icon, label, sub, disabled, active, danger, locked, hover],

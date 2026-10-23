@@ -53,6 +53,8 @@ export const VR_CONFIG = {
     miniSize: 0.078,
     /** Appui du doigt : distance de déclenchement (m) */
     touchDown: 0.012,
+    /** Déplacement maximal du bout du doigt entre l'appui et le retrait pour compter un tap (m) */
+    tapSlop: 0.2,
     /** Éclaireur / bandit : zone de saisie (m) */
     banditGrab: 0.08,
   },

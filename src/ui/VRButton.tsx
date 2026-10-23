@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { xrStore } from '../scene/xr';
+import { Icon } from './icons/Icon';
 
 /** Bouton « Réalité mixte » : actif uniquement si un casque WebXR (immersive-ar) est disponible */
 export function VRButton() {
@@ -23,7 +24,7 @@ export function VRButton() {
       onClick={() => xrStore.enterAR()}
       title={supported ? 'Jouer sur votre table en réalité mixte' : 'Aucun casque détecté (Meta Quest 3 requis)'}
     >
-      🥽 Réalité mixte
+      <Icon id="headset" /> Réalité mixte
     </button>
   );
 }

@@ -9,6 +9,7 @@ import { VR_CONFIG } from './config';
 import { feedback } from './feedback';
 import { useVR } from './store';
 import { Button3D, FacePlayer, Label, Panel } from './ui/kit';
+import { I } from '../ui/icons';
 
 const _m = new THREE.Matrix4();
 const _pos = new THREE.Vector3();
@@ -109,8 +110,8 @@ export function Placement() {
     <group position={[b.x, b.y, b.z]} rotation={[0, b.yaw, 0]}>
       <FacePlayer position={[0, 0.32, 0.1]} tilt={0.2}>
         <Panel width={0.5} height={fallback ? 0.2 : 0.11}>
-          <Label text={tableFound ? '✅ Valider pour poser ici' : '👉 Pointez votre table'} size={0.034} position={[0, fallback ? 0.055 : 0, 0]} />
-          {fallback && <Button3D width={0.36} height={0.07} icon="📍" label="Poser devant moi" position={[0, -0.04, 0.004]} onActivate={place} />}
+          <Label text={tableFound ? `${I.check} Valider pour poser ici` : `${I.point} Pointez votre table`} size={0.034} position={[0, fallback ? 0.055 : 0, 0]} />
+          {fallback && <Button3D width={0.36} height={0.07} icon={I.pin} label="Poser devant moi" position={[0, -0.04, 0.004]} onActivate={place} />}
         </Panel>
       </FacePlayer>
     </group>

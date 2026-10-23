@@ -61,6 +61,7 @@ import {
 } from './rules';
 import { clamp, cloneState, gameTime, pushNotice } from './stateUtils';
 import type { BuildingTypeId, GameState } from './types';
+import { I } from '../ui/icons';
 
 /** Une phrase d'ambiance par saison (aucun effet de jeu n'est dit) */
 const SEASON_TEXT: Record<SeasonId, string> = {
@@ -114,7 +115,7 @@ export function createInitialState(seed: number): GameState {
   };
   pushNotice(state, {
     kind: 'info',
-    icon: '🏰',
+    icon: I.castle,
     title: 'Un nouveau départ',
     text: 'Trois villageois s\'installent au pied du château. Construisez un champ avant l\'hiver, et surveillez le moral !',
   });
@@ -136,7 +137,7 @@ export function applyUnlocks(state: GameState, notify: boolean): void {
   if (builds.length) {
     pushNotice(state, {
       kind: 'good',
-      icon: '🔓',
+      icon: I.unlock,
       title: builds.length > 1 ? 'Nouveaux bâtiments' : 'Nouveau bâtiment',
       text: `Vous pouvez maintenant construire : ${builds.map((u) => `${BUILDING_BY_ID[u.type].icon} ${BUILDING_BY_ID[u.type].name}`).join(', ')}.`,
     });
@@ -145,7 +146,7 @@ export function applyUnlocks(state: GameState, notify: boolean): void {
     const names = upgrades.filter((u) => u.level === level).map((u) => BUILDING_BY_ID[u.type].name);
     pushNotice(state, {
       kind: 'good',
-      icon: '⬆️',
+      icon: I.up,
       title: `Améliorations niveau ${level}`,
       text: `Débloqué pour : ${names.join(', ')}. Cliquez sur un bâtiment pour l'améliorer.`,
     });
@@ -217,20 +218,20 @@ export function buyParcel(state: GameState, parcelId: number): GameState | null 
   s.parcels.bought++;
   const { counts, features } = parcelContents(s, parcelId);
   const found = [
-    counts.forest ? `${counts.forest} 🌲` : '',
-    counts.rock ? `${counts.rock} 🪨` : '',
-    counts.fertile ? `${counts.fertile} 🌼` : '',
+    counts.forest ? `${counts.forest} ${I.tree}` : '',
+    counts.rock ? `${counts.rock} ${I.stone}` : '',
+    counts.fertile ? `${counts.fertile} ${I.flower}` : '',
     counts.water ? 'rivière' : '',
   ].filter(Boolean);
   const camp = features.find((f) => f.type === 'camp');
   const ruins = features.find((f) => f.type === 'ruins');
   pushNotice(s, {
     kind: camp ? 'bad' : 'good',
-    icon: '🗺️',
+    icon: I.map,
     title: 'Nouvelle parcelle',
     text:
-      `Terres acquises pour ${price} 🪙${found.length ? ` : ${found.join(', ')}` : ''}.` +
-      (camp ? ' ⚠️ Un camp de bandits s\'y cache : détruisez-le, sinon les attaques se multiplieront !' : '') +
+      `Terres acquises pour ${price} ${I.gold}${found.length ? ` : ${found.join(', ')}` : ''}.` +
+      (camp ? ` ${I.warning} Un camp de bandits s'y cache : détruisez-le, sinon les attaques se multiplieront !` : '') +
       (ruins ? ' Des ruines y cachent peut-être un trésor : cliquez dessus pour les déblayer.' : ''),
   });
   return s;
@@ -249,7 +250,7 @@ export function clearRuins(state: GameState, featureId: number): GameState | nul
   const collapse = rng.chance(PARCELS.ruins.collapseChance) ? loseVillagers(s, 1, 1) : 0;
   pushNotice(s, {
     kind: collapse ? 'bad' : 'good',
-    icon: '🏛️',
+    icon: I.manor,
     title: 'Ruines déblayées',
     text: `Trésor : ${formatResources(feature.loot)}.${collapse ? ' Un éboulement a coûté la vie à un villageois.' : ''}`,
   });
@@ -282,7 +283,7 @@ export function attackCamp(state: GameState, featureId: number): GameState | nul
     s.stats.banditsKilled += enemy;
     pushNotice(s, {
       kind: 'good',
-      icon: '⛺',
+      icon: I.camp,
       title: 'Camp détruit',
       text: `Le camp est rasé ! Butin : ${formatResources(feature.loot)}${lost ? ', 1 villageois tombé' : ''}.`,
     });
@@ -291,7 +292,7 @@ export function attackCamp(state: GameState, featureId: number): GameState | nul
     addMorale(s, TUNING.morale.fightLost);
     pushNotice(s, {
       kind: 'bad',
-      icon: '⛺',
+      icon: I.camp,
       title: 'Attaque repoussée',
       text: `Les bandits tiennent bon : ${lost} ${lost > 1 ? 'morts' : 'mort'}. Renforcez votre défense (tours) avant de réessayer.`,
     });
@@ -353,13 +354,13 @@ function updateMorale(s: GameState, hungry: boolean, rng: Rng) {
 
   if (s.population <= 0) return;
   if (s.morale < M.revoltBelow) {
-    pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Révolte !', text: revolt(s, rng) });
+    pushNotice(s, { kind: 'bad', icon: I.fire, title: 'Révolte !', text: revolt(s, rng) });
   } else if (s.morale < M.leaveBelow) {
     const n = Math.min(s.population, Math.max(1, Math.ceil(s.population * M.leaveRatio)));
     s.population -= n;
     pushNotice(s, {
       kind: 'bad',
-      icon: '😠',
+      icon: I.angry,
       title: 'Mécontentement',
       text: `Le moral est au plus bas : ${n} ${n > 1 ? 'villageois quittent' : 'villageois quitte'} le village.`,
     });
@@ -413,7 +414,7 @@ export function advanceDay(state: GameState): GameState {
     s.population -= leaving;
     pushNotice(s, {
       kind: 'bad',
-      icon: '🍽️',
+      icon: I.plate,
       title: 'Famine',
       text: `Faute de nourriture, ${leaving} villageois ${leaving > 1 ? 'quittent' : 'quitte'} le village.`,
     });
@@ -426,7 +427,7 @@ export function advanceDay(state: GameState): GameState {
       s.population += arrivals;
       pushNotice(s, {
         kind: 'info',
-        icon: '👋',
+        icon: I.hand,
         title: arrivals > 1 ? 'Nouveaux villageois' : 'Nouveau villageois',
         text: `${arrivals} ${arrivals > 1 ? 'personnes rejoignent' : 'personne rejoint'} le village, attirée${arrivals > 1 ? 's' : ''} par vos réserves.`,
       });

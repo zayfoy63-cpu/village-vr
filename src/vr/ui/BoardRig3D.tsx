@@ -11,6 +11,7 @@ import { boardHalf } from '../layout';
 import { pointOnHorizontalPlane, samplePointer } from '../pointers';
 import { useVR } from '../store';
 import { Button3D } from './kit';
+import { I } from '../../ui/icons';
 
 const rimMat = new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0, depthWrite: false });
 const woodMat = new THREE.MeshStandardMaterial({ color: '#a8743f', roughness: 0.9, flatShading: true });
@@ -140,8 +141,8 @@ export function BoardRig3D() {
           <cylinderGeometry args={[0.055, 0.055, 0.09, 10]} />
           <meshBasicMaterial visible={false} />
         </mesh>
-        <Button3D width={0.06} height={0.06} icon="▲" position={[-0.07, 0.07, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.min(VR_CONFIG.board.maxHeight, useVR.getState().board.y + 0.05) })} />
-        <Button3D width={0.06} height={0.06} icon="▼" position={[-0.07, 0.005, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.max(VR_CONFIG.board.minHeight, useVR.getState().board.y - 0.05) })} />
+        <Button3D width={0.06} height={0.06} icon={I.triUp} position={[-0.07, 0.07, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.min(VR_CONFIG.board.maxHeight, useVR.getState().board.y + 0.05) })} />
+        <Button3D width={0.06} height={0.06} icon={I.triDown} position={[-0.07, 0.005, 0]} onActivate={() => useVR.getState().setBoard({ y: Math.max(VR_CONFIG.board.minHeight, useVR.getState().board.y - 0.05) })} />
       </group>
     </group>
   );

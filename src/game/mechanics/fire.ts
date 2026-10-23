@@ -8,6 +8,7 @@ import { TUNING, startFire } from '../events';
 import { pushNotice } from '../stateUtils';
 import type { Building, GameState } from '../types';
 import { HOUSING, type Mechanic, center, solve, strike, touching, within } from './common';
+import { I } from '../../ui/icons';
 
 export const FIRE = {
   conditions: {
@@ -64,7 +65,7 @@ export function onFireEnd(state: GameState, b: Building) {
 
 export const fire: Mechanic<typeof FIRE> = {
   id: 'fire',
-  icon: '🔥',
+  icon: I.fire,
   title: 'Le feu qui court',
   page: 'Une étincelle, un toit de chaume, et le feu a sauté de maison en maison plus vite qu\'on ne pouvait courir.',
   solvedPage: 'Le feu a pris, mais il est resté seul : de l\'espace entre les toits et de l\'eau à portée de seau l\'ont privé de proies.',
@@ -77,6 +78,6 @@ export const fire: Mechanic<typeof FIRE> = {
     const chance = FIRE.effect.summerIgnite * (wellNear(state, target) ? FIRE.solution.wellIgnite : 1);
     if (!rng.chance(chance)) return;
     startFire(state, target, now);
-    pushNotice(state, { kind: 'bad', icon: '🔥', title: 'Incendie !', text: 'La chaleur, une escarbille… une maison prend feu.' });
+    pushNotice(state, { kind: 'bad', icon: I.fire, title: 'Incendie !', text: 'La chaleur, une escarbille… une maison prend feu.' });
   },
 };

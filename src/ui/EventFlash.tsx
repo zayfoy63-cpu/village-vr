@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TUNING } from '../game/events';
 import { useGame } from '../store/gameStore';
+import { RichText } from './icons/Icon';
 
 type Kind = 'raid' | 'storm' | 'flood' | 'fire';
 
@@ -73,7 +74,7 @@ export function Toast() {
   if (!toast || !visible) return null;
   return (
     <div key={toast.at} className="toast">
-      {toast.text}
+      <RichText text={toast.text} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { tileAt, neighbors8 } from '../mapgen';
 import { statsOf } from '../rules';
 import type { Building, GameState } from '../types';
 import { type Mechanic, solve, strike } from './common';
+import { I } from '../../ui/icons';
 
 export const DEFORESTATION = {
   conditions: {
@@ -65,7 +66,7 @@ export function deforestedRatio(state: GameState): number {
 
 export const deforestation: Mechanic<typeof DEFORESTATION> = {
   id: 'deforestation',
-  icon: '🪵',
+  icon: I.wood,
   title: 'Les souches',
   page: 'Là où chantaient les bois, il ne reste que des souches. Les anciens regardent la rivière en hochant la tête.',
   solvedPage: 'Quelques pousses vertes percent entre les souches. Laissée en paix, la forêt finit par revenir — mais elle prend son temps.',

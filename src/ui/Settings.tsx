@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../store/gameStore';
+import { Icon } from './icons/Icon';
 
-/** Bouton ⚙️ + panneau des paramètres */
+/** Bouton engrenage + panneau des paramètres */
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
   const settings = useGame((s) => s.settings);
@@ -10,7 +11,7 @@ export function SettingsButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} title="Paramètres">
-        ⚙️ Paramètres
+        <Icon id="gear" /> Paramètres
       </button>
       {open &&
         // Portail vers <body> : sinon le flou du panneau parent piège la fenêtre (position fixed)

@@ -13,6 +13,7 @@ import { Rng } from './rng';
 import { assignWorkers, canAfford } from './rules';
 import { cloneState, gameTime, pushNotice } from './stateUtils';
 import type { Building, GameState, Resources } from './types';
+import { I } from '../ui/icons';
 
 function burning(state: GameState): Building[] {
   return state.buildings.filter((b) => b.fire);
@@ -86,14 +87,14 @@ function updateFires(s: GameState, t: number, rng: Rng) {
       onFireSpread(s, b);
       target.fire = { start: at, nextSpread: at + F.spreadEvery, destroyAt: at + F.destroyAfter };
       addMorale(s, TUNING.morale.fireStarted);
-      pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Le feu se propage', text: `${name} → ${BUILDING_BY_ID[target.type].name}. Cliquez dessus pour l'éteindre !`, at: { x: target.x, z: target.z } });
+      pushNotice(s, { kind: 'bad', icon: I.fire, title: 'Le feu se propage', text: `${name} → ${BUILDING_BY_ID[target.type].name}. Cliquez dessus pour l'éteindre !`, at: { x: target.x, z: target.z } });
     }
     if (t >= f.destroyAt) {
       onFireEnd(s, b);
       if (b.type === 'castle') {
         delete b.fire;
         b.damaged = true;
-        pushNotice(s, { kind: 'bad', icon: '🔥', title: 'Château incendié', text: 'Le feu s\'éteint de lui-même, mais le château est endommagé.' });
+        pushNotice(s, { kind: 'bad', icon: I.fire, title: 'Château incendié', text: 'Le feu s\'éteint de lui-même, mais le château est endommagé.' });
       } else {
         s.buildings = s.buildings.filter((x) => x.id !== b.id);
         addMorale(s, TUNING.morale.buildingLost);
@@ -101,7 +102,7 @@ function updateFires(s: GameState, t: number, rng: Rng) {
         pushNotice(s, {
           at: { x: b.x, z: b.z },
           kind: 'bad',
-          icon: '🔥',
+          icon: I.fire,
           title: 'Bâtiment réduit en cendres',
           text: `${name} a entièrement brûlé${victims ? ', 1 villageois a péri' : ''}.`,
         });

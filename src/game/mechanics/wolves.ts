@@ -9,6 +9,7 @@ import { pushNotice } from '../stateUtils';
 import type { Building, GameState, Point } from '../types';
 import { type Mechanic, center, dist, gap, solve, strike, within } from './common';
 import { isForest } from './deforestation';
+import { I } from '../../ui/icons';
 
 export const WOLVES = {
   conditions: {
@@ -67,7 +68,7 @@ function nearestForest(state: GameState, p: Point): Point {
 
 export const wolves: Mechanic<typeof WOLVES> = {
   id: 'wolves',
-  icon: '🐺',
+  icon: I.wolf,
   title: 'Les yeux dans le noir',
   page: 'Une nuit de neige, des yeux ont brillé à la lisière. Au matin, il y avait des traces, et du sang.',
   solvedPage: 'Les hurlements ont tourné autour du village toute la nuit, sans jamais approcher : les bêtes n\'aiment ni les flammes ni les pieux.',
@@ -117,13 +118,13 @@ export const wolves: Mechanic<typeof WOLVES> = {
         strike(state, 'wolves');
         if (target.type === 'sheepfold') {
           target.damaged = true;
-          pushNotice(state, { kind: 'bad', icon: '🐺', title: 'La bergerie', text: 'Au matin, l\'enclos est éventré : il manque des bêtes.' });
+          pushNotice(state, { kind: 'bad', icon: I.wolf, title: 'La bergerie', text: 'Au matin, l\'enclos est éventré : il manque des bêtes.' });
         } else if (state.population > 1) {
           const dead = rng.chance(W.effect.killChance) ? loseVillagers(state, 1, 1) : 0;
           if (!dead) state.injuries.push({ count: 1, untilDay: state.day + W.effect.injuryDays });
           pushNotice(state, {
             kind: 'bad',
-            icon: '🐺',
+            icon: I.wolf,
             title: 'Une nuit de neige',
             text: dead ? 'On a retrouvé des traces dans la neige… et personne au bout.' : 'Un villageois rentre au petit jour, mordu et transi.',
           });

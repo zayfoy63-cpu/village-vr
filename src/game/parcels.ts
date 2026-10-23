@@ -3,6 +3,7 @@
 
 import { Rng } from './rng';
 import type { GameMap, GameState, ParcelFeature, Resources, TileType } from './types';
+import { I } from '../ui/icons';
 
 export const PARCELS = {
   /** Limites des colonnes et des rangées de parcelles (en cases) : 4 × 3 parcelles sur la carte 20 × 14 */
@@ -112,7 +113,7 @@ export function canBuyParcel(state: GameState, id: number): ParcelCheck {
   if (ownsParcel(state, id)) return { ok: false, reason: 'Déjà achetée', ...base };
   if (!isAdjacentToOwned(state, id)) return { ok: false, reason: 'Doit toucher une parcelle déjà possédée', ...base };
   if (state.population < minPopulation) return { ok: false, reason: `Requiert ${minPopulation} habitants`, ...base };
-  if (state.resources.gold < price) return { ok: false, reason: `Requiert ${price} 🪙`, ...base };
+  if (state.resources.gold < price) return { ok: false, reason: `Requiert ${price} ${I.gold}`, ...base };
   return { ok: true, ...base };
 }
 

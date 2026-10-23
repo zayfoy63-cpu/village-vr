@@ -1,4 +1,4 @@
-// Toute l'interface 3D (fonds de panneaux, boutons, textes, emojis) en UN seul maillage dessiné en
+// Toute l'interface 3D (fonds de panneaux, boutons, textes, icônes) en UN seul maillage dessiné en
 // un seul appel. Chaque élément du kit déclare ses triangles dans son repère local et un objet 3D
 // d'ancrage ; juste avant chaque rendu, les sommets sont placés en coordonnées monde.
 // Ordre de dessin : du plus loin au plus proche, chaque panneau d'un bloc (son fond puis son contenu),
@@ -74,8 +74,8 @@ export interface TextOpts {
   align: 'left' | 'center' | 'right';
   /** Largeur maximale : le texte est resserré au-delà (comme fillText(…, maxWidth)) */
   squeeze?: number;
-  /** Opacité des emojis (couleur propre) */
-  emojiAlpha?: number;
+  /** Opacité des icônes (couleurs propres, non teintées) */
+  iconAlpha?: number;
 }
 
 export class Builder {
@@ -131,7 +131,7 @@ export class Builder {
       const adv = advance(ch, o.weight) * em * sx;
       if (ch.trim()) {
         const g = glyph(ch, o.weight, o.outline);
-        const c: RGBA = g.emoji ? [1, 1, 1, (o.emojiAlpha ?? 1) * o.color[3]] : o.color;
+        const c: RGBA = g.colored ? [1, 1, 1, (o.iconAlpha ?? 1) * o.color[3]] : o.color;
         const left = pen - g.ox * em * sx;
         const top = o.y + g.oy * em;
         this.quad(left, top - g.h * em, left + g.w * em * sx, top, g.u0, g.v0, g.u1, g.v1, c);
@@ -168,7 +168,7 @@ function rounded(w: number, h: number, r: number): [number, number][] {
   return pts;
 }
 
-/** WHITE exporté pour les emojis d'icônes (non teintés) */
+/** Blanc : icônes non teintées */
 export const NO_TINT = WHITE;
 
 // ---------------------------------------------------------------------------------------------

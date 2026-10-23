@@ -13,22 +13,24 @@ import type { Resources } from '../game/types';
 import { severity } from '../game/events';
 import { computeNet, hasModifier, injuredCount, housingCapacity, jobsCapacity, moraleFactor } from '../game/rules';
 import { useGame } from '../store/gameStore';
+import { I } from './icons';
+import { Icon, RichText } from './icons/Icon';
 
 const MODIFIER_LABELS = [
-  { id: 'drought', label: '🌵 Sécheresse' },
-  { id: 'harshWinter', label: '🥶 Hiver rude' },
-  { id: 'goodHarvest', label: '🌻 Bonne récolte' },
-  { id: 'quarantine', label: '😷 Quarantaine' },
-  { id: 'blight', label: '🥀 Récoltes malades' },
-  { id: 'sheltered', label: '🏠 Villageois à l\'abri' },
+  { id: 'drought', label: `${I.cactus} Sécheresse` },
+  { id: 'harshWinter', label: `${I.cold} Hiver rude` },
+  { id: 'goodHarvest', label: `${I.sunflower} Bonne récolte` },
+  { id: 'quarantine', label: `${I.mask} Quarantaine` },
+  { id: 'blight', label: `${I.wilted} Récoltes malades` },
+  { id: 'sheltered', label: `${I.house} Villageois à l'abri` },
 ] as const;
 
-function moraleLook(m: number): { emoji: string; cls: string; label: string } {
-  if (m < MORALE.revoltBelow) return { emoji: '🤬', cls: 'critical', label: 'Révolte imminente' };
-  if (m < MORALE.leaveBelow) return { emoji: '😠', cls: 'bad', label: 'Des habitants partent chaque jour' };
-  if (m < MORALE.lowProduction) return { emoji: '😟', cls: 'low', label: 'Production réduite' };
-  if (m < 70) return { emoji: '🙂', cls: 'ok', label: 'Correct' };
-  return { emoji: '😄', cls: 'good', label: 'Excellent' };
+function moraleLook(m: number): { icon: string; cls: string; label: string } {
+  if (m < MORALE.revoltBelow) return { icon: I.furious, cls: 'critical', label: 'Révolte imminente' };
+  if (m < MORALE.leaveBelow) return { icon: I.angry, cls: 'bad', label: 'Des habitants partent chaque jour' };
+  if (m < MORALE.lowProduction) return { icon: I.worried, cls: 'low', label: 'Production réduite' };
+  if (m < 70) return { icon: I.smile, cls: 'ok', label: 'Correct' };
+  return { icon: I.happy, cls: 'good', label: 'Excellent' };
 }
 
 /** Jauge de moral : faim, pertes et pillages la font baisser ; marchés, tours et réserves la soutiennent */
@@ -47,7 +49,7 @@ function MoraleGauge() {
     .join('\n');
   return (
     <div className={`hud-item morale ${look.cls}`} title={tip}>
-      <span className="hud-icon">{look.emoji}</span>
+      <span className="hud-icon"><RichText text={look.icon} /></span>
       <div className="morale-bar">
         <div className="morale-fill" style={{ width: `${morale}%` }} />
         <div className="morale-mark" style={{ left: `${MORALE.lowProduction}%` }} />
@@ -61,7 +63,7 @@ function MoraleGauge() {
 function ResourceItem({ k, value, net }: { k: keyof Resources; value: number; net: number }) {
   return (
     <div className="hud-item" title={RESOURCE_META[k].name}>
-      <span className="hud-icon">{RESOURCE_META[k].icon}</span>
+      <span className="hud-icon"><RichText text={RESOURCE_META[k].icon} /></span>
       <span className="hud-value">{Math.floor(value)}</span>
       {Math.abs(net) >= 0.05 && <span className={`hud-delta ${net < 0 ? 'neg' : 'pos'}`}>{signed(net)}/j</span>}
     </div>
@@ -104,20 +106,20 @@ export function HUD() {
       </div>
       <div className="hud-group">
         <div className="hud-item" title="Population / places">
-          <span className="hud-icon">👥</span>
+          <span className="hud-icon"><Icon id="people" /></span>
           <span className="hud-value">
             {data.population}/{capacity}
           </span>
         </div>
         {injured > 0 && (
           <div className="hud-item injured" title="Villageois blessés : ils ne travaillent pas pendant quelques jours">
-            <span className="hud-icon">🤕</span>
+            <span className="hud-icon"><Icon id="injured" /></span>
             <span className="hud-value">{injured}</span>
           </div>
         )}
         <MoraleGauge />
         <div className="hud-item" title="Travailleurs occupés / postes">
-          <span className="hud-icon">👷</span>
+          <span className="hud-icon"><Icon id="worker" /></span>
           <span className="hud-value">
             {Math.min(data.population, jobs)}/{jobs}
           </span>
@@ -125,7 +127,7 @@ export function HUD() {
       </div>
       <div className="hud-group hud-time">
         <div className="hud-item" title={`Année ${yearOf(data.day)}`}>
-          <span className="hud-icon">{season.icon}</span>
+          <span className="hud-icon"><RichText text={season.icon} /></span>
           <span className="hud-value">
             {season.name} {dayInSeason(data.day)}/{DAYS_PER_SEASON}
           </span>
@@ -141,7 +143,7 @@ export function HUD() {
         <div className="hud-group">
           {MODIFIER_LABELS.filter((m) => hasModifier(game, m.id)).map((m) => (
             <span key={m.id} className="hud-mod">
-              {m.label}
+              <RichText text={m.label} />
             </span>
           ))}
         </div>

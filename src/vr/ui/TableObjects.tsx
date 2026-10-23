@@ -14,15 +14,16 @@ import { boardHalf } from '../layout';
 import { samplePointer } from '../pointers';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME } from './kit';
+import { I } from '../../ui/icons';
 
 const glass = new THREE.MeshStandardMaterial({ color: '#cfe9ff', transparent: true, opacity: 0.38, roughness: 0.1 });
 const sand = new THREE.MeshStandardMaterial({ color: '#f0c457', roughness: 0.9, flatShading: true });
 const frameMat = new THREE.MeshStandardMaterial({ color: '#7a4f2b', roughness: 0.9, flatShading: true });
 
 const SPEEDS: { v: Speed; icon: string; label: string }[] = [
-  { v: 0.5, icon: '🐢', label: '×½' },
-  { v: 1, icon: '▶️', label: '×1' },
-  { v: 2, icon: '⏩', label: '×2' },
+  { v: 0.5, icon: I.slow, label: '×½' },
+  { v: 1, icon: I.play, label: '×1' },
+  { v: 2, icon: I.fast, label: '×2' },
 ];
 
 /**
@@ -110,7 +111,7 @@ export function Hourglass({ x, z }: { x: number; z: number }) {
         <meshBasicMaterial visible={false} />
       </mesh>
       <FacePlayer position={[0, 0.19, 0]} tilt={0.3}>
-        <Label text={speed === 0 ? '⏸ Pause' : SPEEDS.find((s) => s.v === speed)?.label ?? ''} size={0.03} color={speed === 0 ? THEME.warn : THEME.text} />
+        <Label text={speed === 0 ? `${I.pause} Pause` : SPEEDS.find((s) => s.v === speed)?.label ?? ''} size={0.03} color={speed === 0 ? THEME.warn : THEME.text} />
       </FacePlayer>
       <FacePlayer position={[0, 0.0, 0.1]} tilt={0.9}>
         <group>
@@ -139,7 +140,7 @@ export function UndoButton({ x, z }: { x: number; z: number }) {
   const what = undo.kind === 'demolish' ? 'Remis dans la boîte' : undo.kind === 'move' ? 'Déplacé' : 'Posé';
   return (
     <FacePlayer position={[x, 0.01, z]} tilt={0.8}>
-      <Button3D width={0.2} height={0.08} icon="↩️" label="Annuler" sub={`${what} · ${Math.ceil(left)} s`} onActivate={() => undoLast()} />
+      <Button3D width={0.2} height={0.08} icon={I.undo} label="Annuler" sub={`${what} · ${Math.ceil(left)} s`} onActivate={() => undoLast()} />
     </FacePlayer>
   );
 }
@@ -172,8 +173,8 @@ export function MenuObjects({ x, z }: { x: number; z: number }) {
   return (
     <FacePlayer position={[x, 0.01, z]} tilt={0.8}>
       <group>
-        <Button3D width={0.13} height={0.1} icon="📜" label={`${found}/${MECHANICS.length}`} active={panel === 'chronicle'} position={[0, 0.05, 0]} onActivate={() => setPanel(panel === 'chronicle' ? null : 'chronicle')} />
-        <Button3D width={0.1} height={0.1} icon="⚙️" active={panel === 'settings'} position={[0.12, 0.05, 0]} onActivate={() => setPanel(panel === 'settings' ? null : 'settings')} />
+        <Button3D width={0.13} height={0.1} icon={I.scroll} label={`${found}/${MECHANICS.length}`} active={panel === 'chronicle'} position={[0, 0.05, 0]} onActivate={() => setPanel(panel === 'chronicle' ? null : 'chronicle')} />
+        <Button3D width={0.1} height={0.1} icon={I.gear} active={panel === 'settings'} position={[0.12, 0.05, 0]} onActivate={() => setPanel(panel === 'settings' ? null : 'settings')} />
       </group>
     </FacePlayer>
   );
@@ -196,14 +197,14 @@ export function Chronicle3D({ z }: { z: number }) {
     <FacePlayer position={[0, 0.004, z]} tilt={0.8}>
       <group position={[0, h / 2, 0]}>
         <Panel width={w} height={h}>
-          <Label text="📜 Chronique du village" size={0.036} position={[0, h / 2 - 0.04, 0]} />
+          <Label text={`${I.scroll} Chronique du village`} size={0.036} position={[0, h / 2 - 0.04, 0]} />
           <Label text={`Découvertes : ${found} / ${MECHANICS.length}`} size={0.024} color={THEME.dim} position={[0, h / 2 - 0.08, 0]} />
           {items.map((m, i) => {
             const p = chronicle[m.id];
             const y = h / 2 - 0.17 - i * 0.115;
             return (
               <group key={m.id} position={[0, y, 0]}>
-                <Label text={p?.struck ? m.icon : '❔'} size={0.04} position={[-w / 2 + 0.05, 0.01, 0]} />
+                <Label text={p?.struck ? m.icon : I.question} size={0.04} position={[-w / 2 + 0.05, 0.01, 0]} />
                 {p?.struck ? (
                   <>
                     <Label text={m.title} size={0.026} align="left" position={[-w / 2 + 0.1, 0.035, 0]} />
@@ -215,10 +216,10 @@ export function Chronicle3D({ z }: { z: number }) {
               </group>
             );
           })}
-          <Button3D width={0.1} height={0.06} icon="◀" disabled={page === 0} position={[-0.12, -h / 2 + 0.04, 0.004]} onActivate={() => setPage((p) => Math.max(0, p - 1))} />
+          <Button3D width={0.1} height={0.06} icon={I.triLeft} disabled={page === 0} position={[-0.12, -h / 2 + 0.04, 0.004]} onActivate={() => setPage((p) => Math.max(0, p - 1))} />
           <Label text={`${page + 1}/${pages}`} size={0.024} position={[0, -h / 2 + 0.04, 0]} />
-          <Button3D width={0.1} height={0.06} icon="▶" disabled={page >= pages - 1} position={[0.12, -h / 2 + 0.04, 0.004]} onActivate={() => setPage((p) => Math.min(pages - 1, p + 1))} />
-          <Button3D width={0.05} height={0.05} icon="✖️" position={[w / 2 - 0.035, h / 2 - 0.035, 0.004]} onActivate={() => setPanel(null)} />
+          <Button3D width={0.1} height={0.06} icon={I.play} disabled={page >= pages - 1} position={[0.12, -h / 2 + 0.04, 0.004]} onActivate={() => setPage((p) => Math.min(pages - 1, p + 1))} />
+          <Button3D width={0.05} height={0.05} icon={I.close} position={[w / 2 - 0.035, h / 2 - 0.035, 0.004]} onActivate={() => setPanel(null)} />
         </Panel>
       </group>
     </FacePlayer>
@@ -249,35 +250,35 @@ export function Settings3D({ z }: { z: number }) {
     <FacePlayer position={[0, 0.004, z]} tilt={0.8}>
       <group position={[0, h / 2, 0]}>
         <Panel width={w} height={h}>
-          <Label text="⚙️ Paramètres" size={0.036} position={[0, h / 2 - 0.04, 0]} />
+          <Label text={`${I.gear} Paramètres`} size={0.036} position={[0, h / 2 - 0.04, 0]} />
           <Row i={0}>
             <Label text="Main dominante" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
-            <Button3D width={0.13} height={0.065} icon="🫲" label="Gauche" active={prefs.dominant === 'left'} position={[0.1, 0, 0]} onActivate={() => setPrefs({ dominant: 'left' })} />
-            <Button3D width={0.13} height={0.065} icon="🫱" label="Droite" active={prefs.dominant === 'right'} position={[0.25, 0, 0]} onActivate={() => setPrefs({ dominant: 'right' })} />
+            <Button3D width={0.13} height={0.065} icon={I.handLeft} label="Gauche" active={prefs.dominant === 'left'} position={[0.1, 0, 0]} onActivate={() => setPrefs({ dominant: 'left' })} />
+            <Button3D width={0.13} height={0.065} icon={I.handRight} label="Droite" active={prefs.dominant === 'right'} position={[0.25, 0, 0]} onActivate={() => setPrefs({ dominant: 'right' })} />
           </Row>
           <Row i={1}>
             <Label text="Position" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
-            <Button3D width={0.13} height={0.065} icon="🪑" label="Assis" active={prefs.seated} position={[0.1, 0, 0]} onActivate={() => setPrefs({ seated: true })} />
-            <Button3D width={0.13} height={0.065} icon="🧍" label="Debout" active={!prefs.seated} position={[0.25, 0, 0]} onActivate={() => setPrefs({ seated: false })} />
+            <Button3D width={0.13} height={0.065} icon={I.chair} label="Assis" active={prefs.seated} position={[0.1, 0, 0]} onActivate={() => setPrefs({ seated: true })} />
+            <Button3D width={0.13} height={0.065} icon={I.person} label="Debout" active={!prefs.seated} position={[0.25, 0, 0]} onActivate={() => setPrefs({ seated: false })} />
           </Row>
           <Row i={2}>
             <Label text="Son" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
-            <Button3D width={0.28} height={0.065} icon={prefs.sound ? '🔊' : '🔇'} label={prefs.sound ? 'Activé' : 'Coupé'} active={prefs.sound} position={[0.175, 0, 0]} onActivate={() => setPrefs({ sound: !prefs.sound })} />
+            <Button3D width={0.28} height={0.065} icon={prefs.sound ? I.sound : I.mute} label={prefs.sound ? 'Activé' : 'Coupé'} active={prefs.sound} position={[0.175, 0, 0]} onActivate={() => setPrefs({ sound: !prefs.sound })} />
           </Row>
           <Row i={3}>
             <Label text="Pause sur décision" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
-            <Button3D width={0.28} height={0.065} icon="⏸" label={autoPause ? 'Oui' : 'Non'} active={autoPause} position={[0.175, 0, 0]} onActivate={() => setSettings({ autoPause: !autoPause })} />
+            <Button3D width={0.28} height={0.065} icon={I.pause} label={autoPause ? 'Oui' : 'Non'} active={autoPause} position={[0.175, 0, 0]} onActivate={() => setSettings({ autoPause: !autoPause })} />
           </Row>
           <Row i={4}>
             <Label text="Compteur de perf." size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
-            <Button3D width={0.28} height={0.065} icon="📈" label={prefs.showFps ? 'Affiché' : 'Masqué'} active={prefs.showFps} position={[0.175, 0, 0]} onActivate={() => setPrefs({ showFps: !prefs.showFps })} />
+            <Button3D width={0.28} height={0.065} icon={I.chart} label={prefs.showFps ? 'Affiché' : 'Masqué'} active={prefs.showFps} position={[0.175, 0, 0]} onActivate={() => setPrefs({ showFps: !prefs.showFps })} />
           </Row>
           <group position={[0, -h / 2 + 0.05, 0.004]}>
-            <Button3D width={0.17} height={0.07} icon="📍" label="Replacer" position={[-0.2, 0, 0]} onActivate={() => { setPanel(null); setPhase('placing'); }} />
-            <Button3D width={0.17} height={0.07} icon="👋" label="Revoir" position={[0, 0, 0]} onActivate={() => { setPrefs({ tutorialDone: false }); useVR.setState({ tutorialStep: 0 }); setPanel(null); }} />
-            <Button3D width={0.2} height={0.07} icon="🆕" label={confirm ? 'Retapez !' : 'Nouvelle'} danger={confirm} position={[0.2, 0, 0]} onActivate={() => { if (confirm) { newGame(); setPanel(null); setConfirm(false); } else setConfirm(true); }} />
+            <Button3D width={0.17} height={0.07} icon={I.pin} label="Replacer" position={[-0.2, 0, 0]} onActivate={() => { setPanel(null); setPhase('placing'); }} />
+            <Button3D width={0.17} height={0.07} icon={I.hand} label="Revoir" position={[0, 0, 0]} onActivate={() => { setPrefs({ tutorialDone: false }); useVR.setState({ tutorialStep: 0 }); setPanel(null); }} />
+            <Button3D width={0.2} height={0.07} icon={I.newGame} label={confirm ? 'Retapez !' : 'Nouvelle'} danger={confirm} position={[0.2, 0, 0]} onActivate={() => { if (confirm) { newGame(); setPanel(null); setConfirm(false); } else setConfirm(true); }} />
           </group>
-          <Button3D width={0.05} height={0.05} icon="✖️" position={[w / 2 - 0.035, h / 2 - 0.035, 0.004]} onActivate={() => setPanel(null)} />
+          <Button3D width={0.05} height={0.05} icon={I.close} position={[w / 2 - 0.035, h / 2 - 0.035, 0.004]} onActivate={() => setPanel(null)} />
         </Panel>
       </group>
     </FacePlayer>
@@ -302,8 +303,8 @@ export function GameOver3D() {
       <Panel width={w} height={h} border={THEME.bad}>
         <Label text="Le village est désert…" size={0.044} position={[0, h / 2 - 0.05, 0]} />
         <Label text="Le dernier habitant a quitté les lieux." size={0.024} color={THEME.dim} position={[0, h / 2 - 0.095, 0]} />
-        {[stat('📅', game.day - 1, 'jours', 0), stat('👥', game.stats.maxPopulation, 'population max', 1), stat('🏗️', game.stats.buildingsBuilt, 'bâtiments', 2), stat('🗡️', game.stats.banditsKilled, 'bandits', 3), stat('🧯', game.stats.firesPutOut, 'feux éteints', 4), stat('⭐', score(game), 'score', 5)]}
-        <Button3D width={0.3} height={0.075} icon="🆕" label="Nouvelle partie" position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => newGame()} />
+        {[stat(I.calendar, game.day - 1, 'jours', 0), stat(I.people, game.stats.maxPopulation, 'population max', 1), stat(I.crane, game.stats.buildingsBuilt, 'bâtiments', 2), stat(I.dagger, game.stats.banditsKilled, 'bandits', 3), stat(I.extinguisher, game.stats.firesPutOut, 'feux éteints', 4), stat(I.star, score(game), 'score', 5)]}
+        <Button3D width={0.3} height={0.075} icon={I.newGame} label="Nouvelle partie" position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => newGame()} />
       </Panel>
     </FacePlayer>
   );
@@ -316,7 +317,7 @@ export function HandsLost({ z }: { z: number }) {
   return (
     <FacePlayer position={[0, 0.14, z]} tilt={0.2}>
       <Panel width={0.2} height={0.07} border={THEME.warn}>
-        <Label text="🖐️❓ 💡 / 🎮" size={0.03} />
+        <Label text={`${I.hand}${I.question} ${I.bulb} / ${I.controller}`} size={0.03} />
       </Panel>
     </FacePlayer>
   );

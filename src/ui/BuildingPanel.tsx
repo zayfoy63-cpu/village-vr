@@ -15,8 +15,10 @@ import {
 import type { Building, Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { CostLine } from './BuildBar';
+import { I } from './icons';
+import { Icon, RichText } from './icons/Icon';
 
-const icons = (keys: (keyof Resources)[]) => keys.map((k) => RESOURCE_META[k].icon).join(' ');
+const icons = (keys: (keyof Resources)[]) => <RichText text={keys.map((k) => RESOURCE_META[k].icon).join(' ')} />;
 
 /** Transformation et équipement : entrée → sortie, blocage, stock plein, outils, marche / arrêt */
 function ChainStatus({ building }: { building: Building }) {
@@ -33,30 +35,34 @@ function ChainStatus({ building }: { building: Building }) {
     <>
       {building.paused ? (
         <div className="bp-alert damaged">
-          <span>⏸ Mis à l'arrêt : ses travailleurs sont affectés ailleurs.</span>
+          <span><Icon id="pause" /> Mis à l'arrêt : ses travailleurs sont affectés ailleurs.</span>
         </div>
       ) : capped ? (
-        <div className="bp-note">📦 Stock plein : en pause automatique (travailleurs libérés).</div>
+        <div className="bp-note"><Icon id="box" /> Stock plein : en pause automatique (travailleurs libérés).</div>
       ) : run?.blocked === 'input' ? (
         <div className="bp-alert fire">
-          <span>⛔ À l'arrêt : manque de {icons(run.missing)} {run.missing.map((k) => RESOURCE_META[k].name.toLowerCase()).join(', ')}.</span>
+          <span><Icon id="forbidden" /> À l'arrêt : manque de {icons(run.missing)} {run.missing.map((k) => RESOURCE_META[k].name.toLowerCase()).join(', ')}.</span>
         </div>
       ) : isProcessor && run && run.ratio < 0.999 && run.missing.length > 0 ? (
         <div className="bp-note warn">
           Tourne à {pct} % : pas assez de {icons(run.missing)}.
         </div>
       ) : null}
-      {run?.blocked === 'workers' && !building.paused && <div className="bp-note warn">👷 Aucun travailleur : bâtiment à l'arrêt.</div>}
+      {run?.blocked === 'workers' && !building.paused && <div className="bp-note warn"><Icon id="worker" /> Aucun travailleur : bâtiment à l'arrêt.</div>}
       {equippable && building.workers > 0 && (
         <div className={`bp-note ${run?.equipped ? 'pos-note' : ''}`}>
-          {run?.equipped
-            ? `🛠️ Équipé d'outils : +${Math.round(CHAINS.tools.bonus * 100)} % de production.`
-            : `🛠️ Sans outils : une forge donnerait +${Math.round(CHAINS.tools.bonus * 100)} %.`}
+          <RichText
+            text={
+              run?.equipped
+                ? `${I.tools} Équipé d'outils : +${Math.round(CHAINS.tools.bonus * 100)} % de production.`
+                : `${I.tools} Sans outils : une forge donnerait +${Math.round(CHAINS.tools.bonus * 100)} %.`
+            }
+          />
         </div>
       )}
       {stats.workers ? (
         <button className="bp-toggle" onClick={() => togglePause(building.id)}>
-          {building.paused ? '▶ Relancer le bâtiment' : '⏸ Mettre à l\'arrêt'}
+          <RichText text={building.paused ? `${I.play} Relancer le bâtiment` : `${I.pause} Mettre à l'arrêt`} />
         </button>
       ) : null}
     </>
@@ -88,13 +94,12 @@ export function BuildingPanel() {
   return (
     <div className="building-panel">
       <div className="bp-head">
-        <span className="bp-icon">{def.icon}</span>
+        <span className="bp-icon"><RichText text={def.icon} /></span>
         <div className="bp-title">
           <strong>{def.name}</strong>
           {max > 1 && (
             <span className="bp-level">
-              Niveau {building.level}/{max} {'★'.repeat(building.level)}
-              {'☆'.repeat(max - building.level)}
+              Niveau {building.level}/{max} <RichText text={I.star.repeat(building.level) + I.starEmpty.repeat(max - building.level)} />
             </span>
           )}
         </div>
@@ -106,10 +111,10 @@ export function BuildingPanel() {
       {building.fire && (
         <div className="bp-alert fire">
           {building.fire.extinguishEnd !== undefined ? (
-            <span>💧 Extinction en cours…</span>
+            <span><Icon id="drop" /> Extinction en cours…</span>
           ) : (
             <>
-              <span>🔥 En feu ! Ne produit plus rien.</span>
+              <span><Icon id="fire" /> En feu ! Ne produit plus rien.</span>
               <button className="primary" onClick={() => extinguish(building.id)}>
                 Éteindre
               </button>
@@ -119,7 +124,7 @@ export function BuildingPanel() {
       )}
       {building.damaged && !building.fire && (
         <div className="bp-alert damaged">
-          <span>🔨 Endommagé : production x{DAMAGED_FACTOR}. Un nouveau dégât le détruira.</span>
+          <span><Icon id="hammer" /> Endommagé : production x{DAMAGED_FACTOR}. Un nouveau dégât le détruira.</span>
           <div className="bp-row">
             <span>Réparation</span>
             <CostLine cost={repairCost(building)} resources={resources} />
@@ -136,18 +141,18 @@ export function BuildingPanel() {
 
       <div className="bp-row">
         <span>Actuellement</span>
-        <strong>{current || def.description}</strong>
+        <strong><RichText text={current || def.description} /></strong>
       </div>
       {stats.workers ? (
         <div className="bp-row">
           <span>Travailleurs</span>
           <strong className={building.workers < stats.workers ? 'warn' : ''}>
-            👷 {building.workers}/{stats.workers}
+            <Icon id="worker" /> {building.workers}/{stats.workers}
           </strong>
         </div>
       ) : null}
       {locked ? (
-        <div className="bp-note">🔒 Se mettra en marche dès que {conditionLabel(levelDef(building.type, building.level).unlock)}.</div>
+        <div className="bp-note"><Icon id="lock" /> Se mettra en marche dès que <RichText text={conditionLabel(levelDef(building.type, building.level).unlock)} />.</div>
       ) : stats.workers && building.workers < stats.workers && !building.paused && !isCapped(game, building) ? (
         <div className="bp-note warn">
           Il manque {stats.workers - building.workers} {stats.workers - building.workers > 1 ? 'travailleurs' : 'travailleur'} :
@@ -162,13 +167,13 @@ export function BuildingPanel() {
             <div className="bp-sep" />
             <div className="bp-row">
               <span>Niveau {building.level + 1}</span>
-              <strong className="pos">{next}</strong>
+              <strong className="pos"><RichText text={next} /></strong>
             </div>
             {check.next.workers ? (
               <div className="bp-row">
                 <span>Travailleurs requis</span>
                 <strong className={check.next.workers > (stats.workers ?? 0) ? 'warn-soft' : ''}>
-                  👷 {check.next.workers}
+                  <Icon id="worker" /> {check.next.workers}
                   {check.next.workers > (stats.workers ?? 0) ? ` (+${check.next.workers - (stats.workers ?? 0)})` : ''}
                 </strong>
               </div>
@@ -178,12 +183,12 @@ export function BuildingPanel() {
               <CostLine cost={check.next.cost} resources={resources} />
             </div>
             <button className="primary bp-upgrade" disabled={!check.ok || !!building.fire} onClick={() => upgrade(building.id)}>
-              ⬆️ Améliorer
+              <Icon id="up" /> Améliorer
             </button>
-            {!check.ok && <div className={`bp-reason ${check.locked ? 'locked' : ''}`}>{check.reason}</div>}
+            {!check.ok && <div className={`bp-reason ${check.locked ? 'locked' : ''}`}><RichText text={check.reason} /></div>}
           </>
         ) : (
-          <div className="bp-note">🏆 Niveau maximum atteint.</div>
+          <div className="bp-note"><Icon id="trophy" /> Niveau maximum atteint.</div>
         ))}
     </div>
   );

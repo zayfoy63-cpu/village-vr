@@ -6,6 +6,7 @@ import { BASE_RESOURCES, MORALE, RESOURCE_KEYS, SAVE_KEY, SAVE_VERSION, START_RE
 import { emptyMech } from './mechanics/common';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
+import { deepLegacyToIcons } from './legacyIcons';
 
 export function saveGame(state: GameState): void {
   try {
@@ -46,10 +47,11 @@ export function migrate(data: GameState): GameState | null {
   const defaults = { maxPopulation: 0, buildingsBuilt: 0, upgrades: 0, eventsSurvived: 0, banditsKilled: 0, firesPutOut: 0 };
   s.stats = { ...defaults, ...(data.stats as Partial<GameState['stats']>) };
   // Les anciennes cartes "trade" (v2) ne sont plus interactives : on les garde comme simple historique
+  // Les textes des anciennes versions contiennent des emojis : convertis en icônes dessinées
   s.notices = (Array.isArray(data.notices) ? data.notices : []).map((n) => {
     const { trade: _old, ...rest } = n as typeof n & { trade?: unknown };
     void _old;
-    return rest;
+    return deepLegacyToIcons(rest);
   });
   s.nextNoticeId = Number(data.nextNoticeId) || s.notices.reduce((m, n) => Math.max(m, n.id + 1), 1);
   s.morale = typeof data.morale === 'number' ? data.morale : MORALE.start;

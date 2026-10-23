@@ -29,6 +29,7 @@ import type {
   PlacementCheck,
   Resources,
 } from './types';
+import { I } from '../ui/icons';
 
 export function emptyResources(): Resources {
   return { food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0 };
@@ -112,7 +113,7 @@ export function findNewUnlocks(state: GameState): { type: BuildingTypeId; level:
 export function canPlace(state: GameState, type: BuildingTypeId, x: number, z: number): PlacementCheck {
   const def = BUILDING_BY_ID[type];
   if (!isUnlocked(state, type)) {
-    return { ok: false, reason: `🔒 Requiert ${conditionLabel(def.levels[0].unlock)}` };
+    return { ok: false, reason: `${I.lock} Requiert ${conditionLabel(def.levels[0].unlock)}` };
   }
   for (let dz = 0; dz < def.size; dz++) {
     for (let dx = 0; dx < def.size; dx++) {
@@ -149,7 +150,7 @@ export function canUpgrade(state: GameState, b: Building): UpgradeCheck {
   if (b.level >= maxLevel(b.type)) return { ok: false, reason: 'Niveau maximum atteint' };
   const next = levelDef(b.type, b.level + 1);
   if (!isUnlocked(state, b.type, b.level + 1)) {
-    return { ok: false, next, locked: true, reason: `🔒 Requiert ${conditionLabel(next.unlock)}` };
+    return { ok: false, next, locked: true, reason: `${I.lock} Requiert ${conditionLabel(next.unlock)}` };
   }
   if (!canAfford(state.resources, next.cost)) return { ok: false, next, reason: 'Ressources insuffisantes' };
   return { ok: true, next };
@@ -409,7 +410,7 @@ export function defensePower(state: GameState): number {
   }, 0);
 }
 
-/** Effet d'un niveau en texte court : "+4 🌾/jour", "+3 places", "Défense +2" */
+/** Effet d'un niveau en texte court : "+4 [blé]/jour", "+3 places", "Défense +2" */
 export function effectLabel(lvl: LevelDef, produces: Partial<Resources> = lvl.produces ?? {}): string {
   const parts: string[] = [];
   if (lvl.housing) parts.push(`+${lvl.housing} places`);
@@ -430,10 +431,10 @@ export function effectLabel(lvl: LevelDef, produces: Partial<Resources> = lvl.pr
   return parts.join(' · ');
 }
 
-/** "👷 2 travailleurs" (vide si le bâtiment n'emploie personne) */
+/** "[travailleurs] 2 travailleurs" (vide si le bâtiment n'emploie personne) */
 export function workersLabel(lvl: LevelDef): string {
   if (!lvl.workers) return '';
-  return `👷 ${lvl.workers} ${lvl.workers > 1 ? 'travailleurs' : 'travailleur'}`;
+  return `${I.worker} ${lvl.workers} ${lvl.workers > 1 ? 'travailleurs' : 'travailleur'}`;
 }
 
 export function score(state: GameState): number {

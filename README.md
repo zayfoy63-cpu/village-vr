@@ -22,7 +22,7 @@ npm run build     # vérification TypeScript + build de production dans dist/
 | Détails / amélioration | clic sur un bâtiment existant |
 | Construire | clic sur une case (aperçu vert = possible, rouge = impossible) |
 | Annuler la sélection | clic droit ou Échap |
-| Pause / reprise | Espace, ou boutons ⏸ / x0,5 / x1 / x2 |
+| Pause / reprise | Espace, ou boutons pause / x0,5 / x1 / x2 |
 | Intercepter un bandit | clic sur le bandit (les gardes sortent des tours) |
 | Renforcer un bâtiment | clic dessus pendant un orage ou une crue (coût en bois) |
 
@@ -33,28 +33,29 @@ src/
 ├─ game/            Logique pure TypeScript (aucun import React / Three)
 │  ├─ types.ts        Types partagés
 │  ├─ config.ts       Constantes (durée du jour, saisons, ressources de départ…)
-│  ├─ buildings.ts    ⭐ Tableau de configuration des bâtiments
-│  ├─ events.ts       ⭐ Tableau de configuration des événements
+│  ├─ buildings.ts    * Tableau de configuration des bâtiments
+│  ├─ events.ts       * Tableau de configuration des événements
 │  ├─ mapgen.ts       Génération de carte à partir d'une seed
 │  ├─ rules.ts        Placement, travailleurs, production, score
 │  ├─ simulation.ts   Temps qui passe, journée, construction, choix, réparations
 │  ├─ hazards.ts      Actions du joueur sur les dangers (éteindre, gardes, renforts) + délais de choix
 │  ├─ realtime.ts     Bandits, gardes, orage et crue en temps réel (trajets déterministes)
-│  ├─ seasons.ts      ⭐ Effets cachés des saisons, météo, nuit
-│  ├─ mechanics/      ⭐ Mécaniques cachées (un fichier chacune) + registre
-│  ├─ parcels.ts      ⭐ Parcelles : découpage, prix, contenu, camps de bandits et ruines
+│  ├─ seasons.ts      * Effets cachés des saisons, météo, nuit
+│  ├─ mechanics/      * Mécaniques cachées (un fichier chacune) + registre
+│  ├─ parcels.ts      * Parcelles : découpage, prix, contenu, camps de bandits et ruines
 │  ├─ rng.ts          PRNG déterministe (état sauvegardé)
 │  └─ save.ts         Sauvegarde localStorage (try/catch)
 ├─ store/gameStore.ts Zustand : relie logique, rendu et UI
 ├─ scene/           Rendu React Three Fiber (low-poly, flat shading, instancing)
 │  ├─ models/         Un modèle par bâtiment + registre MODELS
 │  └─ xr.ts           Store WebXR (réalité mixte immersive-ar)
-├─ vr/              ⭐ Mode VR / réalité mixte (Quest 3) : interface 100 % 3D, voir « Passage en VR »
-│  ├─ config.ts       ⭐ Tous les réglages VR (tailles, tolérances, vitesses, coûts de déplacement, perf)
+├─ vr/              * Mode VR / réalité mixte (Quest 3) : interface 100 % 3D, voir « Passage en VR »
+│  ├─ config.ts       * Tous les réglages VR (tailles, tolérances, vitesses, coûts de déplacement, perf)
 │  ├─ store.ts        État VR (plateau, entrée mains/manettes, panneaux, préférences)
 │  ├─ ui/             Éléments d'interface en 3D (HUD, boîte de construction, cartes, panneaux…) + kit.tsx
 │  └─ …               Placement (hit-test), glisser-déposer, entrées, session, perf, émulateur
 └─ ui/              HUD, barre de construction, notifications, fin de partie (version PC)
+   └─ icons/          * Icônes dessinées (SVG), partagées par l'interface PC et l'atlas VR
 ```
 
 ### Progression
@@ -71,11 +72,11 @@ Tout est réglable dans `src/game/buildings.ts` :
 
 ### Chaînes de production (`game/buildings.ts`, réglages dans `CHAINS`)
 Débloquées progressivement (onglet **Artisanat**, visible au premier déblocage) :
-- Nourriture : Champ (🌾 blé) → **Moulin** (🥣 farine, dès 8 habitants ; le moulin de départ se met en marche)
-  → **Boulangerie** (🍞 pain, dès 10). Les habitants mangent le pain d'abord : 1 pain = 3 rations.
-- Bois : Cabane de bûcheron → **Scierie** (🪚 planches, dès 12).
-- Fer : **Mine** (🔩 minerai, touche des rochers, dès 15 ; améliorable niveaux 2 et 3) → **Forge** (🛠️ outils, dès 20 + 1 mine) ;
-  forge niveau 2 : ⚔️ armes (défense contre les bandits).
+- Nourriture : Champ (blé) → **Moulin** (farine, dès 8 habitants ; le moulin de départ se met en marche)
+  → **Boulangerie** (pain, dès 10). Les habitants mangent le pain d'abord : 1 pain = 3 rations.
+- Bois : Cabane de bûcheron → **Scierie** (planches, dès 12).
+- Fer : **Mine** (minerai, touche des rochers, dès 15 ; améliorable niveaux 2 et 3) → **Forge** (outils, dès 20 + 1 mine) ;
+  forge niveau 2 : armes (défense contre les bandits).
 - Outils : équipent automatiquement champs, bûcherons, carrières et mines (+30 %, usure 0,1/bâtiment/jour).
 - Maisons bourgeoises, manoirs et niveaux 3 demandent des planches et/ou des outils.
 - Les recettes (`consumes` → `produces`) sont dans les niveaux des bâtiments ; un transformateur s'arrête seul
@@ -84,13 +85,13 @@ Débloquées progressivement (onglet **Artisanat**, visible au premier déblocag
   bâtiment à l'arrêt (rouge : matière première, orange : travailleurs).
 
 ### Décisions
-- Pause automatique quand une carte à choix apparaît (désactivable dans ⚙️ Paramètres) ; reprise après la décision.
+- Pause automatique quand une carte à choix apparaît (désactivable dans Paramètres) ; reprise après la décision.
 - Chaque option affiche ses conséquences chiffrées ; les événements annoncés sont listés dans « Menaces à venir ».
 
 ### Parcelles (`game/parcels.ts`, réglages dans `PARCELS`)
 - La carte est découpée en 4 × 3 parcelles ; seules les 2 parcelles centrales sont possédées au départ.
 - Les parcelles verrouillées sont assombries et couvertes d'un brouillard léger, avec une pastille : prix
-  (ou 🔒 si trop loin) et aperçu du contenu (🌲 forêt, 🪨 rochers, 🌼 terre fertile, 🌊 rivière, ⛺ camp, 🏛️ ruines).
+  (ou un cadenas si trop loin) et aperçu du contenu (forêt, rochers, terre fertile, rivière, camp, ruines).
 - Achat d'une parcelle voisine en cliquant dessus : prix en or croissant (10 × 1,45ⁿ) et habitants requis à partir du 3e achat.
 - Dangers générés avec la seed : **camp de bandits** (attaques plus fréquentes tant qu'il existe, à détruire au combat
   pour un butin) et **ruines** (bloquent 2 cases, à déblayer contre du bois : trésor, risque d'éboulement).
@@ -123,12 +124,12 @@ incendies, bandits, variations de moral, révolte, hiver rude, grands événemen
     leurs gardes seules sur les bandits à portée. Attrapé : butin rendu + or ; enfui : ressources perdues.
     Nombre et vitesse augmentent avec la sévérité. La carte « Bandits » propose aussi rançon ou charge générale.
   - **Orage** (`TUNING.storm`) : un nuage sombre se forme au bord (`warningTime`), puis traverse la carte avec son
-    ombre au sol. Pendant l'approche : renforcer un bâtiment (clic, 4 🪵), rentrer les villageois (pas de blessés,
+    ombre au sol. Pendant l'approche : renforcer un bâtiment (clic, 4 bois), rentrer les villageois (pas de blessés,
     production réduite), protéger les récoltes. Sous le nuage : pluie, éclairs (incendies), dégâts sur ce qui
     n'est pas renforcé.
   - **Crue** (`TUNING.flood`, déclenchée par la mécanique cachée « La rivière ») : l'eau monte progressivement le
     long de la rivière ; les bâtiments menacés sont entourés d'un cercle bleu jusqu'au pic (sacs de sable : clic,
-    3 🪵) ; un champ non protégé est détruit.
+    3 bois) ; un champ non protégé est détruit.
   - **Incendie** : clic sur le bâtiment pour l'éteindre, sinon propagation puis destruction. Neige en hiver.
 - **Autres** : sécheresse, bonne récolte, nouveaux arrivants (les rats et la crue sont devenus des mécaniques cachées).
 - **Bâtiments endommagés** : production x0,5 tant qu'ils ne sont pas réparés (panneau du bâtiment) ; un second
@@ -150,7 +151,7 @@ Rien n'est affiché en jeu : le joueur le devine au décor (couleurs, pluie, nei
 
 La nuit tombe à 80 % de la journée (68 % en hiver) : la lumière baisse et bleuit.
 
-### Mécaniques cachées (`game/mechanics/`) — ⚠️ solutions
+### Mécaniques cachées (`game/mechanics/`) — attention : solutions
 Chaque mécanique est un fichier avec sa config `{ conditions, hint, effect, solution }` et ses crochets
 (`endOfDay`, `startOfDay`, `due`/`update` en temps réel). Pour en ajouter une : un fichier dans ce dossier, son id dans
 `MechanicId` (`types.ts`) et une ligne dans `MECHANICS` (`mechanics/index.ts`). **Aucune solution n'est écrite en jeu** :
@@ -162,7 +163,7 @@ seulement des indices visuels, et des descriptions de bâtiments volontairement 
 | Épuisement des sols (`soil.ts`) | champ cultivé : +0,02 / jour | cultures qui jaunissent | jusqu'à −50 % de production | **jachère** (mettre le champ à l'arrêt : −0,1 / jour) ou **Bergerie** à moins de 2 cases (fumier) |
 | Froid (`cold.ts`) | hiver : bois par habitation (château 0,6, cabane 0,3, maison 0,45…) | cheminées sans fumée, villageois qui tremblent | 3 jours sans bois : 15 % de malades ; 6 jours : morts | **stocker du bois** à l'automne |
 | Propagation du feu (`fire.ts`) | maisons collées ; l'été, quartier entassé (≥ 2 voisins) : 5 % / jour | escarbilles au-dessus des maisons entassées l'été | feu en chaîne | **espacer**, ou **Puits** à moins de 3 cases (propagation x0,3, extinction 2x plus rapide) |
-| Rats (`rats.ts`) | plus de 40 🌾 hors des greniers | petits points gris autour du château | après 5 jours : 20 % de l'excédent dévoré (+5 %/sévérité) | **Grenier** assez grand |
+| Rats (`rats.ts`) | plus de 40 blé hors des greniers | petits points gris autour du château | après 5 jours : 20 % de l'excédent dévoré (+5 %/sévérité) | **Grenier** assez grand |
 | Maladie (`disease.ts`) | sans-abri, maisons collées à ≥ 3 bâtiments, puits à < 2,5 cases du **cimetière** | villageois plus lents et plus pâles | fièvre : 8 % des habitants emportés | **Herboriste**, espacer, éloigner le puits des tombes |
 | Éclaireur (`scout.ts`) | chaque attaque annoncée | silhouette immobile au bord de la carte | l'attaque a lieu | **cliquer dessus** : un garde l'attrape, l'attaque est annulée |
 | Déforestation (`deforestation.ts`) | bûcherons : −0,003 de forêt par bois produit | arbres qui se clairsèment, souches | bûcherons moins productifs ; > 35 % abattus : crues plus fortes et plus larges | laisser repousser (+0,006 / jour près d'une forêt saine) |
@@ -172,10 +173,10 @@ seulement des indices visuels, et des descriptions de bâtiments volontairement 
 Le cimetière apparaît de lui-même après les premiers décès, une stèle par mort.
 
 ### Chronique du village (`store/chronicle.ts`, `ui/Chronicle.tsx`)
-- La première fois qu'une mécanique frappe, une page vague s'ajoute (petit message « 📜 Une page s'ajoute… »).
+- La première fois qu'une mécanique frappe, une page vague s'ajoute (petit message « Une page s'ajoute… »).
 - Quand le joueur applique la bonne solution, même par hasard, la page se complète (dans n'importe quelle partie).
 - Sauvegardée à part dans `localStorage` (`village-vr-chronicle`), donc conservée entre les parties ; bouton
-  « 📜 Chronique 3/10 » dans le menu.
+  « Chronique 3/10 » dans le menu.
 
 ### Logique en temps réel
 `simulation.ts` → `advanceTime(state, dt)` fait avancer le temps de jeu continu (jour + avancement) ;
@@ -220,14 +221,28 @@ tutoriel, vibrations. Les préférences du joueur (main dominante, assis/debout,
 | Pause / menu | sablier (toucher), engrenage | X / Y |
 | Aide | regarder l'intérieur du poignet gauche | regarder la manette gauche |
 
-Bascule mains ↔ manettes automatique. Retrait du casque ou fin de session : pause + sauvegarde.
+Bascule mains / manettes automatique. Retrait du casque ou fin de session : pause + sauvegarde.
 
 ### Tester sans casque (Immersive Web Emulator / IWER)
 - `npm run dev` puis ouvrir `http://localhost:5173/?emulate=controller` (ou `?emulate=hands`) : un Quest 3 virtuel est
-  installé dans la page (`src/vr/emulator.ts`, salon simulé avec table). Cliquer sur **🥽 Réalité mixte**.
+  installé dans la page (`src/vr/emulator.ts`, salon simulé avec table). Cliquer sur **Réalité mixte**.
 - `?ui3d` affiche l'interface 3D VR sur PC (aperçu à la souris, sans casque).
 - En mode dev, `window.__xrDevice` pilote le casque et les contrôleurs émulés (voir les scripts de test du dépôt de travail :
   visée, gâchette, pincement, doigt posé sur un point).
+
+### Icônes (`src/ui/icons/`)
+Aucun emoji dans le jeu : leur affichage dépend des polices du système (carrés vides sous Windows pour les plus
+récents). Toutes les icônes (ressources, bâtiments, événements, HUD, Chronique, paramètres, aide VR) sont dessinées
+dans `ui/icons/defs.ts`, en polygones colorés à fin contour sombre, dans un repère 24 x 24.
+- Dans les textes, une icône est un **jeton** : `` `${I.wood} Bois` `` (`I` exporté par `ui/icons`). Les données du jeu
+  (ressources, bâtiments, notifications, conséquences des choix) ne contiennent que des jetons.
+- PC : `<RichText text={…} />` (`ui/icons/Icon.tsx`) remplace chaque jeton par un SVG ; `<Icon id="wood" />` pour une
+  icône seule. Les icônes de ressources montrent leur nom au survol. Pour un attribut `title`, `plainText(texte)`.
+- VR : l'atlas de caractères dessine chaque icône une seule fois avec les mêmes tracés (aucune texture en plus) ;
+  le présentoir affiche le nom d'une ressource au survol de son icône.
+- Conséquences des choix toujours écrites « icône + chiffre + nom » (`−15 Bois`, `−5 Moral`).
+- Les anciennes sauvegardes (avec emojis) sont converties au chargement (`game/legacyIcons.ts`).
+- Ajouter une icône : une entrée dans `ICON_DEFS` ; elle est aussitôt disponible en `I.monIcone` et `<Icon id>`.
 
 ### Performances VR (objectif Quest 3 : 72 images/s)
 Mesure de référence (émulateur, même partie de 35 bâtiments, pluie + nuit + bandits + 2 incendies) :

@@ -5,6 +5,7 @@
 import { seasonOf } from '../config';
 import type { Building, GameState } from '../types';
 import { type Mechanic, center, memo, solve, strike, within } from './common';
+import { I } from '../../ui/icons';
 
 export const SOIL = {
   conditions: {
@@ -48,7 +49,7 @@ function manured(state: GameState, b: Building): boolean {
 
 export const soil: Mechanic<typeof SOIL> = {
   id: 'soil',
-  icon: '🌾',
+  icon: I.wheat,
   title: 'La terre fatiguée',
   page: 'Les blés ont jauni avant l\'heure et les épis sont maigres. On dirait que la terre elle-même est lasse.',
   solvedPage: 'Un champ qui se repose, ou qu\'on nourrit, retrouve sa vigueur. Les bêtes ont du bon.',

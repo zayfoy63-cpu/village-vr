@@ -12,6 +12,7 @@ import { feedback } from '../feedback';
 import { BOX, boxCenter } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer } from './kit';
+import { I } from '../../ui/icons';
 
 const ghostMat = new THREE.MeshBasicMaterial({ color: '#8fe3ff', transparent: true, opacity: 0.5, depthWrite: false });
 const tileMat = new THREE.MeshBasicMaterial({ color: '#7ee081', transparent: true, opacity: 0.45, depthWrite: false });
@@ -169,7 +170,7 @@ export function Tutorial3D() {
       {/* Seul texte : « Passer » (les points indiquent la progression) */}
       <FacePlayer position={[0, 0.02, 7 * scale + 0.32]} tilt={0.8}>
         <group>
-          <Button3D width={0.16} height={0.06} icon="⏭" label="Passer" onActivate={() => useVR.getState().skipTutorial()} />
+          <Button3D width={0.16} height={0.06} icon={I.skip} label="Passer" onActivate={() => useVR.getState().skipTutorial()} />
           {VR_CONFIG.help.steps.map((s, i) => (
             <mesh key={s} position={[(i - 1.5) * 0.03, 0.05, 0]}>
               <circleGeometry args={[0.008, 10]} />

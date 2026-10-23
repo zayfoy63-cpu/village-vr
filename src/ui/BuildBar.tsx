@@ -5,6 +5,8 @@ import { tileAt } from '../game/mapgen';
 import { canAfford, canPlace, conditionLabel, effectLabel, isUnlocked, workersLabel } from '../game/rules';
 import type { GameState, Resources } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { I, plainText } from './icons';
+import { RichText } from './icons/Icon';
 
 const TAB_KEY = 'village-vr-build-tab';
 
@@ -13,8 +15,8 @@ export function CostLine({ cost, resources }: { cost: Partial<Resources>; resour
     <span className="build-cost">
       {RESOURCE_KEYS.filter((k) => cost[k]).map((k) => (
         <span key={k} className={resources[k] >= (cost[k] ?? 0) ? '' : 'missing'}>
+          <RichText text={RESOURCE_META[k].icon} />
           {cost[k]}
-          {RESOURCE_META[k].icon}
         </span>
       ))}
     </span>
@@ -99,9 +101,13 @@ export function BuildBar() {
     <div className="buildbar-wrap">
       {selected && (
         <div className={`build-hint ${reason ? 'ko' : 'ok'}`}>
-          {reason
-            ? `⚠️ ${reason}`
-            : `${BUILDING_BY_ID[selected].icon} ${BUILDING_BY_ID[selected].name}${fertile ? ' — 🌼 zone fertile x1,75 !' : ''} — clic pour construire · Échap pour annuler`}
+          <RichText
+            text={
+              reason
+                ? `${I.warning} ${reason}`
+                : `${BUILDING_BY_ID[selected].icon} ${BUILDING_BY_ID[selected].name}${fertile ? ` — ${I.flower} zone fertile x1,75 !` : ''} — clic pour construire · Échap pour annuler`
+            }
+          />
         </div>
       )}
       <div className="build-tabs" role="tablist">
@@ -116,7 +122,7 @@ export function BuildBar() {
               onClick={() => setTab(t.id)}
               title="Tab : onglet suivant"
             >
-              <span>{t.icon}</span>
+              <span><RichText text={t.icon} /></span>
               <span className="build-tab-label">{t.label}</span>
             </button>
           );
@@ -134,19 +140,19 @@ export function BuildBar() {
               className={`build-btn ${selected === def.id ? 'active' : ''} ${affordable ? '' : 'poor'} ${open ? '' : 'locked'}`}
               aria-disabled={!open}
               onClick={() => open && select(selected === def.id ? null : def.id)}
-              title={`${def.description}${def.levels.length > 1 ? ` Améliorable jusqu'au niveau ${def.levels.length}.` : ''}`}
+              title={`${plainText(def.description)}${def.levels.length > 1 ? ` Améliorable jusqu'au niveau ${def.levels.length}.` : ''}`}
             >
               <span className="build-key">{i + 1}</span>
-              <span className="build-icon">{open ? def.icon : '🔒'}</span>
+              <span className="build-icon"><RichText text={open ? def.icon : I.lock} /></span>
               <span className="build-name">{def.name}</span>
               <CostLine cost={cost} resources={resources} />
               {open ? (
                 <>
-                  <span className="build-effect">{effectLabel(lvl)}</span>
-                  {lvl.workers ? <span className="build-workers">{workersLabel(lvl)}</span> : null}
+                  <span className="build-effect"><RichText text={effectLabel(lvl)} /></span>
+                  {lvl.workers ? <span className="build-workers"><RichText text={workersLabel(lvl)} /></span> : null}
                 </>
               ) : (
-                <span className="build-lock">{conditionLabel(lvl.unlock)}</span>
+                <span className="build-lock"><RichText text={conditionLabel(lvl.unlock)} /></span>
               )}
             </button>
           );

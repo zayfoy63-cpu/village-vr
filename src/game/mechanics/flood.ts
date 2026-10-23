@@ -11,6 +11,7 @@ import { pushNotice } from '../stateUtils';
 import type { Building, GameState } from '../types';
 import { type Mechanic, center, solve, strike, within } from './common';
 import { DEFORESTATION, deforestedRatio } from './deforestation';
+import { I } from '../../ui/icons';
 
 export const FLOOD = {
   conditions: {
@@ -77,7 +78,7 @@ export function onFloodPeak(state: GameState, lost: number) {
 
 export const flood: Mechanic<typeof FLOOD> = {
   id: 'flood',
-  icon: '🌊',
+  icon: I.flood,
   title: 'La rivière',
   page: 'Après des jours de pluie, la rivière a pris une couleur de boue et s\'est gonflée. Puis elle est sortie de son lit et a emporté ce qui la bordait.',
   solvedPage: 'La rivière a grondé, mais n\'a rien pris cette fois : ce qui reste loin des berges, ou derrière un bon talus, ne craint rien.',
@@ -93,6 +94,6 @@ export const flood: Mechanic<typeof FLOOD> = {
     const f = startFlood(state, now + rng.range(0.05, 0.25), false);
     f.threatened = zone.threatened;
     f.saved = zone.saved;
-    pushNotice(state, { kind: 'bad', icon: '🌊', title: 'Crue', text: 'La rivière sort de son lit !' });
+    pushNotice(state, { kind: 'bad', icon: I.flood, title: 'Crue', text: 'La rivière sort de son lit !' });
   },
 };

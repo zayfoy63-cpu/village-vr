@@ -7,6 +7,7 @@ import { BUILDING_BY_ID } from '../buildings';
 import { addMorale, loseVillagers, TUNING } from '../events';
 import { pushNotice } from '../stateUtils';
 import { type Mechanic, memo, solve, strike } from './common';
+import { I } from '../../ui/icons';
 
 export const MINE = {
   conditions: {
@@ -35,7 +36,7 @@ export const MINE = {
 
 export const mine: Mechanic<typeof MINE> = {
   id: 'mine',
-  icon: '⛏️',
+  icon: I.pickaxe,
   title: 'Le grondement',
   page: 'La mine tremblait depuis des jours, et la poussière sortait par la bouche des galeries. Puis le sol a grondé.',
   solvedPage: 'De bonnes planches calées sous la voûte, et la montagne se tient tranquille.',
@@ -64,7 +65,7 @@ export const mine: Mechanic<typeof MINE> = {
       strike(state, 'mine');
       pushNotice(state, {
         kind: 'bad',
-        icon: '⛏️',
+        icon: I.pickaxe,
         title: BUILDING_BY_ID.mine.name,
         text: `Un grondement sourd, un nuage de poussière : la galerie s'est effondrée${dead ? ` sur ${dead} ${dead > 1 ? 'mineurs' : 'mineur'}` : ''}.`,
       });

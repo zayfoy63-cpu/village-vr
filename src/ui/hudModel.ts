@@ -13,6 +13,7 @@ import {
 import { computeNet, housingCapacity, injuredCount, jobsCapacity } from '../game/rules';
 import type { ResourceKey } from '../game/types';
 import { useGame } from '../store/gameStore';
+import { I } from './icons';
 
 export interface ResourceChip {
   key: ResourceKey;
@@ -31,7 +32,7 @@ export interface HudModel {
   working: number;
   injured: number;
   morale: number;
-  moraleEmoji: string;
+  moraleIcon: string;
   seasonIcon: string;
   seasonName: string;
   dayInSeason: number;
@@ -39,12 +40,12 @@ export interface HudModel {
   day: number;
 }
 
-export function moraleEmoji(m: number): string {
-  if (m < MORALE.revoltBelow) return '🤬';
-  if (m < MORALE.leaveBelow) return '😠';
-  if (m < MORALE.lowProduction) return '😟';
-  if (m < 70) return '🙂';
-  return '😄';
+export function moraleIcon(m: number): string {
+  if (m < MORALE.revoltBelow) return I.furious;
+  if (m < MORALE.leaveBelow) return I.angry;
+  if (m < MORALE.lowProduction) return I.worried;
+  if (m < 70) return I.smile;
+  return I.happy;
 }
 
 /** Re-calculé seulement quand ressources, bâtiments, population ou jour changent (pas à chaque image) */
@@ -64,7 +65,7 @@ export function useHudModel(): HudModel {
     working: Math.min(data.population, jobs),
     injured: injuredCount(game),
     morale: Math.round(data.morale),
-    moraleEmoji: moraleEmoji(data.morale),
+    moraleIcon: moraleIcon(data.morale),
     seasonIcon: season.icon,
     seasonName: season.name,
     dayInSeason: dayInSeason(data.day),

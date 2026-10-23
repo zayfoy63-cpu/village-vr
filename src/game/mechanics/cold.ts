@@ -8,6 +8,7 @@ import { addMorale, loseVillagers } from '../events';
 import { pushNotice } from '../stateUtils';
 import type { BuildingTypeId, GameState } from '../types';
 import { type Mechanic, memo, solve, strike } from './common';
+import { I } from '../../ui/icons';
 
 export const COLD = {
   conditions: {
@@ -41,7 +42,7 @@ export function heatingNeed(state: GameState): number {
 
 export const cold: Mechanic<typeof COLD> = {
   id: 'cold',
-  icon: '❄️',
+  icon: I.winter,
   title: 'Les nuits blanches',
   page: 'Un matin d\'hiver, plus une cheminée ne fumait. Les enfants grelottaient et les toux ont commencé.',
   solvedPage: 'Un hiver entier sans que les foyers s\'éteignent : les piles de bûches de l\'automne ont tenu jusqu\'au dégel.',
@@ -71,7 +72,7 @@ export const cold: Mechanic<typeof COLD> = {
         strike(state, 'cold');
         pushNotice(state, {
           kind: 'bad',
-          icon: '🤧',
+          icon: I.sick,
           title: 'Toux et fièvres',
           text: `${sick} ${sick > 1 ? 'villageois gardent' : 'villageois garde'} le lit${dead ? ', et un ancien ne s\'est pas réveillé' : ''}.`,
         });

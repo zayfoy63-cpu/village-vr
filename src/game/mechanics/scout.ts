@@ -6,6 +6,7 @@ import { TUNING } from '../events';
 import { pushNotice } from '../stateUtils';
 import type { GameState, Point } from '../types';
 import { type Mechanic, center, dist, solve, strike } from './common';
+import { I } from '../../ui/icons';
 
 export const SCOUT = {
   conditions: {
@@ -54,7 +55,7 @@ export function chaseScout(state: GameState, t: number): string | null {
 
 export const scout: Mechanic<typeof SCOUT> = {
   id: 'scout',
-  icon: '👁️',
+  icon: I.eye,
   title: 'La silhouette',
   page: 'La veille de l\'attaque, quelqu\'un se tenait immobile à la lisière. Personne n\'y a prêté attention.',
   solvedPage: 'L\'homme de la lisière a été pris avant de pouvoir rapporter ce qu\'il avait vu. Sa bande n\'est jamais venue.',
@@ -88,7 +89,7 @@ export const scout: Mechanic<typeof SCOUT> = {
     solve(state, 'scout');
     pushNotice(state, {
       kind: 'good',
-      icon: '👁️',
+      icon: I.eye,
       title: 'L\'homme de la lisière',
       text: 'On ramène un inconnu qui épiait le village. Les jours suivants, personne ne vient.',
     });

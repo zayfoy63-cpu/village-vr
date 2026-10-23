@@ -1,11 +1,13 @@
 // Atlas unique de caractères pour toute l'interface 3D : chaque caractère (lettres accentuées,
-// chiffres, emojis…) est dessiné une seule fois en blanc sur un grand canvas partagé, puis tous les
-// textes sont des quadrilatères qui pointent dans cet atlas. Couleur du texte = couleur de sommet.
+// chiffres) est dessiné une seule fois en blanc sur un grand canvas partagé, et chaque icône du jeu
+// (src/ui/icons, jetons dans les textes) une seule fois en couleur. Tous les textes sont des
+// quadrilatères qui pointent dans cet atlas. Couleur du texte = couleur de sommet.
 // Une seule texture, quel que soit le nombre de textes affichés.
 
 import * as THREE from 'three';
+import { drawIcon, iconOf } from '../../ui/icons';
 
-export const FONT = "system-ui, 'Segoe UI', Roboto, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+export const FONT = "system-ui, 'Segoe UI', Roboto, 'Noto Sans', sans-serif";
 
 /** Taille de police dans l'atlas (pixels par em) */
 const BASE = 64;
@@ -25,11 +27,13 @@ export interface Glyph {
   h: number;
   ox: number;
   oy: number;
-  /** Emoji en couleur : pas teinté */
-  emoji: boolean;
+  /** Icône du jeu (couleurs propres) : pas teintée */
+  colored: boolean;
 }
 
-const EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+/** Icônes du jeu (jetons) : taille et avance en em */
+const ICON_SIZE = 1.08;
+const ICON_ADVANCE = 1.2;
 
 // Créé à la première utilisation (la version PC sans interface 3D n'en a pas besoin)
 let ctx: CanvasRenderingContext2D;
@@ -87,6 +91,8 @@ const measureCtx = document.createElement('canvas').getContext('2d')!;
 
 /** Avance d'un caractère, en em */
 export function advance(ch: string, weight: number): number {
+  // Icône du jeu : un carré d'un peu plus d'un em
+  if (iconOf(ch)) return ICON_ADVANCE;
   const key = `${weight}|${ch}`;
   let a = advances.get(key);
   if (a === undefined) {
@@ -100,7 +106,7 @@ export function advance(ch: string, weight: number): number {
 const segmenter = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter('fr', { granularity: 'grapheme' }) : null;
 const splitCache = new Map<string, string[]>();
 
-/** Découpe en caractères visibles (un emoji composé reste entier) */
+/** Découpe en caractères visibles (une lettre accentuée composée reste entière) */
 export function graphemes(text: string): string[] {
   let out = splitCache.get(text);
   if (!out) {
@@ -123,10 +129,12 @@ export function lineWidth(text: string, weight: number): number {
 /** Caractère dans l'atlas (dessiné à la première demande) ; `outline` = liseré sombre */
 export function glyph(ch: string, weight: number, outline: boolean): Glyph {
   atlasTexture();
-  const key = `${weight}|${outline ? 1 : 0}|${ch}`;
+  const icon = iconOf(ch);
+  // Une icône est dessinée une seule fois, quel que soit le style du texte qui l'entoure
+  const key = icon ? `icon|${ch}` : `${weight}|${outline ? 1 : 0}|${ch}`;
   const hit = glyphs.get(key);
   if (hit) return hit;
-  const stroke = outline ? BASE * 0.14 : 0;
+  const stroke = outline && !icon ? BASE * 0.14 : 0;
   const adv = advance(ch, weight) * BASE;
   const cw = Math.ceil(adv + stroke + PAD * 2);
   const ch_ = Math.ceil(BASE * 1.3 + stroke + PAD * 2);
@@ -146,17 +154,23 @@ export function glyph(ch: string, weight: number, outline: boolean): Glyph {
   shelfH = Math.max(shelfH, ch_);
   const ox = PAD + stroke / 2;
   const oy = ch_ / 2;
-  ctx.font = fontOf(weight);
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  if (outline) {
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = stroke;
-    ctx.strokeStyle = 'rgba(15,10,5,0.75)';
-    ctx.strokeText(ch, x + ox, y + oy);
+  if (icon) {
+    // Icône du jeu : dessin vectoriel (mêmes tracés que les SVG de l'interface PC)
+    const size = ICON_SIZE * BASE;
+    drawIcon(ctx, icon, x + ox + (adv - size) / 2, y + oy - size / 2, size);
+  } else {
+    ctx.font = fontOf(weight);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    if (outline) {
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = stroke;
+      ctx.strokeStyle = 'rgba(15,10,5,0.75)';
+      ctx.strokeText(ch, x + ox, y + oy);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(ch, x + ox, y + oy);
   }
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(ch, x + ox, y + oy);
   dirty = true;
   const g: Glyph = {
     u0: x / SIZE,
@@ -167,7 +181,7 @@ export function glyph(ch: string, weight: number, outline: boolean): Glyph {
     h: ch_ / BASE,
     ox: ox / BASE,
     oy: oy / BASE,
-    emoji: EMOJI.test(ch),
+    colored: !!icon,
   };
   glyphs.set(key, g);
   return g;

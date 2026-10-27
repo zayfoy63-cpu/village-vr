@@ -260,13 +260,15 @@ export interface ButtonProps {
   onHover?: (hover: boolean) => void;
   /** Action importante : sceau de cire */
   seal?: boolean;
+  /** Identifiant pour les tests (sinon le libellé ou l'icône) */
+  testId?: string;
 }
 
 /**
  * Bouton 3D : surbrillance + léger agrandissement au survol, petit « tap » à l'appui, son et
  * vibration. La zone sensible dépasse le dessin (tolérance en mode mains).
  */
-export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActivate, disabled, active, danger, locked, position, onHover, seal }: ButtonProps) {
+export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActivate, disabled, active, danger, locked, position, onHover, seal, testId }: ButtonProps) {
   const [hover, setHover] = useState(false);
   const group = useRef<THREE.Group>(null);
   const press = useRef(0);
@@ -348,7 +350,7 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
         {/* Zone sensible agrandie (invisible) */}
         <mesh
           position={[0, 0, 0.003]}
-          userData={{ testId: label ?? icon }}
+          userData={{ testId: testId ?? label ?? icon }}
           onPointerOver={over}
           onPointerOut={out}
           onClick={(e) => {

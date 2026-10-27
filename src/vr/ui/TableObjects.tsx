@@ -246,7 +246,6 @@ export function Settings3D({ z }: { z: number }) {
   const setPanel = useVR((s) => s.setPanel);
   const prefs = useVR((s) => s.prefs);
   const setPrefs = useVR((s) => s.setPrefs);
-  const setPhase = useVR((s) => s.setPhase);
   const autoPause = useGame((s) => s.settings.autoPause);
   const setSettings = useGame((s) => s.setSettings);
   const newGame = useGame((s) => s.newGame);
@@ -288,7 +287,7 @@ export function Settings3D({ z }: { z: number }) {
             <Button3D width={0.28} height={0.065} icon={I.chart} label={prefs.showFps ? 'Affiché' : 'Masqué'} active={prefs.showFps} position={[0.175, 0, 0]} onActivate={() => setPrefs({ showFps: !prefs.showFps })} />
           </Row>
           <group position={[0, -h / 2 + 0.05, 0.004]}>
-            <Button3D width={0.17} height={0.07} icon={I.pin} label="Replacer" position={[-0.2, 0, 0]} onActivate={() => { setPanel(null); setPhase('placing'); }} />
+            <Button3D width={0.17} height={0.07} icon={I.pin} label="Recentrer" sub="devant moi" position={[-0.2, 0, 0]} onActivate={() => { setPanel(null); useVR.getState().recenter(); }} />
             <Button3D width={0.17} height={0.07} icon={I.hand} label="Revoir" position={[0, 0, 0]} onActivate={() => { setPrefs({ tutorialDone: false }); useVR.setState({ tutorialStep: 0 }); setPanel(null); }} />
             <Button3D width={0.2} height={0.07} icon={I.newGame} label={confirm ? 'Retapez !' : 'Nouvelle'} danger={confirm} position={[0.2, 0, 0]} onActivate={() => { if (confirm) { newGame(); setPanel(null); setConfirm(false); } else setConfirm(true); }} />
           </group>

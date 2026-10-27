@@ -4,7 +4,7 @@ import { xrStore } from '../scene/xr';
 import { VR_CONFIG } from './config';
 import { useVR, type Hand } from './store';
 
-export type FeedbackKind = 'hover' | 'click' | 'grab' | 'drop' | 'error' | 'event';
+export type FeedbackKind = 'hover' | 'click' | 'grab' | 'drop' | 'error' | 'event' | 'thud';
 
 let ctx: AudioContext | null = null;
 
@@ -15,6 +15,8 @@ const TONES: Record<FeedbackKind, { f: number[]; type: OscillatorType; dur: numb
   drop: { f: [330, 220], type: 'sine', dur: 0.12, gain: 0.8 },
   error: { f: [180, 150], type: 'square', dur: 0.14, gain: 0.35 },
   event: { f: [523, 659, 784], type: 'sine', dur: 0.12, gain: 0.7 },
+  // Plateau posé sur la table : petit « toc » de bois, grave et sec
+  thud: { f: [150, 92], type: 'triangle', dur: 0.07, gain: 1 },
 };
 
 /** Son discret (ignoré si l'audio est indisponible ou coupé dans les paramètres) */

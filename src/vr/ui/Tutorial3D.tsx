@@ -1,6 +1,7 @@
 // Première prise en main (≈30 s, sans texte) : des mains fantômes translucides rejouent chaque geste sur le
-// plateau : attraper un bâtiment, le poser, tapoter, tourner le plateau. On reproduit le geste pour passer
-// au suivant ; « Passer » ignore tout. En mode manettes, c'est une manette fantôme qui joue les gestes.
+// plateau : attraper un bâtiment, le poser, tapoter, zoomer (deux pincements au-dessus des cases, qu'on
+// écarte). On reproduit le geste pour passer au suivant ; « Passer » ignore tout. Le geste « attraper le
+// plateau par ses bords » est montré avant, pendant la présentation du plateau (BoardGrab).
 
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
@@ -23,7 +24,7 @@ const ease = (t: number) => t * t * (3 - 2 * t);
 const lerp3 = (a: THREE.Vector3, b: THREE.Vector3, k: number, out: THREE.Vector3) => out.lerpVectors(a, b, k);
 
 /** Main fantôme : paume, quatre doigts, pouce. `pinch` rapproche l'index et le pouce. */
-function GhostHand({ group, thumb, index, right }: { group: React.RefObject<THREE.Group | null>; thumb: React.RefObject<THREE.Mesh | null>; index: React.RefObject<THREE.Mesh | null>; right: boolean }) {
+export function GhostHand({ group, thumb, index, right }: { group: React.RefObject<THREE.Group | null>; thumb: React.RefObject<THREE.Mesh | null>; index: React.RefObject<THREE.Mesh | null>; right: boolean }) {
   const s = right ? 1 : -1;
   return (
     <group ref={group} visible={false}>
@@ -67,6 +68,10 @@ export function Tutorial3D() {
   const hand = useRef<THREE.Group>(null);
   const thumb = useRef<THREE.Mesh>(null);
   const index = useRef<THREE.Mesh>(null);
+  // Seconde main fantôme : zoom à deux mains
+  const hand2 = useRef<THREE.Group>(null);
+  const thumb2 = useRef<THREE.Mesh>(null);
+  const index2 = useRef<THREE.Mesh>(null);
   const tile = useRef<THREE.Mesh>(null);
   const ring = useRef<THREE.Mesh>(null);
   const baseline = useRef({ built: 0, yaw: 0, scale: 0 });
@@ -90,9 +95,9 @@ export function Tutorial3D() {
     const g = useGame.getState().game;
     const b = g.buildings.find((x) => x.type !== 'castle' && x.type !== 'mill') ?? g.buildings.find((x) => x.type === 'castle')!;
     const tapP = new THREE.Vector3((b.x + 0.5 - 10) * scale, 0.033 + 0.09, (b.z + 0.5 - 7) * scale);
-    const rimA = new THREE.Vector3(10 * scale + 0.03, 0.06, 7 * scale * 0.2);
-    const rimB = new THREE.Vector3(10 * scale + 0.03, 0.06, 7 * scale * 1.0 + 0.05);
-    return { mini, tileP, tapP, rimA, rimB };
+    // Zoom : au-dessus du centre des cases, loin des bords
+    const zoomY = 0.033 + 0.14;
+    return { mini, tileP, tapP, zoomY };
   }, [dominant, scale, target, step]);
 
   useFrame(({ clock }) => {
@@ -104,7 +109,7 @@ export function Tutorial3D() {
     if (id === 'grab') ok = vr.held !== null;
     else if (id === 'drop') ok = g.game.stats.buildingsBuilt > baseline.current.built;
     else if (id === 'tap') ok = g.inspected !== null;
-    else if (id === 'rotate') ok = Math.abs(vr.board.yaw - baseline.current.yaw) > 0.3 || Math.abs(vr.board.scale / baseline.current.scale - 1) > 0.1;
+    else if (id === 'zoom') ok = Math.abs(vr.board.scale / baseline.current.scale - 1) > 0.1;
     if (ok) {
       feedback('drop');
       vr.advanceTutorial();
@@ -134,13 +139,23 @@ export function Tutorial3D() {
       poke = Math.abs(Math.sin(t * Math.PI * 2 * 1.5));
       pos.y += 0.04 - poke * 0.04;
     } else {
-      // Pincement sur le bord, glissé le long du bord
-      lerp3(geo.rimA, geo.rimB, ease(t < 0.5 ? t * 2 : 2 - t * 2), pos);
-      pinch = 1;
+      // Deux pincements au-dessus des cases, puis les mains s'écartent
+      pinch = Math.min(1, t / 0.2);
+      const spread = 0.05 + ease(Math.min(1, Math.max(0, (t - 0.2) / 0.6))) * 0.12;
+      pos.set(spread, geo.zoomY, 0);
     }
     h.position.copy(pos);
-    h.rotation.set(0, id === 'rotate' ? -Math.PI / 2 : 0, 0);
+    h.rotation.set(0, 0, 0);
     h.visible = true;
+    const h2 = hand2.current;
+    if (h2) {
+      h2.visible = id === 'zoom';
+      h2.position.set(-pos.x, pos.y, pos.z);
+      if (thumb2.current && index2.current) {
+        thumb2.current.rotation.z = (right() ? 1 : -1) * (0.8 - pinch * 0.6);
+        index2.current.rotation.x = Math.PI / 2 + pinch * 0.35;
+      }
+    }
     if (thumb.current && index.current) {
       thumb.current.rotation.z = (right() ? -1 : 1) * (0.8 - pinch * 0.6);
       index.current.rotation.x = Math.PI / 2 + pinch * 0.35 - poke * 0.5;
@@ -161,6 +176,7 @@ export function Tutorial3D() {
   return (
     <group>
       <GhostHand group={hand} thumb={thumb} index={index} right={right()} />
+      <GhostHand group={hand2} thumb={thumb2} index={index2} right={!right()} />
       <mesh ref={tile} material={tileMat} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
         <planeGeometry args={[scale * 0.95, scale * 0.95]} />
       </mesh>

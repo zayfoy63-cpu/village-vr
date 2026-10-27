@@ -7,7 +7,6 @@ import { BuildBox } from './ui/BuildBox';
 import { BuildingPanel3D } from './ui/BuildingPanel3D';
 import { Bubbles3D, Cards3D, Threats3D } from './ui/Cards3D';
 import { FeaturePanel3D, ParcelPanel3D, ParcelTags3D } from './ui/Land3D';
-import { BoardRig3D } from './ui/BoardRig3D';
 import { TableObjects } from './ui/TableObjects';
 import { Tutorial3D } from './ui/Tutorial3D';
 import { Hud3D } from './ui/Hud3D';
@@ -21,7 +20,6 @@ export function useBoardHalf() {
 
 export function VRUI() {
   const phase = useVR((s) => s.phase);
-  const pcPreview = useVR((s) => s.pcPreview);
   const { hw, hd } = useBoardHalf();
   void hw;
   if (phase !== 'playing') return null;
@@ -38,7 +36,6 @@ export function VRUI() {
       <group name="UI:ParcelPanel3D"><ParcelPanel3D /></group>
       <group name="UI:FeaturePanel3D"><FeaturePanel3D /></group>
       <group name="UI:TableObjects"><TableObjects /></group>
-      {!pcPreview && <group name="UI:BoardRig3D"><BoardRig3D /></group>}
       <group name="UI:Tutorial3D"><Tutorial3D /></group>
     </group>
   );

@@ -23,14 +23,16 @@ function Rows({ input }: { input: 'hand' | 'controller' }) {
       ? [
           [I.pinch, 'Attraper · poser'],
           [I.tap, 'Tapoter : détails'],
-          [I.hand, 'Bord du plateau : tourner'],
-          [I.twoHands, 'Deux mains : zoom'],
+          [I.hand, 'Pincer un bord : porter le plateau'],
+          [I.twoHands, 'Deux pincements au-dessus : zoom'],
+          [I.lock, 'Cadenas : libérer le plateau'],
           [I.hourglass, 'Sablier : pause · vitesse'],
           [I.box, 'Détruire : remettre dans la boîte'],
         ]
       : [
           [I.trigger, 'Gâchette : choisir · poser'],
-          [I.grip, 'Grip : attraper'],
+          [I.grip, 'Grip : attraper · grip au bord : porter le plateau'],
+          [I.lock, 'Cadenas : libérer le plateau'],
           [I.btnA, `A : boîte   ${I.btnB} B : annuler`],
           [I.btnX, 'X : pause   Y : menu'],
           [I.stick, 'Stick : tourner · zoom'],
@@ -38,11 +40,11 @@ function Rows({ input }: { input: 'hand' | 'controller' }) {
         ];
   const h = rows.length * 0.04 + 0.05;
   return (
-    <Panel width={0.4} height={h} border={THEME.accent}>
+    <Panel width={0.46} height={h} border={THEME.accent}>
       {rows.map(([icon, text], i) => (
         <group key={text} position={[0, h / 2 - 0.04 - i * 0.04, 0]}>
-          <Label text={icon} size={0.03} position={[-0.17, 0, 0]} />
-          <Label text={text} size={0.022} align="left" weight={600} position={[-0.135, 0, 0]} />
+          <Label text={icon} size={0.03} position={[-0.2, 0, 0]} />
+          <Label text={text} size={0.021} align="left" weight={600} position={[-0.165, 0, 0]} />
         </group>
       ))}
     </Panel>

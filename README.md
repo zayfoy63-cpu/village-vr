@@ -186,8 +186,25 @@ de façon déterministe (le PRNG est dans l'état). Le rendu ne fait que lire ce
 
 ## Passage en VR (Meta Quest 3, réalité mixte)
 
-Le plateau se pose sur une vraie table (passthrough, `immersive-ar`) ; tout se joue en 3D, aux mains ou aux manettes.
-La version PC reste inchangée (souris, interface DOM).
+Le plateau se manipule comme un vrai plateau de jeu de société et se pose sur une vraie table (passthrough,
+`immersive-ar`) ; tout se joue en 3D, aux mains ou aux manettes. La version PC reste inchangée (souris, interface DOM).
+
+### Le plateau en main (`vr/BoardGrab.tsx`, `vr/boardGrab.ts`)
+- **Au lancement**, le plateau apparaît devant le joueur, à hauteur de taille, légèrement incliné vers lui ; ses bords
+  brillent doucement et deux mains fantômes montrent le geste. Pas de table à viser : on l'attrape et on le pose
+  (« Jouer ici » le laisse où il est).
+- **Les 4 bords sont des poignées** : pincer (mains) ou serrer le grip (manettes) près d'un bord saisit le plateau ; le bord
+  s'illumine quand la main approche. Une main : déplacer et tourner autour de la verticale ; deux mains sur deux bords :
+  porter comme une planche, très stable (mouvement lissé). Le plateau reste toujours à l'horizontale. Pendant la saisie,
+  le jeu continue mais les clics sur le village sont coupés.
+- **Pose** : relâché juste au-dessus (ou un peu en dessous) d'une vraie table, il s'y aimante (courte descente, petit
+  rebond, « toc » de bois et vibration). La table vient des plans détectés par le casque, à défaut du hit-test vers le bas.
+  Relâché en l'air, il flotte. Pendant le déplacement, une ombre douce sur la table aide à juger la hauteur.
+- **Cadenas** près du coin avant droit (en retrait du présentoir) : verrouillé après chaque pose (les bords ne s'attrapent plus), un tapotement le libère.
+  **Paramètres → Recentrer devant moi** en secours. La position est mémorisée pour la session (`sessionStorage`).
+- **Zoom** : deux pincements (ou deux grips) au-dessus des cases, loin des bords, puis écarter / rapprocher les mains.
+- Réglages : `VR_CONFIG.grab` (distances de saisie, pincement, lissage, zoom) et `VR_CONFIG.snap` (force et durée de
+  l'aimantation, sondage de la table, ombre) dans `src/vr/config.ts`.
 
 ### Règle d'architecture : une seule couche d'interaction
 Toute l'interface VR (HUD, boîte de construction, panneaux de bâtiment, cartes d'événement, menaces, Chronique, fin de
@@ -199,7 +216,9 @@ le pincement à distance, la saisie directe (`pointerType: 'grab'`) et le bout d
 > **Toute nouvelle fonctionnalité passe par cette couche** : un nouvel élément 3D avec des gestionnaires pointeur, jamais
 > un composant qui lit la manette ou la main directement. Ainsi elle marche d'office à la souris, au rayon, au pincement
 > et au toucher. Les actions de jeu passent toujours par le store (`useGame`), comme à la souris.
-> Les rares entrées « hors pointeur » (boutons A/B/X/Y, sticks, retrait du casque) sont centralisées dans `vr/Session.tsx`.
+> Les rares entrées « hors pointeur » sont centralisées : boutons A/B/X/Y, sticks et retrait du casque dans
+> `vr/Session.tsx` ; saisie du plateau par ses bords et zoom à deux mains (proximité de la main, pas de cible pointée)
+> dans `vr/BoardGrab.tsx`.
 
 ### Réglages
 Tout est dans **`src/vr/config.ts`** : taille et hauteur du plateau, zoom, rotation, tolérances de saisie, durée de maintien,
@@ -211,12 +230,15 @@ tutoriel, vibrations. Les préférences du joueur (main dominante, assis/debout,
 | | Mains | Manettes |
 |-|-|-|
 | Choisir / valider | toucher du doigt ou pincer à distance | gâchette (main dominante) |
-| Attraper un bâtiment, un bandit, le bord du plateau | pincer près de l'objet | grip |
+| Attraper un bâtiment, un bandit | pincer près de l'objet | grip |
+| Porter le plateau | pincer un bord (une ou deux mains) | grip près d'un bord |
+| Libérer / verrouiller le plateau | tapoter le cadenas | gâchette sur le cadenas |
 | Poser un bâtiment | pincer dans la boîte, déposer sur une case (aperçu vert / rouge) | idem |
 | Détruire | remettre le bâtiment dans la boîte (remboursement partiel) | idem |
 | Annuler (30 s) | bouton « Annuler » près du plateau | B |
-| Tourner / zoom du plateau | bord du plateau : une main = tourner, deux mains = zoom | stick de la main dominante |
-| Monter / descendre le plateau | poignée du bord | stick de l'autre main |
+| Tourner le plateau | le porter et tourner la main (ou les deux mains) | stick de la main dominante |
+| Zoom | deux pincements au-dessus des cases, écarter les mains | stick de la main dominante, ou deux grips au-dessus |
+| Monter / descendre le plateau | le porter | stick de l'autre main |
 | Boîte de construction | toujours là | A |
 | Pause / menu | sablier (toucher), engrenage | X / Y |
 | Aide | regarder l'intérieur du poignet gauche | regarder la manette gauche |

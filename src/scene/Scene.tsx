@@ -25,7 +25,7 @@ import { PerfMonitor } from '../vr/Perf';
 import { WristHelp } from '../vr/ui/WristHelp';
 import { UIBatch } from '../vr/ui/UIBatch';
 import { DragController } from '../vr/Drag';
-import { Placement } from '../vr/Placement';
+import { BoardGrab } from '../vr/BoardGrab';
 import { SessionControl } from '../vr/Session';
 import { VRRig } from '../vr/VRRig';
 import { VR_CONFIG } from '../vr/config';
@@ -143,7 +143,7 @@ export function Scene() {
         <Backdrop />
         <XRSync />
         <SessionControl />
-        <Placement />
+        <BoardGrab />
         <DragController />
         <DevHook />
         <PerfMonitor />

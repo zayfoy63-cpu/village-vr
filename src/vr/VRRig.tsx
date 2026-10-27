@@ -2,8 +2,10 @@
 // l'interface vit tout autour, à l'échelle réelle (mètres). Rien n'est accroché à la tête.
 // Sur PC (?ui3d), la même interface est affichée en agrandissant le tout (aperçu et tests à la souris).
 
+import { useFrame } from '@react-three/fiber';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type * as THREE from 'three';
+import { BoardEdges } from './BoardGrab';
 import { useVR } from './store';
 import { VRUI } from './VRUI';
 
@@ -30,21 +32,39 @@ function useNoRaycast(ref: React.RefObject<THREE.Group | null>, disabled: boolea
 }
 
 export function VRRig({ world }: { world: ReactNode }) {
-  const board = useVR((s) => s.board);
+  const scale = useVR((s) => s.board.scale);
   const pc = useVR((s) => s.pcPreview);
   const phase = useVR((s) => s.phase);
+  // Pendant la présentation et tant qu'on tient le plateau : pas de clic sur le village
+  const grabbing = useVR((s) => s.grabbing > 0);
+  const rig = useRef<THREE.Group>(null);
   const worldRef = useRef<THREE.Group>(null);
-  useNoRaycast(worldRef, phase === 'placing');
+  useNoRaycast(worldRef, phase === 'placing' || grabbing);
 
-  const ws = pc ? 1 : board.scale;
-  const us = pc ? 1 / board.scale : 1;
+  // Position, orientation et inclinaison suivies à chaque image, sans redessiner l'arbre React
+  useFrame(() => {
+    const g = rig.current;
+    if (!g) return;
+    const { board, tilt } = useVR.getState();
+    if (pc) {
+      g.position.set(0, 0, 0);
+      g.rotation.set(0, 0, 0);
+    } else {
+      g.position.set(board.x, board.y, board.z);
+      g.rotation.set(tilt, board.yaw, 0, 'YXZ');
+    }
+  }, -1);
+
+  const ws = pc ? 1 : scale;
+  const us = pc ? 1 / scale : 1;
   return (
-    <group position={pc ? [0, 0, 0] : [board.x, board.y, board.z]} rotation={[0, pc ? 0 : board.yaw, 0]}>
+    <group ref={rig}>
       <group ref={worldRef} scale={ws} position={[0, BOARD_BASE * ws, 0]}>
         {world}
       </group>
       <group scale={us}>
         <VRUI />
+        {!pc && <BoardEdges />}
       </group>
     </group>
   );

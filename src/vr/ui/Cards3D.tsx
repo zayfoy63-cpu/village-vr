@@ -95,7 +95,7 @@ export function Cards3D() {
     <FacePlayer position={[0, 0.004, hd + 0.3]} tilt={0.8}>
       <group position={[0, h / 2, 0]}>
         <Panel width={w} height={h} border={accent}>
-          <Label text={`${current.icon} ${current.title}`} size={0.036} position={[0, top - 0.04, 0]} />
+          <Label title text={`${current.icon} ${current.title}`} size={0.038} position={[0, top - 0.04, 0]} />
           {isRT ? (
             <Label text={`${I.lightning} Le jeu continue`} size={0.02} color={THEME.warn} position={[0, top - 0.072, 0]} />
           ) : (
@@ -196,7 +196,7 @@ function Flag({ notice, edge, slot, count }: { notice: Notice; edge: number | un
           />
           {info && (
             <Panel width={0.4} height={0.14} position={[0, 0.12, 0.004]}>
-              <Label text={notice.title} size={0.03} position={[0, 0.04, 0]} />
+              <Label title text={notice.title} size={0.032} position={[0, 0.04, 0]} />
               <Label text={notice.text} size={0.02} weight={600} maxWidth={0.37} position={[0, -0.015, 0]} />
             </Panel>
           )}
@@ -277,7 +277,7 @@ export function Bubbles3D() {
         return (
           <FacePlayer key={b.id} position={[x, y, z]} tilt={0.1}>
             <Panel width={0.36} height={0.09} border={color}>
-              <Label text={`${n.icon} ${n.title}`} size={0.026} position={[0, 0.022, 0]} />
+              <Label title text={`${n.icon} ${n.title}`} size={0.028} position={[0, 0.022, 0]} />
               <Label text={text} size={0.017} weight={600} color={THEME.dim} maxWidth={0.34} position={[0, -0.02, 0]} />
             </Panel>
           </FacePlayer>

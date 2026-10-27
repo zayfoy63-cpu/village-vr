@@ -233,7 +233,8 @@ Bascule mains / manettes automatique. Retrait du casque ou fin de session : paus
 ### Icônes (`src/ui/icons/`)
 Aucun emoji dans le jeu : leur affichage dépend des polices du système (carrés vides sous Windows pour les plus
 récents). Toutes les icônes (ressources, bâtiments, événements, HUD, Chronique, paramètres, aide VR) sont dessinées
-dans `ui/icons/defs.ts`, en polygones colorés à fin contour sombre, dans un repère 24 x 24.
+dans `ui/icons/defs.ts`, façon enluminure : trait d'encre brune un peu tremblé et lavis de couleurs de la palette
+posé légèrement à côté du trait, dans un repère 24 x 24.
 - Dans les textes, une icône est un **jeton** : `` `${I.wood} Bois` `` (`I` exporté par `ui/icons`). Les données du jeu
   (ressources, bâtiments, notifications, conséquences des choix) ne contiennent que des jetons.
 - PC : `<RichText text={…} />` (`ui/icons/Icon.tsx`) remplace chaque jeton par un SVG ; `<Icon id="wood" />` pour une
@@ -265,6 +266,34 @@ libérées) **→ 116 appels (passe d'ombre comprise) et 2 textures, stables en 
 - **Divers** : rendu fovéal fixe (`perf.foveation`), résolution `perf.frameBufferScaling`, `matrixAutoUpdate = false`
   sur les objets immobiles, aucun objet ni matériau recréé à chaque image (textures et géométries stables en jeu).
 - **Compteur** (Paramètres → « Compteur de perf. ») : FPS, appels de dessin, triangles et textures, sur le présentoir.
+
+### Style « fait main » (`src/palette.ts`, `scene/handmade.ts`, `scene/wear.ts`)
+Rien n'est parfaitement droit, et rien ne coûte un appel de dessin ni une texture de plus :
+- **Palette unique** (`palette.ts`) : 16 couleurs inspirées des miniatures médiévales (terres, ocres, verts mousse,
+  rouge brique, bleu guède). Matériaux 3D, sol, végétation, interface PC (variables CSS `--pal-*`) et VR, icônes : tout en
+  dérive (`palMix` pour une nuance intermédiaire). Lumière dorée et contrastée le jour, bleutée la nuit (`Scene.tsx`).
+- **Pièces des modèles** : primitives légèrement déformées (`ROUGH` : murs qui penchent, faîtages affaissés, pointes
+  décalées) ; chaque pièce et chaque bâtiment reçoit une inclinaison, une rotation, une taille et une teinte seedées
+  (`VariantSeed`, `partJitter`, `buildingJitter`) : deux maisons du même type ne sont jamais identiques. La teinte passe
+  par la couleur d'instance des regroupements (`partPool.ts`). Réglages dans `HANDMADE`.
+- **Nature** : sapins à 2 ou 3 étages de travers, feuillus en une à trois boules bosselées (chêne, peuplier, buisson),
+  rochers et cailloux tous différents, herbes folles et touffes d'herbe rase à cheval sur les cases.
+- **Sol** : cases bosselées aux nuances irrégulières, tournées au hasard ; chemins de terre (`wear.ts`) qui serpentent
+  entre les bâtiments (arbre couvrant), terre battue autour des maisons, et qui s'élargissent et s'assombrissent là où
+  les villageois passent souvent (usure non sauvegardée, recalculée au chargement).
+- **Villageois** : taille, carrure, démarche et tunique propres à chacun ; un prénom médiéval (`game/names.ts`) au survol
+  (infobulle PC, étiquette VR).
+- **Signes de vie** (`models/LifeProps.tsx`) : bûches, tonneaux, seau, linge, outils, caisses selon le type de bâtiment.
+- **Interface « registre »** : papier, encre brune, coins inégaux, sceaux de cire pour les actions importantes ; aucune
+  ombre portée ni dégradé. Polices embarquées (`@fontsource`, aucun chargement extérieur) : IM Fell English pour les
+  titres (chiffres modernes pour rester lisible), Alegreya Sans pour les textes et les chiffres. En VR, elles sont dessinées
+  dans l'atlas unique, avec le grain du papier et les bords irréguliers des plaques (`atlas.ts`, `uiBatch.ts`).
+- **Annales** (`game/annals.ts`) : les grands événements reçoivent un nom (« Le Grand Feu de l'an 2 ») dans la Chronique.
+  Champ facultatif de la sauvegarde : les anciennes parties commencent avec des annales vides.
+
+Compteur avant / après (même partie de 35 bâtiments) : VR crise 116 → 116 appels, 2 → 2 textures ; VR jour 102 → 102 ;
+PC 46 → 46 appels, 1 → 1 texture. Les triangles augmentent (VR crise 77 640 → 114 190) : formes moins régulières et
+taches au sol, sans effet sur le nombre d'appels.
 
 ## Déploiement
 `vercel.json` est configuré pour Vite (build `npm run build`, sortie `dist/`).

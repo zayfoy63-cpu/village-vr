@@ -11,6 +11,7 @@ import { BoardRig3D } from './ui/BoardRig3D';
 import { TableObjects } from './ui/TableObjects';
 import { Tutorial3D } from './ui/Tutorial3D';
 import { Hud3D } from './ui/Hud3D';
+import { VillagerTag3D } from './ui/VillagerTag3D';
 
 /** Demi-dimensions du plateau en mètres (repère de l'interface) */
 export function useBoardHalf() {
@@ -33,6 +34,7 @@ export function VRUI() {
       <group name="UI:Threats3D"><Threats3D /></group>
       <group name="UI:Bubbles3D"><Bubbles3D /></group>
       <group name="UI:ParcelTags3D"><ParcelTags3D /></group>
+      <group name="UI:VillagerTag3D"><VillagerTag3D /></group>
       <group name="UI:ParcelPanel3D"><ParcelPanel3D /></group>
       <group name="UI:FeaturePanel3D"><FeaturePanel3D /></group>
       <group name="UI:TableObjects"><TableObjects /></group>

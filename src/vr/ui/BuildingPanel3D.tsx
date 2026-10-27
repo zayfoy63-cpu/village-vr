@@ -78,6 +78,7 @@ function Content({ building: b }: { building: Building }) {
         height={0.065}
         icon={I.up}
         label="Améliorer"
+        seal
         sub={check.locked ? I.lock : check.next ? costText(check.next.cost) : ''}
         disabled={!check.ok}
         onActivate={() => {
@@ -100,7 +101,7 @@ function Content({ building: b }: { building: Building }) {
   const h = 0.2 + extraCur + (status ? 0.045 + (stLines - 1) * 0.029 : 0);
   return (
     <Panel width={w} height={h}>
-      <Label text={title} size={0.034} position={[0, h / 2 - 0.035, 0]} />
+      <Label title text={title} size={0.036} position={[0, h / 2 - 0.035, 0]} />
       <Label text={current} size={0.026} color={THEME.accent} position={[0, h / 2 - 0.075 - extraCur / 2, 0]} maxWidth={w - 0.05} />
       {stats.workers ? <Label text={`${I.worker} ${b.workers}/${stats.workers}`} size={0.026} position={[w / 2 - 0.06, h / 2 - 0.035, 0]} /> : null}
       {status && (

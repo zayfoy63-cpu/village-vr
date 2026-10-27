@@ -106,7 +106,7 @@ function Info({ type, z }: { type: BuildingTypeId; z: number }) {
   return (
     <FacePlayer position={[0, 0.16, z]} tilt={0.3}>
       <Panel width={w} height={lines ? 0.15 : 0.13}>
-        <Label text={`${def.icon} ${def.name}`} size={0.034} position={[0, 0.045, 0]} />
+        <Label title text={`${def.icon} ${def.name}`} size={0.036} position={[0, 0.045, 0]} />
         <Label text={sub} size={0.03} color={unlocked ? (canAfford(game.resources, cost) ? THEME.accent : THEME.bad) : THEME.warn} position={[0, 0.005, 0]} />
         <Label text={lines || def.description} size={0.02} color={THEME.dim} weight={600} position={[0, -0.04, 0]} maxWidth={w - 0.03} />
       </Panel>

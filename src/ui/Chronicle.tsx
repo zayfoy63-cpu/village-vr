@@ -8,6 +8,7 @@ import { Icon, RichText } from './icons/Icon';
 export function ChronicleButton() {
   const [open, setOpen] = useState(false);
   const chronicle = useGame((s) => s.chronicle);
+  const annals = useGame((s) => s.game.annals) ?? [];
   const found = MECHANICS.filter((m) => chronicle[m.id]?.struck).length;
   return (
     <>
@@ -23,6 +24,23 @@ export function ChronicleButton() {
                 Découvertes : {found} / {MECHANICS.length}
                 {found > 0 && ` · pages complètes : ${MECHANICS.filter((m) => chronicle[m.id]?.solved).length}`}
               </div>
+              <h3 className="annals-title">Annales de ce village</h3>
+              {annals.length === 0 ? (
+                <p className="annals-empty">Rien encore de digne d'être écrit. Les anciens disent que ça viendra bien assez tôt.</p>
+              ) : (
+                <ol className="annals">
+                  {annals.map((a, i) => (
+                    <li key={i}>
+                      <span className="cp-icon"><RichText text={a.icon} /></span>
+                      <div>
+                        <strong>{a.name}</strong> <span className="annals-day">jour {a.day}</span>
+                        <p>{a.line}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <h3 className="annals-title">Ce que le village a appris</h3>
               <div className="chronicle-pages">
                 {MECHANICS.map((m) => {
                   const page = chronicle[m.id];

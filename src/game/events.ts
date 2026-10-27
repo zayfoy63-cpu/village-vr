@@ -7,6 +7,7 @@
 //   3. arrivée → trigger() : effet immédiat et/ou carte à choix (resolve() à la réponse)
 //   4. sans réponse avant la fin du délai : l'option par défaut s'applique
 
+import { recordAnnal } from './annals';
 import { BUILDING_BY_ID, CHAINS } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
 import { PARCELS, activeCamps } from './parcels';
@@ -400,11 +401,11 @@ function banditChoice(state: GameState, count: number, ransom: number): ChoiceSp
 function resolveBandits({ state, rng, now }: EventContext, optionId: string): EventOutcome {
   const raid = state.raid;
   const active = raid ? raid.bandits.filter((b) => b.status === 'active') : [];
-  if (!raid || !active.length) return { text: 'Les bandits sont déjà partis.', kind: 'info' };
+  if (!raid || !active.length) return { text: 'Le temps de sonner la cloche, les bandits avaient filé.', kind: 'info' };
   if (optionId === 'ransom') {
     raidTurnBack(state, now);
     addMorale(state, TUNING.morale.ransom);
-    return { text: 'Les bandits empochent la rançon et font demi-tour.', kind: 'info' };
+    return { text: 'Les bandits soupèsent la bourse, crachent par terre et s\'en retournent.', kind: 'info' };
   }
   if (optionId === 'fight') {
     const count = active.length;
@@ -466,7 +467,7 @@ export const EVENTS: EventDef[] = [
     roll: ({ state, rng, severity: sev }) => ({ count: raidSize(state, sev), edge: campEdge(state) ?? rng.int(0, 3) }),
     announce: {
       days: [2, 3],
-      text: (p, d) => `Environ ${p.count} bandits aperçus ${DIRECTIONS[p.edge]} – arrivée dans ${d} ${plural(d, 'jour', 'jours')}. Tours de garde et or seront utiles.`,
+      text: (p, d) => `Un berger dit avoir vu ${p.count} rôdeurs ${DIRECTIONS[p.edge]}. Ils seront là dans ${d} ${plural(d, 'jour', 'jours')} : tours de garde et or seront utiles.`,
     },
     trigger: ({ state, rng, now }, p) => {
       const ransom = fmt(TUNING.raid.ransomBase + p.count * TUNING.raid.ransomPerBandit + state.population * 0.2);
@@ -487,7 +488,7 @@ export const EVENTS: EventDef[] = [
     roll: ({ rng }) => ({ edge: rng.int(0, 3) }),
     announce: {
       days: [1, 1],
-      text: (p) => `Un orage se forme ${DIRECTIONS[p.edge]} : il traversera le village demain. Réparez ce qui est abîmé et gardez du bois pour renforcer.`,
+      text: (p) => `Le ciel noircit ${DIRECTIONS[p.edge]}. Demain, l\'orage passera sur le village : réparez ce qui est abîmé et gardez du bois pour renforcer.`,
     },
     trigger: ({ state, rng, now }, p) => {
       startStorm(state, p.edge ?? 0, now, rng);
@@ -505,11 +506,11 @@ export const EVENTS: EventDef[] = [
     weight: () => 0,
     announce: {
       days: [3, 3],
-      text: (_p, d) => `Les anciens prédisent un hiver rude dans ${d} jours : la consommation de nourriture doublera tout l'hiver. Faites des réserves !`,
+      text: (_p, d) => `Les oies sont parties tôt et les anciens hochent la tête : l\'hiver sera rude, dans ${d} jours. On mangera deux fois plus jusqu\'au printemps. Remplissez les greniers.`,
     },
     trigger: ({ state }) => {
       addModifier(state, 'harshWinter', 10);
-      return { text: 'Le grand froid est là : les villageois mangent deux fois plus jusqu\'au printemps.' };
+      return { text: 'Le grand froid mord les doigts : on mange deux fois plus jusqu\'au printemps.' };
     },
   },
   {
@@ -535,14 +536,14 @@ export const EVENTS: EventDef[] = [
     weight: (s) => (s.population >= 5 ? 1.5 + 0.2 * seasonIndex(s.day) : 0),
     roll: ({ severity: sev }) => ({ rate: Math.min(0.4, 0.07 * sev), quarantineDays: 4 }),
     trigger: ({ state, severity: sev }, p) => ({
-      text: 'Une fièvre se répand dans le village.',
+      text: 'Une fièvre court de maison en maison. On ferme les volets.',
       choice: {
         defaultId: 'ignore',
         options: epidemicOptions(state, p, fmt(6 + 4 * sev), 'Quarantaine', 'Faire venir un médecin', 'Ignorer'),
       },
     }),
     resolve: ({ state, rng, now }, id, p) => {
-      if (id === 'doctor') return { text: 'Le médecin soigne les malades : personne ne meurt.', kind: 'good' };
+      if (id === 'doctor') return { text: 'Le médecin veille trois nuits durant : personne n\'est emporté.', kind: 'good' };
       if (id === 'quarantine') {
         addModifier(state, 'quarantine', p.quarantineDays);
         addMorale(state, TUNING.morale.quarantine);
@@ -562,7 +563,7 @@ export const EVENTS: EventDef[] = [
     weight: (s) => (s.day >= 8 ? 1.2 : 0),
     roll: ({ rng, severity: sev }) => ({ n: 2 + rng.int(0, 2) + Math.floor(sev) }),
     trigger: (_ctx, p) => ({
-      text: `${p.n} réfugiés fuyant la guerre demandent asile.`,
+      text: `${p.n} réfugiés, la guerre dans le dos, frappent à la porte du village.`,
       choice: {
         defaultId: 'refuse',
         options: [
@@ -593,7 +594,7 @@ export const EVENTS: EventDef[] = [
         return { text: `${p.n} nouveaux habitants.${crowd > 0 ? ` ${crowd} sans logement : construisez des maisons !` : ''}`, kind: 'good' };
       }
       addMorale(state, TUNING.morale.refuseRefugees);
-      return { text: 'Les réfugiés reprennent la route. Le village a honte.', kind: 'info' };
+      return { text: 'Les réfugiés reprennent la route sous la pluie. Personne n\'ose en parler à la veillée.', kind: 'info' };
     },
   },
   {
@@ -643,12 +644,12 @@ export const EVENTS: EventDef[] = [
           ],
         };
       };
-      return { text: 'Il propose deux échanges.', choice: { defaultId: 'none', timeout: 1, options: [opt(0), opt(1), { id: 'none', label: 'Refuser', detail: '' }] } };
+      return { text: 'Sa charrette grince sous les ballots. Il propose deux marchés.', choice: { defaultId: 'none', timeout: 1, options: [opt(0), opt(1), { id: 'none', label: 'Refuser', detail: '' }] } };
     },
     resolve: ({ state }, id, p) => {
-      if (id === 'none') return { text: 'Le marchand reprend la route.', kind: 'info' };
+      if (id === 'none') return { text: 'Le marchand hausse les épaules et reprend la route.', kind: 'info' };
       for (const k of RESOURCE_KEYS) state.resources[k] += p[`${id}_get_${k}`] ?? 0;
-      return { text: 'Marché conclu !', kind: 'good' };
+      return { text: 'Tope là ! Marché conclu.', kind: 'good' };
     },
   },
 
@@ -792,10 +793,10 @@ export const EVENTS: EventDef[] = [
     roll: ({ severity: sev }) => ({ rate: Math.min(0.5, 0.12 * sev), quarantineDays: 6 }),
     announce: {
       days: [3, 3],
-      text: (_p, d) => `La peste ravage les villages voisins : elle arrivera dans ${d} jours. Prévoyez de l'or pour un médecin.`,
+      text: (_p, d) => `Les cloches des villages voisins sonnent le glas : la peste sera là dans ${d} jours. Gardez de l\'or pour un médecin.`,
     },
     trigger: ({ state, severity: sev }, p) => ({
-      text: 'La peste est dans le village !',
+      text: 'La peste a passé le gué. Elle est chez nous.',
       choice: {
         defaultId: 'ignore',
         options: epidemicOptions(state, p, fmt(12 + 6 * sev), 'Quarantaine stricte', 'Faire venir des médecins', 'Prier'),
@@ -857,6 +858,8 @@ export function arriveEvent(state: GameState, pendingId: number, rng: Rng, now: 
 }
 
 function showOutcome(state: GameState, ev: EventDef, out: EventOutcome, params: EventParams, now: number) {
+  // Les grands événements reçoivent un nom dans les annales du village
+  recordAnnal(state, ev.id);
   pushNotice(state, {
     kind: out.kind ?? (out.choice ? 'trade' : ev.kind),
     icon: ev.icon,

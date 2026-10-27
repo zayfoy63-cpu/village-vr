@@ -389,6 +389,8 @@ export interface GameState {
   discovered: ResourceKey[];
   stats: GameStats;
   gameOver: boolean;
+  /** Annales : événements marquants nommés (facultatif : absent des anciennes sauvegardes) */
+  annals?: { day: number; icon: string; name: string; line: string }[];
 }
 
 export interface PlacementCheck {

@@ -65,7 +65,7 @@ export function ParcelPanel3D() {
   return (
     <FacePlayer position={[x, 0.2, z]} tilt={0.3}>
       <Panel width={0.42} height={h}>
-        <Label text={`${I.map} Parcelle à vendre`} size={0.034} position={[0, h / 2 - 0.035, 0]} />
+        <Label title text={`${I.map} Parcelle à vendre`} size={0.036} position={[0, h / 2 - 0.035, 0]} />
         <Label text={content} size={0.028} position={[0, h / 2 - 0.08, 0]} />
         {camp && <Label text={`${I.camp} Camp de bandits : attaques plus fréquentes`} size={0.021} color={THEME.bad} position={[0, h / 2 - 0.115, 0]} maxWidth={0.4} />}
         {ruins && <Label text={`${I.manor} Ruines : un trésor, mais un risque d'éboulement`} size={0.021} color={THEME.warn} position={[0, h / 2 - 0.115, 0]} maxWidth={0.4} />}
@@ -75,6 +75,7 @@ export function ParcelPanel3D() {
           height={0.065}
           icon={I.gold}
           label="Acheter"
+          seal
           disabled={!check.ok}
           position={[0, -h / 2 + 0.04, 0.004]}
           onActivate={() => {
@@ -105,7 +106,7 @@ export function FeaturePanel3D() {
   return (
     <FacePlayer position={[x, 0.2, z]} tilt={0.3}>
       <Panel width={0.42} height={h}>
-        <Label text={isCamp ? `${I.camp} Camp de bandits` : `${I.manor} Ruines anciennes`} size={0.034} position={[0, h / 2 - 0.035, 0]} />
+        <Label title text={isCamp ? `${I.camp} Camp de bandits` : `${I.manor} Ruines anciennes`} size={0.034} position={[0, h / 2 - 0.035, 0]} />
         {isCamp ? (
           <>
             <Label text={`${I.weapons} Camp ${enemy}   ${I.shield} Vous ${power}`} size={0.03} color={power >= enemy ? THEME.good : THEME.warn} position={[0, h / 2 - 0.08, 0]} />
@@ -123,6 +124,7 @@ export function FeaturePanel3D() {
           height={0.065}
           icon={isCamp ? I.weapons : I.pickaxe}
           label={isCamp ? 'Attaquer le camp' : 'Déblayer'}
+          seal
           disabled={!owned || (!isCamp && !canAfford(game.resources, PARCELS.ruins.clearCost))}
           position={[0, -h / 2 + 0.04, 0.004]}
           onActivate={() => (isCamp ? attack(feature.id) : clear(feature.id))}

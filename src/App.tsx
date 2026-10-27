@@ -17,6 +17,7 @@ import { HUD } from './ui/HUD';
 import { TimeControls } from './ui/TimeControls';
 import { VRButton } from './ui/VRButton';
 import { Icon } from './ui/icons/Icon';
+import { VillagerTip } from './ui/VillagerTip';
 
 function SeedPanel() {
   const seed = useGame((s) => s.game.seed);
@@ -48,6 +49,7 @@ export function App() {
       <ParcelBadges />
       <BanditMarkers />
       <EventFlash />
+      <VillagerTip />
       <div className="ui-layer">
         <div className="top-row">
           <SeedPanel />

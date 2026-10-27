@@ -45,6 +45,9 @@ export function plainText(text: string): string {
 // --- Dessin sur canvas (atlas VR) ----------------------------------------------------------------
 
 const OUTLINE = PAL.ink;
+
+/** Encre et lavis : épaisseur du trait (repère 24), décalage de la couleur, liseré des traits */
+export const INK = { width: 1.35, offset: [0.45, 0.35] as const, line: 1.6 };
 let paths: Map<string, Path2D> | null = null;
 
 function path(d: string): Path2D {
@@ -68,18 +71,22 @@ export function drawIcon(ctx: CanvasRenderingContext2D, id: IconId, x: number, y
   for (const s of ICON_DEFS[id].shapes) {
     const p = path(s.d);
     if (s.fill === 'none') {
-      // Trait : liseré sombre puis couleur
+      // Trait : liseré d'encre puis couleur
       ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = (s.w ?? 2) + 1.4;
+      ctx.lineWidth = (s.w ?? 2) + INK.line;
       ctx.stroke(p);
       ctx.strokeStyle = s.stroke ?? OUTLINE;
       ctx.lineWidth = s.w ?? 2;
       ctx.stroke(p);
     } else {
+      // Lavis posé un peu à côté du trait, puis trait d'encre
+      ctx.save();
+      ctx.translate(INK.offset[0], INK.offset[1]);
       ctx.fillStyle = s.fill;
       ctx.fill(p);
+      ctx.restore();
       ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.1;
+      ctx.lineWidth = INK.width;
       ctx.stroke(p);
     }
   }

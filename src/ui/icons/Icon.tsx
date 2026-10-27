@@ -2,7 +2,7 @@
 // nom au survol (infobulle).
 
 import { Fragment, memo, type CSSProperties } from 'react';
-import { ICON_DEFS, ICON_OUTLINE, ICON_TOKEN, iconOf, type IconId } from './index';
+import { ICON_DEFS, ICON_OUTLINE, ICON_TOKEN, INK, iconOf, type IconId } from './index';
 import { RESOURCE_ICON_IDS } from './resources';
 
 export const Icon = memo(function Icon({ id, size = '1.2em', title, style }: { id: IconId; size?: string | number; title?: string; style?: CSSProperties }) {
@@ -15,11 +15,15 @@ export const Icon = memo(function Icon({ id, size = '1.2em', title, style }: { i
       {def.shapes.map((s, i) =>
         s.fill === 'none' ? (
           <Fragment key={i}>
-            <path d={s.d} fill="none" stroke={ICON_OUTLINE} strokeWidth={(s.w ?? 2) + 1.4} strokeLinecap="round" strokeLinejoin="round" />
+            <path d={s.d} fill="none" stroke={ICON_OUTLINE} strokeWidth={(s.w ?? 2) + INK.line} strokeLinecap="round" strokeLinejoin="round" />
             <path d={s.d} fill="none" stroke={s.stroke ?? ICON_OUTLINE} strokeWidth={s.w ?? 2} strokeLinecap="round" strokeLinejoin="round" />
           </Fragment>
         ) : (
-          <path key={i} d={s.d} fill={s.fill} stroke={ICON_OUTLINE} strokeWidth={1.1} strokeLinejoin="round" />
+          <Fragment key={i}>
+            {/* Lavis posé un peu à côté du trait d'encre */}
+            <path d={s.d} fill={s.fill} transform={`translate(${INK.offset[0]} ${INK.offset[1]})`} />
+            <path d={s.d} fill="none" stroke={ICON_OUTLINE} strokeWidth={INK.width} strokeLinejoin="round" />
+          </Fragment>
         ),
       )}
     </svg>

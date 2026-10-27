@@ -62,6 +62,8 @@ export function migrate(data: GameState): GameState | null {
   s.storm = data.storm ?? null;
   s.flood = data.flood ?? null;
   s.injuries = Array.isArray(data.injuries) ? data.injuries : [];
+  // Annales (ajout du style « chronique ») : absentes des anciennes parties
+  s.annals = Array.isArray(data.annals) ? data.annals.filter((a) => a && typeof a.name === 'string') : [];
   s.floodUntil = Number(data.floodUntil) || 0;
   // v6 → v7 : mécaniques cachées
   const fresh = emptyMech(data.map.tiles.length);

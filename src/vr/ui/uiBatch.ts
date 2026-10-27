@@ -5,7 +5,8 @@
 // sans aucune texture par texte : seulement l'atlas partagé.
 
 import * as THREE from 'three';
-import { WHITE_UV, advance, atlasGeneration, atlasTexture, flushAtlas, glyph, graphemes, lineWidth } from './atlas';
+import { GRAIN_UV, WHITE_UV, advance, atlasGeneration, atlasTexture, flushAtlas, glyph, graphemes, lineWidth, type FontKind } from './atlas';
+import { PAL } from '../../palette';
 
 interface Node {
   visible: boolean;
@@ -76,7 +77,12 @@ export interface TextOpts {
   squeeze?: number;
   /** Opacité des icônes (couleurs propres, non teintées) */
   iconAlpha?: number;
+  /** Police : texte courant et chiffres (par défaut) ou titres à la plume */
+  font?: FontKind;
 }
+
+/** Bord des plaques : papier découpé à la main, sceau de cire, ou net */
+export type Edge = 'paper' | 'wax' | 'clean';
 
 export class Builder {
   pos: number[] = [];
@@ -99,14 +105,20 @@ export class Builder {
     this.idx.push(a, a + 1, a + 2, a, a + 2, a + 3);
   }
 
-  /** Rectangle arrondi plein (et sa bordure) centré sur (0, 0) */
-  plate(w: number, h: number, r: number, fill: RGBA, border: RGBA | null, bw: number) {
+  /**
+   * Plaque pleine (et sa bordure) centrée sur (0, 0). Fond sur le grain de papier de l'atlas, bords
+   * légèrement irréguliers (papier) ou bosselés (cire) : jamais deux arêtes parfaitement droites.
+   */
+  plate(w: number, h: number, r: number, fill: RGBA, border: RGBA | null, bw: number, edge: Edge = 'paper') {
     const [u, v] = WHITE_UV;
-    const outer = rounded(w, h, r);
-    const inner = border ? rounded(w - bw * 2, h - bw * 2, Math.max(0, r - bw)) : outer;
-    const center = this.vert(0, 0, u, v, fill);
+    const [gu0, gv0, gu1, gv1] = GRAIN_UV;
+    const gu = (x: number) => gu0 + (x / w + 0.5) * (gu1 - gu0);
+    const gv = (y: number) => gv0 + (y / h + 0.5) * (gv1 - gv0);
+    const outer = outline(w, h, r, edge, w, h);
+    const inner = border ? outline(w - bw * 2, h - bw * 2, Math.max(0, r - bw), edge, w, h) : outer;
+    const center = this.vert(0, 0, gu(0), gv(0), fill);
     const first = this.pos.length / 3;
-    for (const [x, y] of inner) this.vert(x, y, u, v, fill);
+    for (const [x, y] of inner) this.vert(x, y, gu(x), gv(y), fill);
     const n = inner.length;
     for (let i = 0; i < n; i++) this.idx.push(center, first + i, first + ((i + 1) % n));
     if (!border) return;
@@ -120,23 +132,35 @@ export class Builder {
     }
   }
 
-  /** Une ligne de texte, caractère par caractère depuis l'atlas */
+  /**
+   * Une ligne de texte, caractère par caractère depuis l'atlas. Avec `outline` : liseré d'encre
+   * sous un texte clair, ou halo couleur papier sous un texte sombre (encre lisible sur tout fond).
+   */
   text(str: string, o: TextOpts) {
-    const lw = lineWidth(str, o.weight) * o.size;
+    const font = o.font ?? 'body';
+    const lw = lineWidth(str, o.weight, font) * o.size;
     const sx = o.squeeze && lw > o.squeeze ? o.squeeze / lw : 1;
     const width = lw * sx;
-    let pen = o.align === 'left' ? o.x : o.align === 'right' ? o.x - width : o.x - width / 2;
+    const start = o.align === 'left' ? o.x : o.align === 'right' ? o.x - width : o.x - width / 2;
     const em = o.size;
-    for (const ch of graphemes(str)) {
-      const adv = advance(ch, o.weight) * em * sx;
-      if (ch.trim()) {
-        const g = glyph(ch, o.weight, o.outline);
-        const c: RGBA = g.colored ? [1, 1, 1, (o.iconAlpha ?? 1) * o.color[3]] : o.color;
-        const left = pen - g.ox * em * sx;
-        const top = o.y + g.oy * em;
-        this.quad(left, top - g.h * em, left + g.w * em * sx, top, g.u0, g.v0, g.u1, g.v1, c);
+    const dark = o.color[0] * 0.3 + o.color[1] * 0.59 + o.color[2] * 0.11 < 0.25;
+    const halo = o.outline && dark;
+    const passes: ('halo' | 'text')[] = halo ? ['halo', 'text'] : ['text'];
+    for (const pass of passes) {
+      let pen = start;
+      for (const ch of graphemes(str)) {
+        const adv = advance(ch, o.weight, font) * em * sx;
+        if (ch.trim()) {
+          const g = glyph(ch, o.weight, pass === 'halo' ? 'halo' : o.outline && !halo ? 'dark' : false, font);
+          if (pass === 'text' || !g.colored) {
+            const c: RGBA = g.colored ? [1, 1, 1, (o.iconAlpha ?? 1) * o.color[3]] : pass === 'halo' ? [HALO[0], HALO[1], HALO[2], 0.85 * o.color[3]] : o.color;
+            const left = pen - g.ox * em * sx;
+            const top = o.y + g.oy * em;
+            this.quad(left, top - g.h * em, left + g.w * em * sx, top, g.u0, g.v0, g.u1, g.v1, c);
+          }
+        }
+        pen += adv;
       }
-      pen += adv;
     }
   }
 
@@ -145,28 +169,63 @@ export class Builder {
   }
 }
 
-const roundCache = new Map<string, [number, number][]>();
-/** Contour d'un rectangle arrondi (sens trigonométrique), 4 segments par coin */
-function rounded(w: number, h: number, r: number): [number, number][] {
-  const key = `${w.toFixed(4)}|${h.toFixed(4)}|${r.toFixed(4)}`;
-  let pts = roundCache.get(key);
+const outlineCache = new Map<string, [number, number][]>();
+/** Petit bruit stable dans [-1, 1] */
+const wobble = (i: number, k: number) => {
+  const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+};
+
+/**
+ * Contour d'une plaque (sens trigonométrique) : coins arrondis (4 segments) et côtés découpés en
+ * petits segments légèrement décalés. Le décalage ne dépend que de la taille de la plaque extérieure
+ * (`ow`, `oh`) et du rang du point : bord extérieur et bord intérieur bougent ensemble (trait régulier).
+ */
+function outline(w: number, h: number, r: number, edge: Edge, ow: number, oh: number): [number, number][] {
+  const key = `${w.toFixed(4)}|${h.toFixed(4)}|${r.toFixed(4)}|${edge}|${ow.toFixed(4)}|${oh.toFixed(4)}`;
+  let pts = outlineCache.get(key);
   if (pts) return pts;
   pts = [];
   const rr = Math.min(r, w / 2, h / 2);
+  const seed = Math.round(ow * 1e4) * 7 + Math.round(oh * 1e4);
+  // Amplitude du tremblé : discrète sur le papier, plus marquée sur la cire
+  const amp = edge === 'clean' ? 0 : edge === 'wax' ? Math.min(ow, oh) * 0.045 : Math.min(0.0016, Math.min(ow, oh) * 0.02);
+  const sideSteps = (len: number) => (edge === 'clean' ? 0 : Math.min(10, Math.max(1, Math.round(len / (edge === 'wax' ? 0.012 : 0.025)))));
   const corners: [number, number, number][] = [
     [w / 2 - rr, h / 2 - rr, 0],
     [-w / 2 + rr, h / 2 - rr, Math.PI / 2],
     [-w / 2 + rr, -h / 2 + rr, Math.PI],
     [w / 2 - rr, -h / 2 + rr, (3 * Math.PI) / 2],
   ];
-  for (const [cx, cy, a0] of corners) for (let k = 0; k <= 4; k++) {
-    const a = a0 + (k / 4) * (Math.PI / 2);
-    pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
-  }
-  if (roundCache.size > 500) roundCache.clear();
-  roundCache.set(key, pts);
+  let idx = 0;
+  const push = (x: number, y: number, nx: number, ny: number) => {
+    const d = amp * wobble(seed, idx++);
+    pts!.push([x + nx * d, y + ny * d]);
+  };
+  corners.forEach(([cx, cy, a0], c) => {
+    for (let k = 0; k <= 4; k++) {
+      const a = a0 + (k / 4) * (Math.PI / 2);
+      push(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, Math.cos(a), Math.sin(a));
+    }
+    // Côté suivant : du bout de ce coin au début du coin suivant
+    const [nxc, nyc, na0] = corners[(c + 1) % 4];
+    const ex = cx + Math.cos(a0 + Math.PI / 2) * rr;
+    const ey = cy + Math.sin(a0 + Math.PI / 2) * rr;
+    const sx = nxc + Math.cos(na0) * rr;
+    const sy = nyc + Math.sin(na0) * rr;
+    // Nombre de segments fixé par la plaque extérieure : mêmes points pour les deux bords
+    const n = sideSteps(c % 2 === 0 ? ow : oh);
+    const nx = Math.cos(a0 + Math.PI / 2);
+    const ny = Math.sin(a0 + Math.PI / 2);
+    for (let k = 1; k < n; k++) push(ex + ((sx - ex) * k) / n, ey + ((sy - ey) * k) / n, nx, ny);
+  });
+  if (outlineCache.size > 800) outlineCache.clear();
+  outlineCache.set(key, pts);
   return pts;
 }
+
+/** Couleur du halo sous les textes sombres (papier) */
+const HALO = rgba(PAL.parchment);
 
 /** Blanc : icônes non teintées */
 export const NO_TINT = WHITE;

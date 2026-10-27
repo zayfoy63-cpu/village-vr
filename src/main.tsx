@@ -1,6 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import { applyPaletteCss } from './palette';
+
+// La palette unique devient les variables CSS --pal-* de l'interface PC
+applyPaletteCss();
 
 async function boot() {
   // Tests sans casque : ?emulate=controller (manettes) ou ?emulate=hands (mains), avant la création du store XR

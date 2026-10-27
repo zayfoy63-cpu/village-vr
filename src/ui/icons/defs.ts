@@ -1,6 +1,9 @@
-// Dessins des icônes du jeu (repère 24 x 24), dans le style low-poly coloré du village : facettes
-// à aplats de couleur et fin contour sombre. Une seule source : l'interface PC les affiche en SVG,
-// l'interface VR les dessine dans l'atlas de caractères partagé (Path2D, mêmes tracés).
+// Dessins des icônes du jeu (repère 24 x 24), façon enluminure : trait d'encre brune un peu
+// tremblé, lavis de couleurs de la palette posé légèrement à côté du trait (comme colorié à la main).
+// Une seule source : l'interface PC les affiche en SVG, l'interface VR les dessine dans l'atlas de
+// caractères partagé (Path2D, mêmes tracés).
+
+import { PAL, palMix } from '../../palette';
 
 export interface Shape {
   /** Tracé SVG */
@@ -20,8 +23,22 @@ export interface IconDef {
 
 // --- Petits outils de dessin -----------------------------------------------------------------
 
+/** Main levée : chaque sommet bouge un peu, toujours de la même façon pour un même point */
+const shaky = (pts: string) =>
+  pts
+    .trim()
+    .split(/\s+/)
+    .map((pt) => {
+      const [x, y] = pt.split(',').map(Number);
+      const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      const k = Math.sin(x * 39.346 + y * 11.135) * 24634.6345;
+      const dx = (h - Math.floor(h) - 0.5) * 0.6;
+      const dy = (k - Math.floor(k) - 0.5) * 0.6;
+      return `${+(x + dx).toFixed(2)},${+(y + dy).toFixed(2)}`;
+    });
+
 /** Polygone fermé : "x,y x,y …" */
-const p = (pts: string, fill: string): Shape => ({ d: `M${pts.trim().split(/\s+/).join('L')}Z`, fill });
+const p = (pts: string, fill: string): Shape => ({ d: `M${shaky(pts).join('L')}Z`, fill });
 /** Cercle */
 const c = (cx: number, cy: number, r: number, fill: string): Shape => ({
   d: `M${cx - r},${cy}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0Z`,
@@ -35,43 +52,43 @@ const e = (cx: number, cy: number, rx: number, ry: number, fill: string): Shape 
 /** Rectangle */
 const r = (x: number, y: number, w: number, h: number, fill: string): Shape => p(`${x},${y} ${x + w},${y} ${x + w},${y + h} ${x},${y + h}`, fill);
 /** Trait (ligne brisée ou tracé libre) */
-const l = (d: string, stroke: string, w = 2): Shape => ({ d: d.includes('M') ? d : `M${d.trim().split(/\s+/).join('L')}`, fill: 'none', stroke, w });
+const l = (d: string, stroke: string, w = 2): Shape => ({ d: d.includes('M') ? d : `M${shaky(d).join('L')}`, fill: 'none', stroke, w });
 
 // --- Palette -----------------------------------------------------------------------------------
 
 const K = {
-  wood: '#b06f34',
-  woodDark: '#7d4a22',
-  woodLight: '#d9a066',
-  stone: '#a2a7ad',
-  stoneDark: '#71777e',
-  stoneLight: '#cfd3d7',
-  gold: '#f5c432',
-  goldDark: '#d1921b',
-  wheat: '#ecc44f',
-  wheatDark: '#c9962b',
-  green: '#62b043',
-  greenDark: '#3d8a2c',
-  greenLight: '#9ed36a',
-  red: '#d9452f',
-  redDark: '#a12f22',
-  blue: '#3f84d6',
-  blueDark: '#2a5ea3',
-  blueLight: '#8fc6f2',
-  white: '#f6f1e6',
-  cream: '#efe2c4',
-  skin: '#f2c79b',
-  dark: '#3a3a42',
-  iron: '#cfd5dc',
-  orange: '#ef8a2c',
-  yellow: '#ffd84a',
-  purple: '#8a5ac9',
-  face: '#f7c948',
-  faceDark: '#e2a92c',
+  wood: palMix('ochre', 'brick', 0.5),
+  woodDark: PAL.wood,
+  woodLight: palMix('ochre', 'parchment', 0.5),
+  stone: palMix('bone', 'woad', 0.5),
+  stoneDark: palMix('stone', 'woad', 0.5),
+  stoneLight: palMix('bone', 'frost', 0.5),
+  gold: PAL.straw,
+  goldDark: PAL.ochre,
+  wheat: PAL.straw,
+  wheatDark: PAL.ochre,
+  green: PAL.moss,
+  greenDark: PAL.moss,
+  greenLight: PAL.sage,
+  red: PAL.brick,
+  redDark: PAL.brick,
+  blue: PAL.woad,
+  blueDark: PAL.woad,
+  blueLight: PAL.frost,
+  white: PAL.bone,
+  cream: palMix('parchment', 'bone', 0.5),
+  skin: palMix('ochre', 'bone', 0.5),
+  dark: palMix('ink', 'woad', 0.5),
+  iron: palMix('bone', 'frost', 0.5),
+  orange: PAL.ochre,
+  yellow: PAL.straw,
+  purple: PAL.woad,
+  face: PAL.straw,
+  faceDark: PAL.straw,
 };
 
 // Visages (moral, maladie) : cercle à deux facettes, yeux, bouche
-const face = (base = K.face, shade = K.faceDark): Shape[] => [
+const face = (base: string = K.face, shade: string = K.faceDark): Shape[] => [
   c(12, 12, 9.5, base),
   // Croissant d'ombre sur le côté droit (facette)
   { d: 'M12,2.5A9.5,9.5 0 0,1 12,21.5A11,11 0 0,0 12,2.5Z', fill: shade },
@@ -90,7 +107,7 @@ const hand = (mirror = false): Shape[] => {
   const m = (pts: string) => (mirror ? pts.replace(/(\d+(?:\.\d+)?),/g, (_, x) => `${24 - Number(x)},`) : pts);
   return [
     p(m('7,21 6,13 4.5,9.5 6.5,8.8 8.5,12 8.5,5 10.5,4.6 11.2,11 11.5,3.8 13.6,3.8 13.8,11 14.6,4.8 16.6,5.2 16.4,12 17.6,8 19.5,8.6 18.4,15 16,21'), K.skin),
-    p(m('8.5,16 16,16 16,21 7,21'), '#e0a97a'),
+    p(m('8.5,16 16,16 16,21 7,21'), palMix('ochre', 'parchment', 0.5)),
   ];
 };
 
@@ -124,25 +141,25 @@ export const ICON_DEFS = {
   },
   gold: {
     name: 'Or',
-    shapes: [c(12, 12, 9, K.gold), p('12,3 21,12 12,21 16.5,12', K.goldDark), c(12, 12, 5.4, '#ffd95e'), p('10.5,8 13.5,8 13.5,16 10.5,16', K.goldDark)],
+    shapes: [c(12, 12, 9, K.gold), p('12,3 21,12 12,21 16.5,12', K.goldDark), c(12, 12, 5.4, PAL.straw), p('10.5,8 13.5,8 13.5,16 10.5,16', K.goldDark)],
   },
   flour: {
     name: 'Farine',
     shapes: [
       p('6,9 8,5.5 16,5.5 18,9 19.5,20 4.5,20', K.white),
       p('12,9 18,9 19.5,20 12,20', K.cream),
-      p('7.5,8.6 16.5,8.6 16,10.2 8,10.2', '#c9a26b'),
+      p('7.5,8.6 16.5,8.6 16,10.2 8,10.2', palMix('ochre', 'parchment', 0.5)),
       p('12,12 10.5,15 12,18 13.5,15', K.wheat),
     ],
   },
   bread: {
     name: 'Pain',
     shapes: [
-      p('2.5,15 4,9.5 9,6.5 15,6.5 20,9.5 21.5,15 19,18 5,18', '#dc9a4c'),
-      p('2.5,15 5,18 19,18 21.5,15', '#b47233'),
-      l('7.5,9.5 9.5,13', '#f5cf8e', 1.6),
-      l('11.5,8.6 13,12.4', '#f5cf8e', 1.6),
-      l('15.5,9.2 16.5,12.8', '#f5cf8e', 1.6),
+      p('2.5,15 4,9.5 9,6.5 15,6.5 20,9.5 21.5,15 19,18 5,18', PAL.ochre),
+      p('2.5,15 5,18 19,18 21.5,15', palMix('ochre', 'brick', 0.5)),
+      l('7.5,9.5 9.5,13', palMix('straw', 'parchment', 0.5), 1.6),
+      l('11.5,8.6 13,12.4', palMix('straw', 'parchment', 0.5), 1.6),
+      l('15.5,9.2 16.5,12.8', palMix('straw', 'parchment', 0.5), 1.6),
     ],
   },
   planks: {
@@ -159,10 +176,10 @@ export const ICON_DEFS = {
   ironOre: {
     name: 'Minerai de fer',
     shapes: [
-      p('3,17 5.5,9 11,5.5 18,7 21,14 16.5,19.5 8,20', '#5f636b'),
-      p('11,5.5 18,7 21,14 13.5,11.5', '#7c818a'),
-      p('7,11 9.5,9.5 10.5,12 8,13', '#c8733e'),
-      p('14,14 17,13 16.5,16 14.5,16.5', '#c8733e'),
+      p('3,17 5.5,9 11,5.5 18,7 21,14 16.5,19.5 8,20', PAL.slate),
+      p('11,5.5 18,7 21,14 13.5,11.5', palMix('stone', 'woad', 0.5)),
+      p('7,11 9.5,9.5 10.5,12 8,13', palMix('ochre', 'brick', 0.5)),
+      p('14,14 17,13 16.5,16 14.5,16.5', palMix('ochre', 'brick', 0.5)),
       p('12,7.5 14,7 13.5,9', K.iron),
     ],
   },
@@ -213,7 +230,7 @@ export const ICON_DEFS = {
     name: 'Automne',
     shapes: [
       p('12,2.5 14.5,7.5 19.5,6 18,11 22,13.5 16.5,15.5 17,20 12,17.5 7,20 7.5,15.5 2,13.5 6,11 4.5,6 9.5,7.5', K.orange),
-      p('12,2.5 14.5,7.5 19.5,6 18,11 22,13.5 16.5,15.5 17,20 12,17.5', '#d0631f'),
+      p('12,2.5 14.5,7.5 19.5,6 18,11 22,13.5 16.5,15.5 17,20 12,17.5', palMix('ochre', 'brick', 0.5)),
       l('12,22 12,8', K.woodDark, 1.4),
     ],
   },
@@ -240,10 +257,10 @@ export const ICON_DEFS = {
     name: 'Maison bourgeoise',
     shapes: [
       p('3,11 10,11 10,21 3,21', K.cream),
-      p('2,11.5 6.5,6 11,11.5', '#4c5a6b'),
+      p('2,11.5 6.5,6 11,11.5', palMix('slate', 'woad', 0.5)),
       p('10,8 20,8 20,21 10,21', K.stoneLight),
-      p('9,8.5 15,2.5 21,8.5', '#5b6b7e'),
-      p('15,2.5 21,8.5 15,8.5', '#3e4b5a'),
+      p('9,8.5 15,2.5 21,8.5', palMix('slate', 'woad', 0.5)),
+      p('15,2.5 21,8.5 15,8.5', palMix('ink', 'woad', 0.5)),
       r(12, 11, 2.5, 2.5, K.yellow),
       r(15.6, 11, 2.5, 2.5, K.yellow),
       r(13.6, 16, 2.8, 5, K.woodDark),
@@ -254,8 +271,8 @@ export const ICON_DEFS = {
     name: 'Manoir',
     shapes: [
       p('2.5,12 21.5,12 21.5,21 2.5,21', K.cream),
-      p('1.5,12.5 6,8 18,8 22.5,12.5', '#7c2f3b'),
-      p('7,8.5 12,3 17,8.5', '#9b3b4a'),
+      p('1.5,12.5 6,8 18,8 22.5,12.5', PAL.madder),
+      p('7,8.5 12,3 17,8.5', PAL.madder),
       ...[4.5, 9, 13.2, 17.5].map((x) => r(x, 14, 2.2, 3, K.yellow)),
       r(10.6, 17.5, 2.8, 3.5, K.woodDark),
     ],
@@ -278,11 +295,11 @@ export const ICON_DEFS = {
     name: 'Moulin',
     shapes: [
       p('8.5,22 10.5,10 13.5,10 15.5,22', K.cream),
-      p('12,10 13.5,10 15.5,22 12,22', '#d8c7a3'),
+      p('12,10 13.5,10 15.5,22 12,22', PAL.parchment),
       p('10,10.5 12,7.5 14,10.5', K.redDark),
       p('12,9 4,3 3,5 11,10.5', K.white),
-      p('12,9 20,3 21,5 13,10.5', '#e2d9c6'),
-      p('12,9 3.5,14.5 4.5,16 12.5,10.5', '#e2d9c6'),
+      p('12,9 20,3 21,5 13,10.5', PAL.bone),
+      p('12,9 3.5,14.5 4.5,16 12.5,10.5', PAL.bone),
       p('12,9 20.5,14.5 19.5,16 11.5,10.5', K.white),
       c(12, 9, 1.3, K.woodDark),
     ],
@@ -330,7 +347,7 @@ export const ICON_DEFS = {
     shapes: [
       p('4,11 20,11 20,21 4,21', K.red),
       p('12,11 20,11 20,21 12,21', K.redDark),
-      p('2.5,11.5 7,5 17,5 21.5,11.5', '#7a3a24'),
+      p('2.5,11.5 7,5 17,5 21.5,11.5', palMix('umber', 'brick', 0.5)),
       p('8.5,13.5 15.5,13.5 15.5,21 8.5,21', K.cream),
       l('M8.5,13.5 L15.5,21 M15.5,13.5 L8.5,21', K.red, 1.4),
     ],
@@ -338,11 +355,11 @@ export const ICON_DEFS = {
   baguette: {
     name: 'Boulangerie',
     shapes: [
-      p('3,17.5 16.5,4 20.5,3.5 20,7.5 6.5,21 3.5,20.5', '#dc9a4c'),
-      p('3,17.5 3.5,20.5 6.5,21 20,7.5 18,8', '#b47233'),
-      l('8,15.5 10,17', '#f5cf8e', 1.5),
-      l('11.5,12 13.5,13.5', '#f5cf8e', 1.5),
-      l('15,8.5 17,10', '#f5cf8e', 1.5),
+      p('3,17.5 16.5,4 20.5,3.5 20,7.5 6.5,21 3.5,20.5', PAL.ochre),
+      p('3,17.5 3.5,20.5 6.5,21 20,7.5 18,8', palMix('ochre', 'brick', 0.5)),
+      l('8,15.5 10,17', palMix('straw', 'parchment', 0.5), 1.5),
+      l('11.5,12 13.5,13.5', palMix('straw', 'parchment', 0.5), 1.5),
+      l('15,8.5 17,10', palMix('straw', 'parchment', 0.5), 1.5),
     ],
   },
   saw: {
@@ -393,8 +410,8 @@ export const ICON_DEFS = {
       l('M8,16 L8,21 M11,16 L11,21 M14.5,16 L14.5,21 M17,16 L17,21', K.dark, 1.6),
       c(9, 12.5, 4, K.white),
       c(13, 11, 4.5, K.white),
-      c(16.5, 13.5, 3.5, '#e4ddcf'),
-      c(11.5, 15, 3.5, '#e4ddcf'),
+      c(16.5, 13.5, 3.5, PAL.bone),
+      c(11.5, 15, 3.5, PAL.bone),
       p('2,10 6,8.5 7.5,12.5 4,14', K.dark),
     ],
   },
@@ -442,15 +459,15 @@ export const ICON_DEFS = {
   worried: { name: 'Inquiet', shapes: [...face(), ...eyes(), l('M7.5,17 Q12,13.5 16.5,17', K.dark, 1.6), l('M6.5,7.5 L10,6.5 M17.5,7.5 L14,6.5', K.dark, 1.2)] },
   angry: {
     name: 'En colère',
-    shapes: [...face('#f29a3c', '#d9772a'), ...eyes(11), l('M6.5,7.5 L10.5,9.5 M17.5,7.5 L13.5,9.5', K.dark, 1.5), l('M8,17 L16,17', K.dark, 1.6)],
+    shapes: [...face(PAL.ochre, palMix('ochre', 'brick', 0.5)), ...eyes(11), l('M6.5,7.5 L10.5,9.5 M17.5,7.5 L13.5,9.5', K.dark, 1.5), l('M8,17 L16,17', K.dark, 1.6)],
   },
   furious: {
     name: 'Furieux',
-    shapes: [...face('#e2553b', '#b83c28'), ...eyes(11), l('M6,7 L10.5,9.8 M18,7 L13.5,9.8', K.dark, 1.6), p('7.5,15 16.5,15 15.5,18.5 8.5,18.5', K.white)],
+    shapes: [...face(PAL.brick, PAL.brick), ...eyes(11), l('M6,7 L10.5,9.8 M18,7 L13.5,9.8', K.dark, 1.6), p('7.5,15 16.5,15 15.5,18.5 8.5,18.5', K.white)],
   },
-  sick: { name: 'Malade', shapes: [...face('#a8cf68', '#86b04c'), ...eyes(), l('M7,16 Q9,14 11,16 T15,16 T17,15.5', K.greenDark, 1.5)] },
-  cold: { name: 'Gelé', shapes: [...face('#93c9f0', '#6aa8d8'), ...eyes(), p('7.5,14.5 16.5,14.5 16.5,17.5 7.5,17.5', K.white), l('M10.5,14.5 L10.5,17.5 M13.5,14.5 L13.5,17.5', K.blueDark, 1)] },
-  injured: { name: 'Blessé', shapes: [...face(), ...eyes(), l('M8.5,15.5 L15.5,15.5', K.dark, 1.5), p('4,6.5 6,4 19.5,15.5 17.5,18', K.white), p('10,9 12,11 14,9.5 12,7.5', '#e9b7b0')] },
+  sick: { name: 'Malade', shapes: [...face(PAL.sage, PAL.sage), ...eyes(), l('M7,16 Q9,14 11,16 T15,16 T17,15.5', K.greenDark, 1.5)] },
+  cold: { name: 'Gelé', shapes: [...face(PAL.frost, palMix('woad', 'frost', 0.5)), ...eyes(), p('7.5,14.5 16.5,14.5 16.5,17.5 7.5,17.5', K.white), l('M10.5,14.5 L10.5,17.5 M13.5,14.5 L13.5,17.5', K.blueDark, 1)] },
+  injured: { name: 'Blessé', shapes: [...face(), ...eyes(), l('M8.5,15.5 L15.5,15.5', K.dark, 1.5), p('4,6.5 6,4 19.5,15.5 17.5,18', K.white), p('10,9 12,11 14,9.5 12,7.5', palMix('bone', 'brick', 0.5))] },
   mask: { name: 'Quarantaine', shapes: [...face(), ...eyes(8.8), p('5,12 19,12 18,17.5 12,19.5 6,17.5', K.white), l('M5,12 L2.5,10.5 M19,12 L21.5,10.5', K.white, 1.2)] },
 
   // ---------------------------------------------------------------- Événements, dangers, états
@@ -458,7 +475,7 @@ export const ICON_DEFS = {
     name: 'Mort',
     shapes: [
       p('5,10 7,4.5 12,2.5 17,4.5 19,10 17,14.5 16,19 8,19 7,14.5', K.white),
-      p('12,2.5 17,4.5 19,10 17,14.5 16,19 12,19', '#ddd6c6'),
+      p('12,2.5 17,4.5 19,10 17,14.5 16,19 12,19', palMix('parchment', 'frost', 0.5)),
       c(9, 10.5, 2.2, K.dark),
       c(15, 10.5, 2.2, K.dark),
       p('12,13 13.2,15.5 10.8,15.5', K.dark),
@@ -474,7 +491,7 @@ export const ICON_DEFS = {
         return p(`${q(-0.22, 7)} ${q(-0.16, 10.5)} ${q(0.16, 10.5)} ${q(0.22, 7)}`, K.stoneDark);
       }),
       c(12, 12, 7.3, K.stone),
-      c(12, 12, 2.8, '#4b4f56'),
+      c(12, 12, 2.8, palMix('umber', 'woad', 0.5)),
     ],
   },
   dagger: {
@@ -484,28 +501,28 @@ export const ICON_DEFS = {
   storm: {
     name: 'Orage',
     shapes: [
-      p('3.5,13 5,8.5 9,7.5 11,4.5 16,4.5 18.5,7.5 21,9 21,13', '#6c7480'),
-      p('3.5,13 21,13 19.5,15 5,15', '#4d545e'),
+      p('3.5,13 5,8.5 9,7.5 11,4.5 16,4.5 18.5,7.5 21,9 21,13', palMix('stone', 'woad', 0.5)),
+      p('3.5,13 21,13 19.5,15 5,15', PAL.slate),
       p('12,14 9,19 11.5,19 10,23 15.5,16.5 13,16.5 14.5,14', K.yellow),
     ],
   },
   luggage: {
     name: 'Réfugiés',
-    shapes: [l('M9,7 L9,4.5 L15,4.5 L15,7', K.woodDark, 1.6), p('3,7 21,7 21,20 3,20', '#a8672f'), p('12,7 21,7 21,20 12,20', K.woodDark), r(3, 12, 18, 2, K.gold)],
+    shapes: [l('M9,7 L9,4.5 L15,4.5 L15,7', K.woodDark, 1.6), p('3,7 21,7 21,20 3,20', palMix('ochre', 'brick', 0.5)), p('12,7 21,7 21,20 12,20', K.woodDark), r(3, 12, 18, 2, K.gold)],
   },
   people: {
     name: 'Habitants',
     shapes: [
-      c(15.5, 7.5, 3.6, '#e6b98c'),
-      p('9,21 10,14.5 15.5,12 21,14.5 22,21', '#3b7fbf'),
+      c(15.5, 7.5, 3.6, palMix('ochre', 'bone', 0.5)),
+      p('9,21 10,14.5 15.5,12 21,14.5 22,21', PAL.woad),
       c(8.5, 8.5, 3.8, K.skin),
-      p('2,21 3,15 8.5,12.5 14,15 15,21', '#4fa36a'),
+      p('2,21 3,15 8.5,12.5 14,15 15,21', PAL.moss),
     ],
   },
   horse: {
     name: 'Marchand',
     shapes: [
-      p('6,21 7,13 9.5,7 9,3 11.5,5 16,5.5 21,11 20,13.5 17,13 14,11.5 14.5,21', '#9a6436'),
+      p('6,21 7,13 9.5,7 9,3 11.5,5 16,5.5 21,11 20,13.5 17,13 14,11.5 14.5,21', palMix('ochre', 'madder', 0.5)),
       p('9,3 11.5,5 9.5,7 7,13 6.5,9.5', K.woodDark),
       c(15, 8.5, 1, K.dark),
     ],
@@ -538,13 +555,13 @@ export const ICON_DEFS = {
         const q = (k: number, d: number) => `${(12 + Math.cos(a + k) * d).toFixed(2)},${(9 + Math.sin(a + k) * d).toFixed(2)}`;
         return p(`${q(-0.4, 3.5)} ${q(0, 8)} ${q(0.4, 3.5)}`, i % 2 ? K.yellow : K.gold);
       }),
-      c(12, 9, 3.8, '#7a4a22'),
+      c(12, 9, 3.8, PAL.wood),
     ],
   },
   farmer: {
     name: 'Paysan',
     shapes: [
-      p('4,21.5 5,16 12,13.5 19,16 20,21.5', '#4f8fc0'),
+      p('4,21.5 5,16 12,13.5 19,16 20,21.5', PAL.woad),
       c(12, 9.5, 4.2, K.skin),
       p('3,7.5 21,7.5 18,9 6,9', K.wheat),
       p('7.5,7.5 9,3 15,3 16.5,7.5', K.wheatDark),
@@ -555,9 +572,9 @@ export const ICON_DEFS = {
     shapes: [
       l('M9,22 C9,16 9,12 13,9', K.greenDark, 1.6),
       p('9,17 4.5,15.5 6.5,13', K.green),
-      p('13,9 18.5,6 20,10 17,14 13.5,13', '#9b2b3a'),
-      p('13,9 18.5,6 17,9.5', '#c03a4c'),
-      p('17,14 16.5,17.5 15.5,15', '#9b2b3a'),
+      p('13,9 18.5,6 20,10 17,14 13.5,13', palMix('brick', 'madder', 0.5)),
+      p('13,9 18.5,6 17,9.5', PAL.brick),
+      p('17,14 16.5,17.5 15.5,15', palMix('brick', 'madder', 0.5)),
     ],
   },
   flood: {
@@ -571,10 +588,10 @@ export const ICON_DEFS = {
   rat: {
     name: 'Rats',
     shapes: [
-      l('M3,16 C1,12 4,9 6,11', '#c9a6a0', 1.4),
+      l('M3,16 C1,12 4,9 6,11', palMix('bone', 'madder', 0.5), 1.4),
       p('4.5,16.5 7,11 13,9 17.5,11 21.5,14.5 18,17 6,17.5', K.stone),
       p('13,9 17.5,11 21.5,14.5 15,14', K.stoneDark),
-      c(15.5, 9, 2, '#c9a6a0'),
+      c(15.5, 9, 2, palMix('bone', 'madder', 0.5)),
       c(18.5, 13, 0.9, K.dark),
     ],
   },
@@ -585,8 +602,8 @@ export const ICON_DEFS = {
   wolf: {
     name: 'Loups',
     shapes: [
-      p('4,3 9,8 15,8 20,3 20.5,11 18,16 12,21.5 6,16 3.5,11', '#7d8189'),
-      p('12,8 15,8 20,3 20.5,11 18,16 12,21.5', '#5f636b'),
+      p('4,3 9,8 15,8 20,3 20.5,11 18,16 12,21.5 6,16 3.5,11', palMix('stone', 'woad', 0.5)),
+      p('12,8 15,8 20,3 20.5,11 18,16 12,21.5', PAL.slate),
       p('9,15 15,15 12,20', K.white),
       c(9, 11, 1.1, K.yellow),
       c(15, 11, 1.1, K.yellow),
@@ -596,8 +613,8 @@ export const ICON_DEFS = {
   moneyBag: {
     name: 'Butin',
     shapes: [
-      p('8,4 16,4 14,7.5 18.5,11 20,17 17,21 7,21 4,17 5.5,11 10,7.5', '#c9a26b'),
-      p('12,7.5 14,7.5 18.5,11 20,17 17,21 12,21', '#a8834e'),
+      p('8,4 16,4 14,7.5 18.5,11 20,17 17,21 7,21 4,17 5.5,11 10,7.5', palMix('ochre', 'parchment', 0.5)),
+      p('12,7.5 14,7.5 18.5,11 20,17 17,21 12,21', palMix('umber', 'straw', 0.5)),
       r(9, 6.5, 6, 1.8, K.woodDark),
       c(12, 14.5, 3.4, K.gold),
     ],
@@ -628,7 +645,7 @@ export const ICON_DEFS = {
     name: 'Carte',
     shapes: [
       p('2,5 8,3 16,5 22,3 22,19 16,21 8,19 2,21', K.cream),
-      p('8,3 16,5 16,21 8,19', '#dccb9f'),
+      p('8,3 16,5 16,21 8,19', PAL.parchment),
       p('4,9 7,8 8,12 5,14', K.green),
       p('17,10 20,8 21,13 18,15', K.green),
       l('M9,9 Q12,12 10,16', K.blue, 1.4),
@@ -641,7 +658,7 @@ export const ICON_DEFS = {
     name: 'Famine',
     shapes: [
       c(12, 13, 7.5, K.white),
-      c(12, 13, 4.5, '#ddd6c6'),
+      c(12, 13, 4.5, palMix('parchment', 'frost', 0.5)),
       l('M2.5,3 L2.5,9 M4.5,3 L4.5,22', K.iron, 1.4),
       p('19.5,3 21.5,3 21.5,22 19.5,22 19.5,11 18.5,9', K.iron),
     ],
@@ -653,9 +670,9 @@ export const ICON_DEFS = {
     name: 'Chronique',
     shapes: [
       p('6,3 20,3 20,17 18,21 4,21 4,7', K.cream),
-      p('4,7 6,3 8,7', '#d8c49a'),
-      e(19, 19, 2, 2, '#d8c49a'),
-      l('M8,9 L16,9 M8,12 L16,12 M8,15 L13,15', '#a8834e', 1.2),
+      p('4,7 6,3 8,7', PAL.parchment),
+      e(19, 19, 2, 2, PAL.parchment),
+      l('M8,9 L16,9 M8,12 L16,12 M8,15 L13,15', palMix('umber', 'straw', 0.5), 1.2),
     ],
   },
   pause: { name: 'Pause', shapes: [r(6, 4, 4, 16, K.white), r(14, 4, 4, 16, K.white)] },
@@ -667,14 +684,14 @@ export const ICON_DEFS = {
     shapes: [
       p('5,17 6.5,11 11,8 16,9 19,13 19.5,17', K.green),
       p('11,8 16,9 19,13 19.5,17 12.5,17', K.greenDark),
-      p('19,13 21.5,11 23,13.5 20.5,16', '#7fb85b'),
-      l('M7,17 L6.5,20 M16.5,17 L17,20', '#7fb85b', 1.8),
+      p('19,13 21.5,11 23,13.5 20.5,16', PAL.sage),
+      l('M7,17 L6.5,20 M16.5,17 L17,20', PAL.sage, 1.8),
     ],
   },
-  box: { name: 'Stock', shapes: [p('3,8 12,4 21,8 21,18 12,22 3,18', '#c99a5e'), p('12,12 21,8 21,18 12,22', '#a57a43'), p('3,8 12,4 21,8 12,12', '#dfb77c'), l('M7.5,6 L16.5,10', '#8a6232', 1.2)] },
-  forbidden: { name: 'Interdit', shapes: [c(12, 12, 10, K.red), p('2,12 12,2 22,12 12,12', '#e8604a'), r(5.5, 10, 13, 4, K.white)] },
+  box: { name: 'Stock', shapes: [p('3,8 12,4 21,8 21,18 12,22 3,18', palMix('wood', 'straw', 0.5)), p('12,12 21,8 21,18 12,22', palMix('brick', 'sage', 0.5)), p('3,8 12,4 21,8 12,12', palMix('ochre', 'parchment', 0.5)), l('M7.5,6 L16.5,10', palMix('umber', 'ochre', 0.5), 1.2)] },
+  forbidden: { name: 'Interdit', shapes: [c(12, 12, 10, K.red), p('2,12 12,2 22,12 12,12', PAL.brick), r(5.5, 10, 13, 4, K.white)] },
   star: { name: 'Étoile', shapes: [p('12,1.5 14.8,8.5 22.5,9 16.5,14 18.5,21.5 12,17.3 5.5,21.5 7.5,14 1.5,9 9.2,8.5', K.gold), p('12,1.5 14.8,8.5 22.5,9 16.5,14 18.5,21.5 12,17.3', K.goldDark)] },
-  starEmpty: { name: 'Étoile vide', shapes: [p('12,1.5 14.8,8.5 22.5,9 16.5,14 18.5,21.5 12,17.3 5.5,21.5 7.5,14 1.5,9 9.2,8.5', '#5a4c3a')] },
+  starEmpty: { name: 'Étoile vide', shapes: [p('12,1.5 14.8,8.5 22.5,9 16.5,14 18.5,21.5 12,17.3 5.5,21.5 7.5,14 1.5,9 9.2,8.5', palMix('ink', 'stone', 0.5))] },
   drop: {
     name: 'Eau',
     shapes: [
@@ -693,14 +710,14 @@ export const ICON_DEFS = {
       p('7,18.5 17,18.5 18,22 6,22', K.woodDark),
     ],
   },
-  question: { name: 'Inconnu', shapes: [c(12, 12, 10, '#6b5a8a'), l('M8.5,9 C8.5,4.5 15.5,4.5 15.5,8.5 C15.5,11 12,11.5 12,14.5', K.white, 2.4), c(12, 18, 1.5, K.white)] },
+  question: { name: 'Inconnu', shapes: [c(12, 12, 10, PAL.woad), l('M8.5,9 C8.5,4.5 15.5,4.5 15.5,8.5 C15.5,11 12,11.5 12,14.5', K.white, 2.4), c(12, 18, 1.5, K.white)] },
   check: { name: 'Fait', shapes: [p('2.5,4 21.5,4 21.5,20.5 2.5,20.5', K.green), p('12,4 21.5,4 21.5,20.5 12,20.5', K.greenDark), l('6,12.5 10.5,16.5 18,8', K.white, 2.6)] },
   hourglass: {
     name: 'Sablier',
     shapes: [
       r(4.5, 2, 15, 2.5, K.woodDark),
       r(4.5, 19.5, 15, 2.5, K.woodDark),
-      p('6,4.5 18,4.5 13,12 18,19.5 6,19.5 11,12', '#cfe6f5'),
+      p('6,4.5 18,4.5 13,12 18,19.5 6,19.5 11,12', PAL.frost),
       p('8,6 16,6 12.6,11 11.4,11', K.wheat),
       p('12,14 16.5,19.5 7.5,19.5', K.wheat),
     ],
@@ -708,7 +725,7 @@ export const ICON_DEFS = {
   lightning: { name: 'Temps réel', shapes: [p('14,1.5 4.5,13.5 11,13.5 9,22.5 19.5,9.5 13,9.5', K.yellow), p('14,1.5 13,9.5 19.5,9.5 9,22.5 11.5,13', K.gold)] },
   calendar: {
     name: 'Jours',
-    shapes: [p('3,5 21,5 21,21.5 3,21.5', K.white), p('3,5 21,5 21,9.5 3,9.5', K.red), r(6.5, 2.5, 2.2, 4.5, K.dark), r(15.3, 2.5, 2.2, 4.5, K.dark), ...[0, 1, 2].flatMap((i) => [r(6 + i * 4.5, 12, 3, 2.6, '#c9c0ae'), r(6 + i * 4.5, 16.5, 3, 2.6, '#c9c0ae')])],
+    shapes: [p('3,5 21,5 21,21.5 3,21.5', K.white), p('3,5 21,5 21,9.5 3,9.5', K.red), r(6.5, 2.5, 2.2, 4.5, K.dark), r(15.3, 2.5, 2.2, 4.5, K.dark), ...[0, 1, 2].flatMap((i) => [r(6 + i * 4.5, 12, 3, 2.6, palMix('bone', 'stone', 0.5)), r(6 + i * 4.5, 16.5, 3, 2.6, palMix('bone', 'stone', 0.5))])],
   },
   crane: {
     name: 'Bâtiments construits',
@@ -726,17 +743,17 @@ export const ICON_DEFS = {
   },
   headset: {
     name: 'Réalité mixte',
-    shapes: [l('M3,11 C3,3 21,3 21,11', K.dark, 1.6), p('2,9 22,9 22,17 15.5,17 12,14 8.5,17 2,17', '#4b4f56'), p('4,11 10,11 10,15 4,15', K.blueLight), p('14,11 20,11 20,15 14,15', K.blueLight)],
+    shapes: [l('M3,11 C3,3 21,3 21,11', K.dark, 1.6), p('2,9 22,9 22,17 15.5,17 12,14 8.5,17 2,17', palMix('umber', 'woad', 0.5)), p('4,11 10,11 10,15 4,15', K.blueLight), p('14,11 20,11 20,15 14,15', K.blueLight)],
   },
   point: {
     name: 'Pointer',
-    shapes: [p('2,9.5 14,9.5 14,13 9.5,13 10.5,15 16,15 16.5,19.5 6,19.5 3.5,16.5', K.skin), p('14,9.5 21.5,9.5 21.5,12 14,12', K.skin), p('3.5,16.5 6,19.5 16.5,19.5 16,17', '#e0a97a')],
+    shapes: [p('2,9.5 14,9.5 14,13 9.5,13 10.5,15 16,15 16.5,19.5 6,19.5 3.5,16.5', K.skin), p('14,9.5 21.5,9.5 21.5,12 14,12', K.skin), p('3.5,16.5 6,19.5 16.5,19.5 16,17', palMix('ochre', 'parchment', 0.5))],
   },
   tap: {
     name: 'Tapoter',
-    shapes: [p('10,2 13,2 13,10 17.5,10.5 19,13 18.5,21.5 8,21.5 5.5,15 7,13.5 10,15.5', K.skin), p('8,21.5 18.5,21.5 18.8,18 9,18', '#e0a97a')],
+    shapes: [p('10,2 13,2 13,10 17.5,10.5 19,13 18.5,21.5 8,21.5 5.5,15 7,13.5 10,15.5', K.skin), p('8,21.5 18.5,21.5 18.8,18 9,18', palMix('ochre', 'parchment', 0.5))],
   },
-  pin: { name: 'Ici', shapes: [l('12,13 12,22', K.dark, 1.6), c(12, 8, 6, K.red), p('12,2 18,8 12,14', K.redDark), c(10, 6.5, 1.6, '#f08a7a')] },
+  pin: { name: 'Ici', shapes: [l('12,13 12,22', K.dark, 1.6), c(12, 8, 6, K.red), p('12,2 18,8 12,14', K.redDark), c(10, 6.5, 1.6, palMix('parchment', 'brick', 0.5))] },
   triUp: { name: 'Monter', shapes: [p('12,4 21,19 3,19', K.white)] },
   triDown: { name: 'Descendre', shapes: [p('3,5 21,5 12,20', K.white)] },
   triLeft: { name: 'Précédent', shapes: [p('19,3.5 19,20.5 5,12', K.white)] },
@@ -747,7 +764,7 @@ export const ICON_DEFS = {
     name: 'Assis',
     shapes: [p('6,2.5 9,2.5 9,12 6,12', K.wood), p('5,11.5 19,11.5 19,14 5,14', K.woodLight), l('M6.5,14 L6.5,22 M17.5,14 L17.5,22', K.woodDark, 2), p('6,4.5 9,4.5 9,6.5 6,6.5', K.woodDark)],
   },
-  person: { name: 'Debout', shapes: [c(12, 4.5, 3, K.skin), p('8,8.5 16,8.5 17,15.5 14.5,15.5 14,22 10,22 9.5,15.5 7,15.5', '#4f8fc0')] },
+  person: { name: 'Debout', shapes: [c(12, 4.5, 3, K.skin), p('8,8.5 16,8.5 17,15.5 14.5,15.5 14,22 10,22 9.5,15.5 7,15.5', PAL.woad)] },
   sound: { name: 'Son', shapes: [p('3,9 8,9 14,3.5 14,20.5 8,15 3,15', K.white), l('M16.5,8.5 C19,10.5 19,13.5 16.5,15.5 M19,5.5 C24,9.5 24,14.5 19,18.5', K.white, 1.6)] },
   mute: { name: 'Muet', shapes: [p('3,9 8,9 14,3.5 14,20.5 8,15 3,15', K.white), l('M16.5,9 L22,15 M22,9 L16.5,15', K.red, 2)] },
   chart: { name: 'Performances', shapes: [p('2.5,2.5 4.5,2.5 4.5,19.5 21.5,19.5 21.5,21.5 2.5,21.5', K.white), l('6,16 10.5,11 14,13.5 20.5,5.5', K.green, 2.2), p('17.5,5 21,4.5 20.5,8', K.green)] },
@@ -755,17 +772,17 @@ export const ICON_DEFS = {
   bulb: { name: 'Astuce', shapes: [p('12,1.5 17,3.5 19,8.5 16,14 15.5,17 8.5,17 8,14 5,8.5 7,3.5', K.yellow), p('12,1.5 17,3.5 19,8.5 16,14 15.5,17 12,17', K.gold), r(8.5, 17.5, 7, 2, K.stoneDark), r(9.5, 20, 5, 2, K.stoneDark)] },
   controller: {
     name: 'Manettes',
-    shapes: [p('2,9 6,6 18,6 22,9 22.5,16 20,19 16.5,16 7.5,16 4,19 1.5,16', '#4b4f56'), r(5, 10, 5, 1.6, K.white), r(6.7, 8.3, 1.6, 5, K.white), c(16, 9.8, 1.3, K.green), c(18.5, 12.3, 1.3, K.red)],
+    shapes: [p('2,9 6,6 18,6 22,9 22.5,16 20,19 16.5,16 7.5,16 4,19 1.5,16', palMix('umber', 'woad', 0.5)), r(5, 10, 5, 1.6, K.white), r(6.7, 8.3, 1.6, 5, K.white), c(16, 9.8, 1.3, K.green), c(18.5, 12.3, 1.3, K.red)],
   },
-  pinch: { name: 'Pincer', shapes: [p('5,21.5 4,13 6.5,9.5 9,11 9,7 12,4 13.5,5.5 11,9.5 13,12 16,7.5 18,8.5 15.5,15 14,21.5', K.skin), p('13,12 16,7.5 18,8.5 15.5,15', '#e0a97a')] },
-  twoHands: { name: 'Deux mains', shapes: [p('1.5,20 2,11 4,7 6,7.5 5.5,11 7.5,4.5 9.5,5 9.5,12 10.5,20', K.skin), p('22.5,20 22,11 20,7 18,7.5 18.5,11 16.5,4.5 14.5,5 14.5,12 13.5,20', '#e0a97a')] },
-  trigger: { name: 'Gâchette', shapes: [p('6,3 16,3 19,8 17,21.5 11,21.5 10.5,12 6,10', '#4b4f56'), p('10,11 6,13.5 6,16.5 10.5,15', K.gold), c(13.5, 6.5, 1.8, K.blueLight)] },
-  grip: { name: 'Grip', shapes: [p('4,9 7,6.5 17,6.5 20,9 20,17 16,21 8,21 4,17', K.skin), p('4,13 20,13 20,17 16,21 8,21 4,17', '#e0a97a'), l('M8,9 L8,13 M12,8.5 L12,13 M16,9 L16,13', '#c08860', 1)] },
-  btnA: { name: 'Bouton A', shapes: [c(12, 12, 10, '#e45545'), l('M7.5,18 L12,5.5 L16.5,18 M9,14 L15,14', K.white, 2.2)] },
-  btnB: { name: 'Bouton B', shapes: [c(12, 12, 10, '#3f84d6'), l('M8.5,5.5 L8.5,18.5 L13.5,18.5 C17.5,18.5 17.5,12 13.5,12 L8.5,12 M8.5,5.5 L13,5.5 C16.5,5.5 16.5,12 13,12', K.white, 2.1)] },
-  btnX: { name: 'Bouton X', shapes: [c(12, 12, 10, '#5aa64a'), l('M8,7 L16,17 M16,7 L8,17', K.white, 2.4)] },
-  stick: { name: 'Stick', shapes: [p('3,17 21,17 20,21.5 4,21.5', '#4b4f56'), l('12,17 12,8', K.dark, 2.4), c(12, 6.5, 4, K.red), p('12,2.5 16,6.5 12,10.5', K.redDark)] },
+  pinch: { name: 'Pincer', shapes: [p('5,21.5 4,13 6.5,9.5 9,11 9,7 12,4 13.5,5.5 11,9.5 13,12 16,7.5 18,8.5 15.5,15 14,21.5', K.skin), p('13,12 16,7.5 18,8.5 15.5,15', palMix('ochre', 'parchment', 0.5))] },
+  twoHands: { name: 'Deux mains', shapes: [p('1.5,20 2,11 4,7 6,7.5 5.5,11 7.5,4.5 9.5,5 9.5,12 10.5,20', K.skin), p('22.5,20 22,11 20,7 18,7.5 18.5,11 16.5,4.5 14.5,5 14.5,12 13.5,20', palMix('ochre', 'parchment', 0.5))] },
+  trigger: { name: 'Gâchette', shapes: [p('6,3 16,3 19,8 17,21.5 11,21.5 10.5,12 6,10', palMix('umber', 'woad', 0.5)), p('10,11 6,13.5 6,16.5 10.5,15', K.gold), c(13.5, 6.5, 1.8, K.blueLight)] },
+  grip: { name: 'Grip', shapes: [p('4,9 7,6.5 17,6.5 20,9 20,17 16,21 8,21 4,17', K.skin), p('4,13 20,13 20,17 16,21 8,21 4,17', palMix('ochre', 'parchment', 0.5)), l('M8,9 L8,13 M12,8.5 L12,13 M16,9 L16,13', palMix('parchment', 'brick', 0.5), 1)] },
+  btnA: { name: 'Bouton A', shapes: [c(12, 12, 10, PAL.brick), l('M7.5,18 L12,5.5 L16.5,18 M9,14 L15,14', K.white, 2.2)] },
+  btnB: { name: 'Bouton B', shapes: [c(12, 12, 10, PAL.woad), l('M8.5,5.5 L8.5,18.5 L13.5,18.5 C17.5,18.5 17.5,12 13.5,12 L8.5,12 M8.5,5.5 L13,5.5 C16.5,5.5 16.5,12 13,12', K.white, 2.1)] },
+  btnX: { name: 'Bouton X', shapes: [c(12, 12, 10, PAL.moss), l('M8,7 L16,17 M16,7 L8,17', K.white, 2.4)] },
+  stick: { name: 'Stick', shapes: [p('3,17 21,17 20,21.5 4,21.5', palMix('umber', 'woad', 0.5)), l('12,17 12,8', K.dark, 2.4), c(12, 6.5, 4, K.red), p('12,2.5 16,6.5 12,10.5', K.redDark)] },
   updown: { name: 'Hauteur', shapes: [p('12,1.5 18.5,8.5 5.5,8.5', K.white), p('12,22.5 18.5,15.5 5.5,15.5', K.white), r(10.6, 8.5, 2.8, 7, K.white)] },
-  dice: { name: 'Hasard', shapes: [p('3,7 12,3 21,7 21,17 12,21.5 3,17', K.white), p('12,11 21,7 21,17 12,21.5', '#ddd6c6'), p('3,7 12,3 21,7 12,11', '#fbf8f0'), c(12, 7, 1.3, K.red), c(7, 13.5, 1.2, K.dark), c(16.5, 12.5, 1.2, K.dark), c(16.5, 17, 1.2, K.dark)] },
-  mouse: { name: 'Souris', shapes: [p('6,8 8.5,3 15.5,3 18,8 18,17 15.5,21.5 8.5,21.5 6,17', K.white), p('6,9.5 18,9.5 18,8 15.5,3 12,3 12,9.5 6,9.5 6,8', '#ddd6c6'), l('12,3 12,9.5', K.dark, 1.1)] },
+  dice: { name: 'Hasard', shapes: [p('3,7 12,3 21,7 21,17 12,21.5 3,17', K.white), p('12,11 21,7 21,17 12,21.5', palMix('parchment', 'frost', 0.5)), p('3,7 12,3 21,7 12,11', PAL.bone), c(12, 7, 1.3, K.red), c(7, 13.5, 1.2, K.dark), c(16.5, 12.5, 1.2, K.dark), c(16.5, 17, 1.2, K.dark)] },
+  mouse: { name: 'Souris', shapes: [p('6,8 8.5,3 15.5,3 18,8 18,17 15.5,21.5 8.5,21.5 6,17', K.white), p('6,9.5 18,9.5 18,8 15.5,3 12,3 12,9.5 6,9.5 6,8', palMix('parchment', 'frost', 0.5)), l('12,3 12,9.5', K.dark, 1.1)] },
 } satisfies Record<string, IconDef>;

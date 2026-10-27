@@ -1,13 +1,44 @@
+@import '@fontsource/im-fell-english/latin-400.css';
+@import '@fontsource/im-fell-english/latin-400-italic.css';
+@import '@fontsource/alegreya-sans/latin-400.css';
+@import '@fontsource/alegreya-sans/latin-500.css';
+@import '@fontsource/alegreya-sans/latin-700.css';
+
+/* Les chiffres anciens de la police de titres sont jolis mais peu lisibles : chiffres modernes */
+@font-face {
+  font-family: 'Titre chiffres';
+  src: url('../node_modules/@fontsource/alegreya-sans/files/alegreya-sans-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0030-0039;
+  font-display: swap;
+}
+
+/*
+ * Style « registre du village » : papier, encre brune, sceaux de cire. Toutes les couleurs viennent
+ * de la palette unique (src/palette.ts, publiée en variables --pal-*). Pas de dégradés ni d'ombres
+ * portées : des traits d'encre et des bords un peu irréguliers, comme tracés à la main.
+ */
 :root {
-  --panel: rgba(40, 27, 18, 0.82);
-  --panel-border: rgba(214, 170, 110, 0.45);
-  --text: #f6ead6;
-  --muted: #c9b597;
-  --accent: #e7b45a;
-  --good: #6fcf7a;
-  --bad: #ef6b5b;
-  --info: #8fb8e8;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --paper: var(--pal-parchment);
+  --paper-light: color-mix(in srgb, var(--pal-bone) 70%, var(--pal-parchment));
+  --paper-dark: color-mix(in srgb, var(--pal-parchment) 72%, var(--pal-ochre));
+  --panel: color-mix(in srgb, var(--pal-parchment) 96%, transparent);
+  --panel-border: var(--pal-umber);
+  --text: var(--pal-ink);
+  --muted: var(--pal-wood);
+  --accent: var(--pal-madder);
+  --warn: color-mix(in srgb, var(--pal-ochre) 55%, var(--pal-ink));
+  --good: var(--pal-forest);
+  --bad: var(--pal-brick);
+  --info: var(--pal-woad);
+  /* Grain du papier (bruit dessiné par le navigateur, aucun fichier chargé) */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.23 0 0 0 0 0.15 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Coins inégaux : chaque cadre a l'air découpé à la main */
+  --rough: 4px 9px 5px 8px / 8px 4px 9px 5px;
+  --rough-2: 9px 4px 8px 5px / 5px 9px 4px 8px;
+  --font-title: 'Titre chiffres', 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--text);
 }
 
@@ -23,7 +54,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #2a1e17;
+  background: var(--pal-ink);
 }
 
 .app canvas {
@@ -33,7 +64,7 @@ body,
 button {
   font: inherit;
   color: var(--text);
-  background: rgba(90, 60, 38, 0.9);
+  background: var(--paper-light);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 6px 10px;
@@ -42,7 +73,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: rgba(125, 85, 52, 0.95);
+  background: var(--paper-dark);
 }
 
 button:active:not(:disabled) {
@@ -56,8 +87,8 @@ button:disabled {
 
 button.active {
   background: var(--accent);
-  color: #2a1a0c;
-  border-color: #ffd98f;
+  color: var(--text);
+  border-color: var(--pal-ink);
 }
 
 /* ---------- Calque UI ---------- */
@@ -93,8 +124,7 @@ button.active {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+
 }
 
 .seed-panel {
@@ -112,7 +142,7 @@ button.active {
 }
 
 .vr-btn {
-  background: rgba(63, 111, 181, 0.85);
+  background: var(--pal-woad);
 }
 
 /* ---------- HUD ---------- */
@@ -168,14 +198,14 @@ button.active {
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(239, 107, 91, 0.25);
+  background: color-mix(in srgb, var(--pal-brick) 18%, transparent);
 }
 
 .day-bar {
   width: 60px;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--pal-ink) 14%, transparent);
   overflow: hidden;
 }
 
@@ -212,7 +242,6 @@ button.active {
   border-left: 5px solid var(--info);
   border-radius: 10px;
   padding: 8px 10px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   animation: slide-in 0.35s ease-out;
 }
 
@@ -269,7 +298,7 @@ button.active {
 .event-text {
   font-size: 13px;
   margin-top: 4px;
-  color: #eadbc3;
+  color: var(--text);
 }
 
 .event-trade {
@@ -294,19 +323,19 @@ button.active {
 
 /* ---------- Choix et menaces ---------- */
 .event-card.threat {
-  border-left-color: #f0a03c;
-  background: rgba(60, 32, 14, 0.9);
+  border-left-color: var(--pal-ochre);
+  background: color-mix(in srgb, var(--pal-brick) 12%, var(--paper));
 }
 
 .event-card.has-choice {
   border-left-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(231, 180, 90, 0.35), 0 4px 18px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 1px var(--pal-ochre);
 }
 
 .event-countdown {
   font-size: 11px;
   font-weight: 700;
-  color: #f0a03c;
+  color: var(--warn);
   white-space: nowrap;
 }
 
@@ -321,7 +350,7 @@ button.active {
   position: relative;
   height: 16px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--pal-ink) 12%, transparent);
   overflow: hidden;
   font-size: 10.5px;
   text-align: center;
@@ -331,7 +360,7 @@ button.active {
 .choice-timer-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: linear-gradient(90deg, #c0392b, var(--accent));
+  background: var(--pal-madder);
   opacity: 0.55;
   transition: width 0.5s linear;
 }
@@ -378,7 +407,7 @@ button.active {
   font-size: 9.5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #f0a03c;
+  color: var(--warn);
 }
 
 /* ---------- Alerte de crise ---------- */
@@ -405,20 +434,19 @@ button.active {
   font-weight: 700;
   font-size: 13.5px;
   text-align: center;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
 .crisis.fire {
-  background: rgba(190, 60, 20, 0.92);
+  background: var(--pal-brick);
 }
 
 .crisis.raid {
-  background: rgba(140, 25, 25, 0.92);
+  background: var(--pal-madder);
 }
 
 .crisis.water {
-  background: rgba(30, 100, 170, 0.9);
+  background: var(--pal-woad);
   animation: none;
 }
 
@@ -434,7 +462,7 @@ button.active {
   width: 64px;
   height: 7px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--pal-ink) 14%, transparent);
   overflow: hidden;
 }
 
@@ -445,7 +473,7 @@ button.active {
 }
 
 .morale.low .morale-fill {
-  background: #e0b440;
+  background: var(--pal-ochre);
 }
 
 .morale.bad .morale-fill,
@@ -462,7 +490,7 @@ button.active {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--pal-ink) 45%, transparent);
 }
 
 /* ---------- Construction ---------- */
@@ -523,7 +551,7 @@ button.active {
   font-size: 13px;
   border-radius: 10px 10px 0 0;
   border-bottom: none;
-  background: rgba(40, 27, 18, 0.7);
+  background: var(--paper-dark);
   color: var(--muted);
 }
 
@@ -551,7 +579,6 @@ button.active {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
@@ -579,7 +606,7 @@ button.active {
 }
 
 .build-btn.active .build-key {
-  color: #2a1a0c;
+  color: var(--text);
 }
 
 .build-icon {
@@ -609,7 +636,7 @@ button.active {
 }
 
 .build-btn.active .build-cost .missing {
-  color: #8b1d10;
+  color: var(--pal-brick);
 }
 
 .build-effect,
@@ -624,7 +651,7 @@ button.active {
 }
 
 .build-btn.active .build-effect {
-  color: #1f5a25;
+  color: var(--pal-forest);
 }
 
 .build-lock {
@@ -638,15 +665,15 @@ button.active {
 }
 
 .build-btn.active .build-workers {
-  color: #4a3420;
+  color: var(--pal-umber);
 }
 
 .bp-note.warn {
-  color: #f0a03c;
+  color: var(--warn);
 }
 
 .bp-row .warn-soft {
-  color: #f0c060;
+  color: var(--warn);
 }
 
 .build-btn.locked {
@@ -656,7 +683,7 @@ button.active {
 }
 
 .build-btn.locked:hover {
-  background: rgba(90, 60, 38, 0.9);
+  background: var(--paper-light);
 }
 
 @media (max-width: 600px) {
@@ -687,7 +714,7 @@ button.active {
   bottom: 10px;
   font-size: 11px;
   color: var(--muted);
-  background: rgba(40, 27, 18, 0.6);
+  background: color-mix(in srgb, var(--pal-parchment) 88%, transparent);
   padding: 4px 8px;
   border-radius: 8px;
   max-width: 220px;
@@ -704,7 +731,6 @@ button.active {
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 10px 12px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   font-size: 13px;
   animation: slide-in-left 0.25s ease-out;
 }
@@ -811,11 +837,11 @@ button.active {
 }
 
 .bp-alert.fire {
-  background: rgba(190, 60, 20, 0.35);
+  background: color-mix(in srgb, var(--pal-brick) 22%, transparent);
 }
 
 .bp-alert.damaged {
-  background: rgba(150, 110, 60, 0.3);
+  background: color-mix(in srgb, var(--pal-ochre) 25%, transparent);
 }
 
 .bp-alert button {
@@ -846,8 +872,8 @@ button.active {
   font-size: 11.5px;
   line-height: 1.2;
   white-space: nowrap;
-  background: rgba(30, 22, 16, 0.82);
-  border: 1px solid rgba(214, 170, 110, 0.5);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
   border-radius: 10px;
   pointer-events: auto;
   user-select: none;
@@ -855,7 +881,7 @@ button.active {
 
 .parcel-badge.can-buy {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(231, 180, 90, 0.35);
+  box-shadow: 0 0 0 2px var(--pal-ochre);
 }
 
 .parcel-badge.far {
@@ -877,7 +903,6 @@ button.active {
 }
 
 .pb-content .danger {
-  filter: drop-shadow(0 0 3px #ff5040);
 }
 
 .parcel-content {
@@ -895,7 +920,7 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 9, 5, 0.65);
+  background: color-mix(in srgb, var(--pal-ink) 60%, transparent);
   animation: fade 0.5s ease-out;
 }
 
@@ -936,7 +961,7 @@ button.active {
   flex-direction: column;
   align-items: center;
   padding: 10px 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--pal-ink) 6%, transparent);
   border-radius: 10px;
 }
 
@@ -960,14 +985,14 @@ button.active {
 
 button.primary {
   background: var(--accent);
-  color: #2a1a0c;
+  color: var(--pal-bone);
   font-weight: 700;
   padding: 10px 22px;
   font-size: 16px;
 }
 
 button.primary:hover {
-  background: #f3c779;
+  background: var(--pal-brick);
 }
 
 @media (max-width: 900px) {
@@ -1004,18 +1029,18 @@ button.primary:hover {
   font-size: 10.5px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--pal-ink) 6%, transparent);
   white-space: nowrap;
 }
 
 .fx.good {
-  background: rgba(111, 207, 122, 0.2);
-  color: #9fe6a8;
+  background: color-mix(in srgb, var(--pal-forest) 16%, transparent);
+  color: var(--pal-forest);
 }
 
 .fx.bad {
-  background: rgba(239, 107, 91, 0.2);
-  color: #ffb1a6;
+  background: color-mix(in srgb, var(--pal-brick) 16%, transparent);
+  color: var(--pal-brick);
 }
 
 .choice-btn:disabled .fx {
@@ -1030,17 +1055,16 @@ button.primary:hover {
   width: 210px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-left: 4px solid #f0a03c;
+  border-left: 4px solid var(--pal-ochre);
   border-radius: 10px;
   padding: 6px 8px;
   font-size: 12px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
 }
 
 .threat-head {
   font-weight: 700;
   margin-bottom: 4px;
-  color: #f0c060;
+  color: var(--warn);
 }
 
 .threat-item {
@@ -1070,7 +1094,7 @@ button.primary:hover {
   padding: 0 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #f0c060;
+  color: var(--warn);
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
@@ -1129,7 +1153,7 @@ button.primary:hover {
   flex-basis: 100%;
   justify-content: center;
   padding-top: 4px;
-  border-top: 1px solid rgba(214, 170, 110, 0.25);
+  border-top: 1px solid color-mix(in srgb, var(--pal-umber) 30%, transparent);
 }
 
 .bp-note.pos-note {
@@ -1141,7 +1165,7 @@ button.primary:hover {
   margin-top: 6px;
   font-size: 12px;
   padding: 5px;
-  background: rgba(60, 40, 26, 0.9);
+  background: var(--paper-dark);
 }
 
 .modal-overlay {
@@ -1157,7 +1181,7 @@ button.primary:hover {
 }
 
 .crisis.storm {
-  background: rgba(45, 50, 75, 0.94);
+  background: var(--pal-slate);
   border-radius: 14px;
   animation: none;
   display: flex;
@@ -1189,7 +1213,7 @@ button.primary:hover {
 
 .choice-realtime {
   font-size: 11.5px;
-  color: #ffb4a8;
+  color: var(--pal-brick);
   font-weight: 600;
 }
 
@@ -1210,8 +1234,7 @@ button.primary:hover {
   height: 0;
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
-  border-left: 14px solid #ff3b30;
-  filter: drop-shadow(0 0 4px rgba(255, 40, 30, 0.9));
+  border-left: 14px solid var(--pal-brick);
   animation: marker-blink 0.6s ease-in-out infinite alternate;
 }
 
@@ -1230,20 +1253,20 @@ button.primary:hover {
 }
 
 .event-flash.raid {
-  box-shadow: inset 0 0 90px rgba(255, 40, 30, 0.6);
+  box-shadow: inset 0 0 90px color-mix(in srgb, var(--pal-brick) 60%, transparent);
 }
 
 .event-flash.storm {
-  box-shadow: inset 0 0 120px rgba(210, 225, 255, 0.55);
-  background: rgba(220, 230, 255, 0.08);
+  box-shadow: inset 0 0 120px color-mix(in srgb, var(--pal-frost) 55%, transparent);
+  background: color-mix(in srgb, var(--pal-frost) 8%, transparent);
 }
 
 .event-flash.flood {
-  box-shadow: inset 0 0 90px rgba(40, 130, 230, 0.6);
+  box-shadow: inset 0 0 90px color-mix(in srgb, var(--pal-woad) 60%, transparent);
 }
 
 .event-flash.fire {
-  box-shadow: inset 0 0 90px rgba(255, 130, 20, 0.55);
+  box-shadow: inset 0 0 90px color-mix(in srgb, var(--pal-ochre) 55%, transparent);
 }
 
 @keyframes event-flash {
@@ -1260,8 +1283,8 @@ button.primary:hover {
   bottom: 150px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(30, 20, 15, 0.92);
-  border: 1px solid rgba(255, 210, 120, 0.4);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
   padding: 6px 14px;
   border-radius: 999px;
   font-size: 13px;
@@ -1277,14 +1300,14 @@ button.primary:hover {
 }
 
 .hud-item.injured .hud-value {
-  color: #ff9a8a;
+  color: var(--pal-brick);
 }
 
 /* ---------- Chronique du village ---------- */
 .chronicle {
-  background: #f1e6cc;
-  color: #3b2a1a;
-  border: 1px solid #b89b6a;
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
   border-radius: 10px;
   padding: 18px 22px;
   width: min(620px, calc(100vw - 32px));
@@ -1292,20 +1315,19 @@ button.primary:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  font-family: Georgia, 'Times New Roman', serif;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-body);
 }
 
 .chronicle h2 {
   margin: 0;
-  color: #6b3b1b;
+  color: var(--accent);
   font-size: 22px;
 }
 
 .chronicle-count {
   font-size: 13px;
   font-style: italic;
-  color: #7a5a35;
+  color: var(--muted);
 }
 
 .chronicle-pages {
@@ -1320,7 +1342,7 @@ button.primary:hover {
   display: flex;
   gap: 10px;
   padding: 8px 10px;
-  border-bottom: 1px dashed #c9b083;
+  border-bottom: 1px dashed var(--pal-ochre);
 }
 
 .chronicle-page .cp-icon {
@@ -1336,7 +1358,7 @@ button.primary:hover {
 
 .chronicle-page em {
   font-size: 11px;
-  color: #8a6c45;
+  color: var(--muted);
 }
 
 .chronicle-page.blank {
@@ -1344,11 +1366,11 @@ button.primary:hover {
 }
 
 .chronicle-page .cp-solved {
-  color: #2f5d2a;
+  color: var(--pal-forest);
 }
 
 .chronicle-page .cp-missing {
-  color: #9a8466;
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -1377,4 +1399,183 @@ button.primary:hover {
 .choice-effects .ico {
   width: 1.4em;
   height: 1.4em;
+}
+
+/* ---------- Registre du village : papier, encre, cire (surcouche de style) ---------- */
+
+/* Feuilles de papier : grain, trait d'encre, coins inégaux */
+.seed-panel,
+.hud,
+.time-controls,
+.event-card,
+.buildbar,
+.building-panel,
+.parcel-badge,
+.gameover,
+.threat-list,
+.settings,
+.chronicle,
+.build-hint,
+.help {
+  background-color: var(--panel);
+  background-image: var(--grain);
+  border: 1.5px solid var(--panel-border);
+  border-radius: var(--rough);
+  outline: 1px solid color-mix(in srgb, var(--pal-umber) 30%, transparent);
+  outline-offset: -5px;
+}
+
+.event-card,
+.building-panel,
+.settings {
+  border-radius: var(--rough-2);
+}
+
+/* Le ruban de gauche des cartes reste un trait d'encre de couleur */
+.event-card {
+  border-left-width: 5px;
+}
+
+.build-tab {
+  border: 1.5px solid var(--panel-border);
+  border-bottom: none;
+  border-radius: 9px 5px 0 0 / 7px 4px 0 0;
+  background-image: var(--grain);
+}
+
+.build-tab.active {
+  background-color: var(--panel);
+}
+
+/* Titres à la plume */
+.event-title,
+.bp-title strong,
+.threat-title,
+.settings h2,
+.chronicle h2,
+.gameover h1,
+.gameover h2 {
+  font-family: var(--font-title);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.event-title {
+  font-size: 16px;
+}
+
+.bp-title strong {
+  font-size: 19px;
+}
+
+/* Chiffres : police simple et lisible, chiffres alignés */
+.hud-value,
+.build-cost,
+.bp-row,
+.fx,
+.event-day {
+  font-family: var(--font-body);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Boutons : étiquettes de papier cerclées d'encre */
+button {
+  border: 1.5px solid var(--panel-border);
+  border-radius: 6px 3px 7px 4px / 4px 7px 3px 6px;
+  transition: background 0.15s;
+}
+
+button.active {
+  background: var(--pal-straw);
+}
+
+/* Boutons importants : sceaux de cire */
+button.primary {
+  background: var(--pal-madder);
+  color: var(--pal-bone);
+  border: 2px solid color-mix(in srgb, var(--pal-madder) 60%, var(--pal-ink));
+  border-radius: 46% 54% 50% 50% / 55% 48% 52% 45%;
+  outline: 1.5px dashed color-mix(in srgb, var(--pal-bone) 45%, transparent);
+  outline-offset: -5px;
+  font-family: var(--font-title);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--pal-brick);
+}
+
+/* Bannières de crise : bandeaux peints, texte clair */
+.crisis {
+  color: var(--pal-bone);
+  border: 1.5px solid var(--pal-ink);
+  border-radius: 14px 6px 13px 7px / 7px 13px 6px 14px;
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 15px;
+}
+
+.vr-btn {
+  color: var(--pal-bone);
+}
+
+/* Bulles d'information sur les pièces d'or et les jauges : encre au lieu de lueurs */
+.toast {
+  border-radius: var(--rough);
+}
+
+/* Nom d'un villageois survolé */
+.villager-tip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  padding: 2px 9px 3px;
+  font-family: var(--font-title);
+  font-size: 15px;
+  color: var(--text);
+  background-color: var(--panel);
+  background-image: var(--grain);
+  border: 1.5px solid var(--panel-border);
+  border-radius: var(--rough);
+  white-space: nowrap;
+}
+
+/* Annales : événements marquants nommés, dans la Chronique */
+.annals-title {
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--accent);
+  margin: 12px 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pal-umber) 35%, transparent);
+}
+
+.annals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.annals li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.annals strong {
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 16px;
+}
+
+.annals-day {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.annals p,
+.annals-empty {
+  margin: 1px 0 0;
+  font-style: italic;
+  color: var(--muted);
+  font-size: 13px;
 }

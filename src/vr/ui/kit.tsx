@@ -8,26 +8,35 @@ import * as THREE from 'three';
 import { feedback } from '../feedback';
 import { VR_CONFIG } from '../config';
 import { useVR } from '../store';
-import { lineWidth } from './atlas';
+import { lineWidth, type FontKind } from './atlas';
 import { Builder, addItem, removeItem, rgba, type Tris, type UIItem } from './uiBatch';
 import { I } from '../../ui/icons';
+import { PAL, palAlpha, palMix } from '../../palette';
 
 
-/** Palette très contrastée (lisible sur passthrough clair comme sombre) */
+/**
+ * Registre du village : papier, encre brune, sceaux de cire (palette unique). Les textes sombres
+ * posés hors d'un panneau gardent un halo de papier : lisibles sur passthrough clair comme sombre.
+ */
 export const THEME = {
-  panel: 'rgba(24, 16, 10, 0.93)',
-  panelSolid: '#1c140d',
-  border: '#ffd166',
-  text: '#fff8e8',
-  dim: '#b9a98f',
-  accent: '#ffd166',
-  good: '#7ee081',
-  bad: '#ff7a6b',
-  warn: '#ffb347',
-  button: '#3a2a1a',
-  buttonHover: '#5a4128',
-  buttonActive: '#7a5a30',
-  disabled: '#2a2118',
+  panel: palAlpha('parchment', 0.97),
+  panelSolid: PAL.parchment,
+  border: PAL.umber,
+  text: PAL.ink,
+  dim: PAL.wood,
+  accent: PAL.madder,
+  good: PAL.forest,
+  bad: PAL.brick,
+  warn: palMix('ochre', 'ink', 0.35),
+  button: palMix('bone', 'parchment', 0.4),
+  buttonHover: PAL.straw,
+  buttonActive: palMix('straw', 'ochre', 0.45),
+  disabled: palMix('parchment', 'stone', 0.45),
+  disabledText: palMix('wood', 'stone', 0.5),
+  /** Sceau de cire des boutons importants */
+  seal: PAL.madder,
+  sealHover: PAL.brick,
+  sealText: PAL.bone,
 };
 
 // ---------------------------------------------------------------------------
@@ -63,13 +72,13 @@ function useUIItem(layer: 0 | 1, build: () => Tris, ownRoot?: RootRef) {
   return ref;
 }
 
-function wrap(text: string, size: number, weight: number, maxWidth: number): string[] {
+function wrap(text: string, size: number, weight: number, maxWidth: number, font: FontKind = 'body'): string[] {
   const out: string[] = [];
   for (const para of text.split('\n')) {
     let line = '';
     for (const word of para.split(' ')) {
       const test = line ? `${line} ${word}` : word;
-      if (line && lineWidth(test, weight) * size > maxWidth) {
+      if (line && lineWidth(test, weight, font) * size > maxWidth) {
         out.push(line);
         line = word;
       } else line = test;
@@ -89,11 +98,14 @@ export function Label({
   maxWidth,
   position,
   opacity = 1,
+  title = false,
 }: {
   text: string;
   size?: number;
   color?: string;
   weight?: number;
+  /** Titre : police à la plume */
+  title?: boolean;
   align?: 'left' | 'center' | 'right';
   /** Largeur maximale en mètres : le texte passe à la ligne au-delà */
   maxWidth?: number;
@@ -103,7 +115,8 @@ export function Label({
   const build = useMemo(
     () => () => {
       const b = new Builder();
-      const lines = maxWidth ? wrap(text, size, weight, maxWidth) : text.split('\n');
+      const font: FontKind = title ? 'title' : 'body';
+      const lines = maxWidth ? wrap(text, size, weight, maxWidth, font) : text.split('\n');
       const lineH = size * 1.22;
       const total = lines.length * lineH + size * 0.2;
       const c = rgba(color, opacity);
@@ -111,19 +124,19 @@ export function Label({
         const y = total / 2 - (size * 0.1 + lineH * (i + 0.5));
         // Ancrage comme avant : bord gauche / droit du texte à `position` (marge de 0.15 em)
         const x = align === 'left' ? size * 0.15 : align === 'right' ? -size * 0.15 : 0;
-        b.text(l, { size, color: c, weight, outline: true, x, y, align, iconAlpha: opacity });
+        b.text(l, { size, color: c, weight, outline: true, x, y, align, iconAlpha: opacity, font });
       });
       return b.done();
     },
-    [text, size, color, weight, align, maxWidth, opacity],
+    [text, size, color, weight, align, maxWidth, opacity, title],
   );
   const ref = useUIItem(1, build);
   return <group ref={ref} position={position} />;
 }
 
 /** Mesure du texte d'un Label (largeur en mètres) : pour dimensionner les panneaux */
-export function textWidth(text: string, size: number = VR_CONFIG.ui.text, weight = 700): number {
-  return (lineWidth(text, weight) + 0.3) * size;
+export function textWidth(text: string, size: number = VR_CONFIG.ui.text, weight = 700, title = false): number {
+  return (lineWidth(text, weight, title ? 'title' : 'body') + 0.3) * size;
 }
 
 /** Plaque arrondie (fond de panneau) */
@@ -245,13 +258,15 @@ export interface ButtonProps {
   position?: [number, number, number];
   /** Le bouton lui-même ne fait rien mais réagit au survol (infobulle…) */
   onHover?: (hover: boolean) => void;
+  /** Action importante : sceau de cire */
+  seal?: boolean;
 }
 
 /**
  * Bouton 3D : surbrillance + léger agrandissement au survol, petit « tap » à l'appui, son et
  * vibration. La zone sensible dépasse le dessin (tolérance en mode mains).
  */
-export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActivate, disabled, active, danger, locked, position, onHover }: ButtonProps) {
+export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActivate, disabled, active, danger, locked, position, onHover, seal }: ButtonProps) {
   const [hover, setHover] = useState(false);
   const group = useRef<THREE.Group>(null);
   const press = useRef(0);
@@ -262,12 +277,28 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
     () => () => {
       const w = width;
       const h = height;
-      const bg = disabled ? THEME.disabled : danger ? (hover ? '#8a2f25' : '#5e211b') : active ? THEME.buttonActive : hover ? THEME.buttonHover : THEME.button;
-      const border = disabled ? '#5a4d3d' : active || hover ? THEME.accent : danger ? THEME.bad : '#c9a24e';
+      const waxed = seal && !disabled;
+      const bg = disabled
+        ? THEME.disabled
+        : waxed
+          ? hover
+            ? THEME.sealHover
+            : THEME.seal
+          : danger
+            ? hover
+              ? THEME.bad
+              : palMix('brick', 'parchment', 0.55)
+            : active
+              ? THEME.buttonActive
+              : hover
+                ? THEME.buttonHover
+                : THEME.button;
+      const border = disabled ? THEME.disabledText : waxed ? palMix('madder', 'ink', 0.4) : active || hover ? THEME.accent : danger ? THEME.bad : THEME.border;
       const b = new Builder();
-      b.plate(w, h, 0.014, rgba(bg), rgba(border), 0.004);
+      // Sceau : contour de cire irrégulier ; sinon étiquette de papier aux coins inégaux
+      b.plate(w, h, waxed ? Math.min(w, h) * 0.42 : 0.012, rgba(bg), rgba(border), waxed ? 0.005 : 0.0035, waxed ? 'wax' : 'paper');
       // Mise en page en proportions du bouton (positions mesurées depuis le haut)
-      const fg = rgba(disabled ? '#8a7d6a' : THEME.text);
+      const fg = rgba(disabled ? THEME.disabledText : waxed ? THEME.sealText : THEME.text);
       const hasText = !!label;
       const top = (k: number) => h / 2 - h * k;
       if (icon) {
@@ -280,12 +311,12 @@ export function Button3D({ width = 0.14, height = 0.07, icon, label, sub, onActi
         b.text(label, { size, color: fg, weight: 700, outline: false, x: 0, y, align: 'center', squeeze: w * 0.92 });
       }
       if (sub) {
-        b.text(sub, { size: h * 0.17, color: rgba(disabled ? '#8a7d6a' : THEME.dim), weight: 600, outline: false, x: 0, y: top(0.88), align: 'center', squeeze: w * 0.94 });
+        b.text(sub, { size: h * 0.17, color: rgba(disabled ? THEME.disabledText : waxed ? THEME.sealText : THEME.dim), weight: 600, outline: false, x: 0, y: top(0.88), align: 'center', squeeze: w * 0.94 });
       }
       if (locked) b.text(I.lock, { size: h * 0.34, color: fg, weight: 400, outline: false, x: w * 0.3, y: top(0.28), align: 'center' });
       return b.done();
     },
-    [width, height, icon, label, sub, disabled, active, danger, locked, hover],
+    [width, height, icon, label, sub, disabled, active, danger, locked, hover, seal],
   );
   const visual = useUIItem(1, build);
 

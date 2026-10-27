@@ -11,6 +11,9 @@ import { useSmallShadows } from './quality';
 import { PAL } from '../palette';
 import { rnd, spread } from './handmade';
 import { treadWear } from './wear';
+import { villagerName } from '../game/names';
+import { useVillagerHover, villagerPositions } from './villagerHover';
+import type { ThreeEvent } from '@react-three/fiber';
 
 const MAX_VILLAGERS = 150;
 const WALK_SPEED = 0.55;
@@ -145,15 +148,39 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
       tmp.m.compose(tmp.p.set(a.pos.x + sx * 1.4 + look.lean * hh, hh + 0.06 * look.head + bob, a.pos.z), tmp.q, tmp.s.setScalar(0.11 * look.head));
       head.setMatrixAt(i, tmp.m);
     });
+    villagerPositions.length = list.length;
+    list.forEach((a, i) => (villagerPositions[i] = a.pos));
     body.count = list.length;
     head.count = list.length;
     body.instanceMatrix.needsUpdate = true;
     head.instanceMatrix.needsUpdate = true;
   });
 
+  // Survol : le nom du villageois (infobulle PC, étiquette VR)
+  const seed = map.seed;
+  const hoverAt = (e: ThreeEvent<PointerEvent>) => {
+    if (e.instanceId === undefined) return;
+    useVillagerHover.getState().set({ i: e.instanceId, name: villagerName(e.instanceId, seed) }, e.nativeEvent.clientX, e.nativeEvent.clientY);
+  };
+  useLayoutEffect(() => {
+    // Les villageois bougent : sphère englobante fixe (tout le plateau) pour que les rayons les trouvent
+    const body = bodyRef.current;
+    if (body) body.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(map.width, map.height));
+    return () => useVillagerHover.getState().set(null);
+  }, [map]);
+
   return (
     <group>
-      <instancedMesh matrixAutoUpdate={false} ref={bodyRef} args={[GEO.cylinderLow, undefined, MAX_VILLAGERS]} castShadow={smallShadows} frustumCulled={false}>
+      <instancedMesh
+        matrixAutoUpdate={false}
+        ref={bodyRef}
+        args={[GEO.cylinderLow, undefined, MAX_VILLAGERS]}
+        castShadow={smallShadows}
+        frustumCulled={false}
+        onPointerOver={hoverAt}
+        onPointerMove={hoverAt}
+        onPointerOut={() => useVillagerHover.getState().set(null)}
+      >
         <meshStandardMaterial flatShading />
       </instancedMesh>
       <instancedMesh matrixAutoUpdate={false} ref={headRef} args={[GEO.ball, undefined, MAX_VILLAGERS]} castShadow={smallShadows} frustumCulled={false}>

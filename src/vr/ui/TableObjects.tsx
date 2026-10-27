@@ -186,11 +186,14 @@ export function Chronicle3D({ z }: { z: number }) {
   const panel = useVR((s) => s.panel);
   const setPanel = useVR((s) => s.setPanel);
   const chronicle = useGame((s) => s.chronicle);
+  const annals = useGame((s) => s.game.annals) ?? [];
   const [page, setPage] = useState(0);
   if (panel !== 'chronicle') return null;
   const per = 3;
-  const pages = Math.ceil(MECHANICS.length / per);
-  const items = MECHANICS.slice(page * per, page * per + per);
+  // Page 1 : les annales de ce village (derniers événements marquants), puis ce que le village a appris
+  const pages = 1 + Math.ceil(MECHANICS.length / per);
+  const items = page === 0 ? [] : MECHANICS.slice((page - 1) * per, (page - 1) * per + per);
+  const recent = annals.slice(-3).reverse();
   const found = MECHANICS.filter((m) => chronicle[m.id]?.struck).length;
   const w = 0.62;
   const h = 0.52;
@@ -198,8 +201,18 @@ export function Chronicle3D({ z }: { z: number }) {
     <FacePlayer position={[0, 0.004, z]} tilt={0.8}>
       <group position={[0, h / 2, 0]}>
         <Panel width={w} height={h}>
-          <Label text={`${I.scroll} Chronique du village`} size={0.036} position={[0, h / 2 - 0.04, 0]} />
-          <Label text={`Découvertes : ${found} / ${MECHANICS.length}`} size={0.024} color={THEME.dim} position={[0, h / 2 - 0.08, 0]} />
+          <Label title text={`${I.scroll} Chronique du village`} size={0.04} position={[0, h / 2 - 0.04, 0]} />
+          <Label text={page === 0 ? 'Annales de ce village' : `Découvertes : ${found} / ${MECHANICS.length}`} size={0.024} color={THEME.dim} position={[0, h / 2 - 0.08, 0]} />
+          {page === 0 && recent.length === 0 && (
+            <Label text="Rien encore de digne d'être écrit. Les anciens disent que ça viendra bien assez tôt." size={0.022} weight={600} color={THEME.dim} maxWidth={w - 0.1} position={[0, 0.02, 0]} />
+          )}
+          {recent.map((a, i) => (
+            <group key={`${a.day}${a.name}`} position={[0, h / 2 - 0.17 - i * 0.115, 0]}>
+              <Label text={a.icon} size={0.04} position={[-w / 2 + 0.05, 0.01, 0]} />
+              <Label title text={`${a.name} · jour ${a.day}`} size={0.026} align="left" maxWidth={w - 0.14} position={[-w / 2 + 0.1, 0.035, 0]} />
+              <Label text={a.line} size={0.018} weight={600} align="left" color={THEME.dim} maxWidth={w - 0.16} position={[-w / 2 + 0.1, -0.015, 0]} />
+            </group>
+          ))}
           {items.map((m, i) => {
             const p = chronicle[m.id];
             const y = h / 2 - 0.17 - i * 0.115;
@@ -208,7 +221,7 @@ export function Chronicle3D({ z }: { z: number }) {
                 <Label text={p?.struck ? m.icon : I.question} size={0.04} position={[-w / 2 + 0.05, 0.01, 0]} />
                 {p?.struck ? (
                   <>
-                    <Label text={m.title} size={0.026} align="left" position={[-w / 2 + 0.1, 0.035, 0]} />
+                    <Label title text={m.title} size={0.028} align="left" position={[-w / 2 + 0.1, 0.035, 0]} />
                     <Label text={m.page + (p.solved ? ` ${m.solvedPage}` : '')} size={0.018} weight={600} align="left" color={p.solved ? THEME.good : THEME.text} maxWidth={w - 0.16} position={[-w / 2 + 0.1, -0.015, 0]} />
                   </>
                 ) : (
@@ -251,7 +264,7 @@ export function Settings3D({ z }: { z: number }) {
     <FacePlayer position={[0, 0.004, z]} tilt={0.8}>
       <group position={[0, h / 2, 0]}>
         <Panel width={w} height={h}>
-          <Label text={`${I.gear} Paramètres`} size={0.036} position={[0, h / 2 - 0.04, 0]} />
+          <Label title text={`${I.gear} Paramètres`} size={0.04} position={[0, h / 2 - 0.04, 0]} />
           <Row i={0}>
             <Label text="Main dominante" size={0.026} align="left" position={[-w / 2 + 0.04, 0, 0]} />
             <Button3D width={0.13} height={0.065} icon={I.handLeft} label="Gauche" active={prefs.dominant === 'left'} position={[0.1, 0, 0]} onActivate={() => setPrefs({ dominant: 'left' })} />
@@ -302,10 +315,10 @@ export function GameOver3D() {
   return (
     <FacePlayer position={[0, 0.3, 0]} tilt={0.25}>
       <Panel width={w} height={h} border={THEME.bad}>
-        <Label text="Le village est désert…" size={0.044} position={[0, h / 2 - 0.05, 0]} />
+        <Label title text="Le village est désert…" size={0.048} position={[0, h / 2 - 0.05, 0]} />
         <Label text="Le dernier habitant a quitté les lieux." size={0.024} color={THEME.dim} position={[0, h / 2 - 0.095, 0]} />
         {[stat(I.calendar, game.day - 1, 'jours', 0), stat(I.people, game.stats.maxPopulation, 'population max', 1), stat(I.crane, game.stats.buildingsBuilt, 'bâtiments', 2), stat(I.dagger, game.stats.banditsKilled, 'bandits', 3), stat(I.extinguisher, game.stats.firesPutOut, 'feux éteints', 4), stat(I.star, score(game), 'score', 5)]}
-        <Button3D width={0.3} height={0.075} icon={I.newGame} label="Nouvelle partie" position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => newGame()} />
+        <Button3D width={0.3} height={0.075} icon={I.newGame} label="Nouvelle partie" seal position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => newGame()} />
       </Panel>
     </FacePlayer>
   );

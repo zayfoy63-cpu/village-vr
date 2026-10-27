@@ -48,6 +48,14 @@ export function palAlpha(key: PalKey, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
+/** Mélange de deux couleurs de la palette (nuance intermédiaire, jamais une teinte nouvelle) */
+export function palMix(a: PalKey, b: PalKey, t: number): string {
+  const x = parseInt(PAL[a].slice(1), 16);
+  const y = parseInt(PAL[b].slice(1), 16);
+  const ch = (s: number) => Math.round(((x >> s) & 255) * (1 - t) + ((y >> s) & 255) * t);
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+}
+
 /** Publie la palette en variables CSS (--pal-ink…) pour l'interface PC : une seule source */
 export function applyPaletteCss(root: HTMLElement = document.documentElement) {
   for (const [k, v] of Object.entries(PAL)) root.style.setProperty(`--pal-${k}`, v);

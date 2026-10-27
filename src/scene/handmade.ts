@@ -99,14 +99,14 @@ export const ROUGH: Record<keyof typeof GEO, THREE.BufferGeometry> = {
   rock: wobble(GEO.rock, HANDMADE.wobble.round * 1.5, 19, false),
 };
 
-/** Arbre feuillu : boule bosselée (plus de facettes, rayon irrégulier) */
+/** Arbre feuillu : boule bosselée (dodécaèdre au rayon irrégulier, 36 triangles) */
 export const BLOB = (() => {
-  const g = new THREE.IcosahedronGeometry(0.5, 1);
+  const g = new THREE.DodecahedronGeometry(0.5, 0);
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   const v = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
-    const k = 1 + spread(Math.round(v.x * 997), Math.round(v.y * 991), Math.round(v.z * 983), 0.16);
+    const k = 1 + spread(Math.round(v.x * 997), Math.round(v.y * 991), Math.round(v.z * 983), 0.2);
     v.multiplyScalar(k);
     pos.setXYZ(i, v.x, v.y * 0.92, v.z);
   }

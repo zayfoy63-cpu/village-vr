@@ -12,31 +12,37 @@ import { lastDragEnd } from '../vr/Drag';
 import { onBuildingPointerDown } from '../vr/grab';
 import { FLOOD } from '../game/mechanics/flood';
 import { useGame } from '../store/gameStore';
-import { GEO, tileToWorld } from './shared';
+import { tileToWorld } from './shared';
+import { PAL } from '../palette';
+import { GROUND } from './handmade';
 
 const TILE_COLORS: Record<TileType, string> = {
-  grass: '#94c257',
-  fertile: '#4f9a2c',
-  forest: '#4f7d33',
-  rock: '#8f9478',
-  water: '#3f93d6',
+  grass: PAL.sage,
+  fertile: PAL.moss,
+  forest: PAL.forest,
+  rock: PAL.stone,
+  water: PAL.woad,
 };
 
-const SNOW = new THREE.Color('#eef3f7');
-const LOCKED = new THREE.Color('#2a2622');
-const ICE = new THREE.Color('#9cc7e6');
-const MUD = new THREE.Color('#4d5640');
-
+const SNOW = new THREE.Color(PAL.bone);
+const LOCKED = new THREE.Color(PAL.ink);
+const ICE = new THREE.Color(PAL.frost);
+const MUD = new THREE.Color(PAL.umber);
+const AUTUMN = new THREE.Color(PAL.ochre);
 export function tileColor(type: TileType, season: SeasonId, jitter: number, out: THREE.Color, harsh = false) {
   out.set(TILE_COLORS[type]);
-  out.offsetHSL(0, 0, (jitter - 0.5) * 0.06);
-  if (season === 'autumn' && type !== 'water' && type !== 'rock') out.offsetHSL(-0.04, -0.05, 0);
+  out.offsetHSL(0, 0, (jitter - 0.5) * 0.05);
+  if (season === 'autumn' && type !== 'water' && type !== 'rock') out.lerp(AUTUMN, 0.22 + jitter * 0.12);
   // Hiver rude : neige bien plus épaisse et rivière presque gelée
   if (season === 'winter') out.lerp(type === 'water' ? ICE : SNOW, type === 'water' ? (harsh ? 0.7 : 0.35) : harsh ? 0.92 : 0.65);
   return out;
 }
 
-/** Plateau de cases instancié (1 draw call) + gestion du survol / clic */
+/**
+ * Plateau de cases instancié (1 draw call) + gestion du survol / clic. Cases bosselées, nuancées et
+ * tournées au hasard ; les touffes d'herbe et les chemins de terre qui cassent le damier sont posés
+ * par Nature (taches irrégulières).
+ */
 export function Terrain({ map }: { map: GameMap }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const season = useGame((s) => seasonOf(s.game.day).id);
@@ -52,12 +58,13 @@ export function Terrain({ map }: { map: GameMap }) {
   const build = useGame((s) => s.build);
   const select = useGame((s) => s.select);
   const count = map.width * map.height;
-
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
     const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
     const c = new THREE.Color();
+    const up = new THREE.Vector3(0, 1, 0);
     for (let z = 0; z < map.height; z++) {
       for (let x = 0; x < map.width; x++) {
         const i = z * map.width + x;
@@ -65,11 +72,9 @@ export function Terrain({ map }: { map: GameMap }) {
         const [wx, , wz] = tileToWorld(x, z, map.width, map.height);
         const water = type === 'water';
         const h = water ? 0.2 + swell * 0.06 : 0.3;
-        m.compose(
-          new THREE.Vector3(wx, (water ? -0.1 + swell * 0.06 : 0) - h / 2, wz),
-          new THREE.Quaternion(),
-          new THREE.Vector3(0.995, h, 0.995),
-        );
+        // Quart de tour au hasard : les bosses et nuances du dessus ne se répètent pas
+        q.setFromAxisAngle(up, Math.floor(hash2(x, z, map.seed + 50) * 4) * (Math.PI / 2));
+        m.compose(new THREE.Vector3(wx, (water ? -0.1 + swell * 0.06 : 0) - h / 2, wz), q, new THREE.Vector3(1, h, 1));
         mesh.setMatrixAt(i, m);
         tileColor(type, season, hash2(x, z, map.seed), c, harsh);
         if (water && swell > 0) c.lerp(MUD, swell * 0.65);
@@ -78,8 +83,6 @@ export function Terrain({ map }: { map: GameMap }) {
         mesh.setColorAt(i, c);
       }
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
   }, [map, season, harsh, owned, swell]);
 
@@ -92,7 +95,7 @@ export function Terrain({ map }: { map: GameMap }) {
     <instancedMesh
       ref={ref}
       matrixAutoUpdate={false}
-      args={[GEO.box, undefined, count]}
+      args={[GROUND, undefined, count]}
       receiveShadow
       onPointerMove={(e) => {
         e.stopPropagation();
@@ -142,7 +145,7 @@ export function Terrain({ map }: { map: GameMap }) {
         useGame.getState().inspect(null);
       }}
     >
-      <meshStandardMaterial flatShading roughness={0.95} />
+      <meshStandardMaterial flatShading roughness={0.95} vertexColors />
     </instancedMesh>
   );
 }

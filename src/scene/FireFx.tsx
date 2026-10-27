@@ -5,6 +5,7 @@ import { BUILDING_BY_ID } from '../game/buildings';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
+import { PAL } from '../palette';
 
 const MAX_FIRES = 24;
 const FLAMES = 4;
@@ -12,16 +13,16 @@ const SMOKE = 4;
 const DROPS = 6;
 
 const flameMat = new THREE.MeshStandardMaterial({
-  color: '#ff8a1f',
-  emissive: new THREE.Color('#ff5a00'),
+  color: PAL.ochre,
+  emissive: new THREE.Color(PAL.brick),
   emissiveIntensity: 1.6,
   flatShading: true,
   transparent: true,
   opacity: 0.92,
 });
-const coreMat = new THREE.MeshStandardMaterial({ color: '#ffe066', emissive: new THREE.Color('#ffc400'), emissiveIntensity: 2, flatShading: true });
-const smokeMat = new THREE.MeshStandardMaterial({ color: '#2f2a27', flatShading: true, transparent: true, opacity: 0.7, depthWrite: false });
-const dropMat = new THREE.MeshStandardMaterial({ color: '#7cc4ff', emissive: new THREE.Color('#2a7fd4'), emissiveIntensity: 0.6, flatShading: true });
+const coreMat = new THREE.MeshStandardMaterial({ color: PAL.straw, emissive: new THREE.Color(PAL.straw), emissiveIntensity: 2, flatShading: true });
+const smokeMat = new THREE.MeshStandardMaterial({ color: PAL.ink, flatShading: true, transparent: true, opacity: 0.7, depthWrite: false });
+const dropMat = new THREE.MeshStandardMaterial({ color: PAL.frost, emissive: new THREE.Color(PAL.woad), emissiveIntensity: 0.6, flatShading: true });
 
 /**
  * Flammes, fumée noire et gouttes d'eau (pendant l'extinction) sur les bâtiments en feu.

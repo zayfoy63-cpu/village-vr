@@ -6,6 +6,7 @@ import { SOIL } from '../game/mechanics/soil';
 import { useGame } from '../store/gameStore';
 import { GEO, MAT, tileToWorld } from './shared';
 import { useSmallShadows } from './quality';
+import { PAL } from '../palette';
 
 const MAX_FIELDS = 200;
 const MAX_ROWS = 6;
@@ -14,15 +15,15 @@ const ROWS_BY_LEVEL = [4, 5, 6];
 /** Bottes de foin posées au bord du champ par niveau */
 const BALES_BY_LEVEL = [0, 1, 2];
 
-const DAMAGED_CROP = new THREE.Color('#6b5434');
+const DAMAGED_CROP = new THREE.Color(PAL.umber);
 /** Cultures d'un sol épuisé : paille pâle et délavée (distincte du doré d'un blé mûr) */
-const TIRED_CROP = new THREE.Color('#d8d3a0');
+const TIRED_CROP = new THREE.Color(PAL.straw);
 
 const CROP_COLORS: Record<SeasonId, string> = {
-  spring: '#93d35c',
-  summer: '#6fae3c',
-  autumn: '#e0b440',
-  winter: '#a68a5c',
+  spring: PAL.sage,
+  summer: PAL.moss,
+  autumn: PAL.straw,
+  winter: PAL.wood,
 };
 
 /** Tous les champs en 3 draw calls : terre labourée, rangées de cultures, bottes de foin */

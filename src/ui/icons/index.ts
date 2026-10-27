@@ -6,6 +6,7 @@
 // Le DOM les remplace par des SVG (<RichText>), l'atlas VR par le dessin correspondant.
 
 import { ICON_DEFS, type IconDef } from './defs';
+import { PAL } from '../../palette';
 
 export type IconId = keyof typeof ICON_DEFS;
 export { ICON_DEFS };
@@ -43,7 +44,7 @@ export function plainText(text: string): string {
 
 // --- Dessin sur canvas (atlas VR) ----------------------------------------------------------------
 
-const OUTLINE = '#2b1d12';
+const OUTLINE = PAL.ink;
 let paths: Map<string, Path2D> | null = null;
 
 function path(d: string): Path2D {

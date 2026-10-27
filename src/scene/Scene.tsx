@@ -31,8 +31,9 @@ import { VRRig } from '../vr/VRRig';
 import { VR_CONFIG } from '../vr/config';
 import { useVR } from '../vr/store';
 import { xrStore } from './xr';
+import { PAL } from '../palette';
 
-const BG = '#2a1e17';
+const BG = PAL.ink;
 
 /**
  * Groupe racine du monde : taille réelle sur PC ; en réalité mixte (ou en aperçu ?ui3d), le plateau et
@@ -160,9 +161,15 @@ export function Scene() {
   );
 }
 
-const SUN = new THREE.Color('#ffd39b');
-const MOON = new THREE.Color('#8fa6d8');
-const GRAY_SKY = new THREE.Color('#c9cfd6');
+// Lumière de miniature : soleil doré (paille adoucie de parchemin), ombres franches ; la nuit, lune
+// bleutée (givre) et ciel de guède ; temps gris : givre délavé
+const SUN = new THREE.Color(PAL.straw).lerp(new THREE.Color(PAL.bone), 0.35);
+const MOON = new THREE.Color(PAL.frost).lerp(new THREE.Color(PAL.woad), 0.35);
+const GRAY_SKY = new THREE.Color(PAL.frost);
+const SKY_DAY = new THREE.Color(PAL.parchment);
+const SKY_NIGHT = new THREE.Color(PAL.woad);
+const GROUND_DAY = new THREE.Color(PAL.umber);
+const GROUND_NIGHT = new THREE.Color(PAL.slate);
 
 /** Lumières : soleil qui baisse et bleuit la nuit (plus tôt en hiver), ciel voilé les jours de pluie */
 function Lights() {
@@ -198,21 +205,26 @@ function Lights() {
     const night = nightLevel(g.day, g.dayProgress) * (vrOn ? VR_CONFIG.perf.nightDim : 1);
     const grey = g.mech.rain || g.storm ? 1 : 0;
     if (sun.current) {
-      sun.current.intensity = 2.4 * (1 - 0.75 * night) * (1 - 0.35 * grey);
+      // Plus de contraste qu'avant : soleil plus fort, éclairage d'ambiance plus faible
+      sun.current.intensity = 2.9 * (1 - 0.7 * night) * (1 - 0.35 * grey);
       sun.current.color.copy(SUN).lerp(MOON, night).lerp(GRAY_SKY, grey * 0.4 * (1 - night));
     }
-    if (sky.current) sky.current.intensity = 0.9 * (1 - 0.55 * night);
-    if (warm.current) warm.current.intensity = 60 * (1 - 0.7 * night);
+    if (sky.current) {
+      sky.current.intensity = 0.62 * (1 - 0.35 * night);
+      sky.current.color.copy(SKY_DAY).lerp(SKY_NIGHT, night);
+      sky.current.groundColor.copy(GROUND_DAY).lerp(GROUND_NIGHT, night);
+    }
+    if (warm.current) warm.current.intensity = 55 * (1 - 0.7 * night);
   });
   return (
     <>
-      <hemisphereLight ref={sky} args={['#ffe6c2', '#5a3d26', 0.9]} />
-      <ambientLight intensity={0.15} color="#ffd9a8" />
+      <hemisphereLight ref={sky} args={[PAL.parchment, PAL.umber, 0.62]} />
+      <ambientLight intensity={0.08} color={PAL.parchment} />
       <directionalLight
         ref={sun}
         position={[10, 18, 9]}
         intensity={2.4}
-        color="#ffd39b"
+        color={PAL.straw}
         castShadow={shadows}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
@@ -220,7 +232,7 @@ function Lights() {
         shadow-camera-near={1}
         shadow-camera-far={60}
       />
-      <pointLight ref={warm} position={[-14, 8, -10]} intensity={60} color="#ff9a52" distance={40} />
+      <pointLight ref={warm} position={[-14, 8, -10]} intensity={60} color={PAL.ochre} distance={40} />
     </>
   );
 }

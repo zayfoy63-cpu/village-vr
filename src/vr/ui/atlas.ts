@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { drawIcon, iconOf } from '../../ui/icons';
+import { TINT_BASE } from '../../palette';
 
 export const FONT = "system-ui, 'Segoe UI', Roboto, 'Noto Sans', sans-serif";
 
@@ -69,7 +70,7 @@ export function atlasGeneration() {
 function reset() {
   if (!texture) return;
   ctx.clearRect(0, 0, SIZE, SIZE);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = TINT_BASE;
   ctx.fillRect(0, 0, WHITE, WHITE);
   glyphs.clear();
   shelfX = WHITE + PAD;
@@ -168,7 +169,7 @@ export function glyph(ch: string, weight: number, outline: boolean): Glyph {
       ctx.strokeStyle = 'rgba(15,10,5,0.75)';
       ctx.strokeText(ch, x + ox, y + oy);
     }
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = TINT_BASE;
     ctx.fillText(ch, x + ox, y + oy);
   }
   dirty = true;

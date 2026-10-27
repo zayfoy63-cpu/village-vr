@@ -13,10 +13,11 @@ import { BOX, boxCenter } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer } from './kit';
 import { I } from '../../ui/icons';
+import { PAL } from '../../palette';
 
-const ghostMat = new THREE.MeshBasicMaterial({ color: '#8fe3ff', transparent: true, opacity: 0.5, depthWrite: false });
-const tileMat = new THREE.MeshBasicMaterial({ color: '#7ee081', transparent: true, opacity: 0.45, depthWrite: false });
-const ringMat = new THREE.MeshBasicMaterial({ color: '#8fe3ff', transparent: true, opacity: 0.7, depthWrite: false });
+const ghostMat = new THREE.MeshBasicMaterial({ color: PAL.frost, transparent: true, opacity: 0.5, depthWrite: false });
+const tileMat = new THREE.MeshBasicMaterial({ color: PAL.sage, transparent: true, opacity: 0.45, depthWrite: false });
+const ringMat = new THREE.MeshBasicMaterial({ color: PAL.frost, transparent: true, opacity: 0.7, depthWrite: false });
 
 const ease = (t: number) => t * t * (3 - 2 * t);
 const lerp3 = (a: THREE.Vector3, b: THREE.Vector3, k: number, out: THREE.Vector3) => out.lerpVectors(a, b, k);
@@ -174,7 +175,7 @@ export function Tutorial3D() {
           {VR_CONFIG.help.steps.map((s, i) => (
             <mesh key={s} position={[(i - 1.5) * 0.03, 0.05, 0]}>
               <circleGeometry args={[0.008, 10]} />
-              <meshBasicMaterial color={i === step ? '#ffd166' : i < step ? '#7ee081' : '#8a7d6a'} />
+              <meshBasicMaterial color={i === step ? PAL.straw : i < step ? PAL.sage : PAL.stone} />
             </mesh>
           ))}
         </group>

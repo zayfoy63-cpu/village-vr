@@ -7,6 +7,7 @@
 // à jour des matrices, les matrices monde de ces repères sont recopiées dans les instances.
 
 import * as THREE from 'three';
+import { TINT_BASE } from '../palette';
 
 /** Ce qu'on lit d'un repère : sa matrice monde, sa visibilité et ses parents */
 interface Node {
@@ -18,6 +19,8 @@ interface Node {
 interface Item {
   obj: Node;
   color: THREE.Color | null;
+  /** Écart de luminosité propre à la pièce (style fait main) */
+  tint: number;
 }
 
 export interface Pool {
@@ -67,7 +70,7 @@ function family(m: THREE.Material): { key: string; material: THREE.Material; tin
   const key = `std|${s.roughness}|${s.flatShading ? 1 : 0}`;
   let shared = sharedStd.get(key);
   if (!shared) {
-    shared = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: s.roughness, metalness: 0, flatShading: s.flatShading });
+    shared = new THREE.MeshStandardMaterial({ color: TINT_BASE, roughness: s.roughness, metalness: 0, flatShading: s.flatShading });
     sharedStd.set(key, shared);
   }
   return { key, material: shared, tinted: true };
@@ -96,8 +99,8 @@ function bump() {
   for (const l of listeners) l();
 }
 
-/** Ajoute une pièce ; renvoie de quoi la retirer */
-export function addPart(geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean, obj: Node): () => void {
+/** Ajoute une pièce (avec un écart de luminosité facultatif) ; renvoie de quoi la retirer */
+export function addPart(geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean, obj: Node, tint = 1): () => void {
   const fam = family(material);
   const key = `${geoId(geometry)}|${fam.key}|${shadow ? 1 : 0}`;
   let pool = pools.get(key);
@@ -107,7 +110,7 @@ export function addPart(geometry: THREE.BufferGeometry, material: THREE.Material
     pools.set(key, pool);
     bump();
   }
-  const item: Item = { obj, color: fam.tinted ? (material as THREE.MeshStandardMaterial).color : null };
+  const item: Item = { obj, color: fam.tinted ? (material as THREE.MeshStandardMaterial).color : null, tint };
   pool.items.add(item);
   if (pool.items.size > pool.capacity) {
     // Plus de place : un maillage deux fois plus grand remplace l'ancien
@@ -158,9 +161,9 @@ export function syncPools(scene: THREE.Scene) {
       if (!shownIn(o, scene)) continue;
       mats.set(o.matrixWorld.elements, n * 16);
       if (cols && it.color) {
-        cols[n * 3] = it.color.r;
-        cols[n * 3 + 1] = it.color.g;
-        cols[n * 3 + 2] = it.color.b;
+        cols[n * 3] = it.color.r * it.tint;
+        cols[n * 3 + 1] = it.color.g * it.tint;
+        cols[n * 3 + 2] = it.color.b * it.tint;
       }
       n++;
     }

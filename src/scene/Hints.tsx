@@ -19,6 +19,7 @@ import { GEO, TILE } from './shared';
 import { useSmallShadows } from './quality';
 import { useVR } from '../vr/store';
 import { VR_CONFIG } from '../vr/config';
+import { PAL } from '../palette';
 
 const MAX_RATS = 18;
 const MAX_SPARKS = 90;
@@ -27,17 +28,17 @@ const MAX_PEBBLES = 20;
 const MAX_WOLVES = 4;
 const MAX_EYES = 6;
 
-const ratMat = new THREE.MeshStandardMaterial({ color: '#2f2c2a', flatShading: true });
-const sparkMat = new THREE.MeshBasicMaterial({ color: '#ffc04d' });
-const dustMat = new THREE.MeshStandardMaterial({ color: '#d2c3a4', transparent: true, opacity: 0.75, depthWrite: false, flatShading: true });
-const pebbleMat = new THREE.MeshStandardMaterial({ color: '#5a554e', flatShading: true });
+const ratMat = new THREE.MeshStandardMaterial({ color: PAL.ink, flatShading: true });
+const sparkMat = new THREE.MeshBasicMaterial({ color: PAL.straw });
+const dustMat = new THREE.MeshStandardMaterial({ color: PAL.parchment, transparent: true, opacity: 0.75, depthWrite: false, flatShading: true });
+const pebbleMat = new THREE.MeshStandardMaterial({ color: PAL.slate, flatShading: true });
 // Éclaireur : manteau clair (pour se détacher du cadre en bois sombre) et capuche sombre
-const cloakMat = new THREE.MeshStandardMaterial({ color: '#c9c1ae', flatShading: true });
-const hoodMat = new THREE.MeshStandardMaterial({ color: '#2b2622', flatShading: true });
-const glintMat = new THREE.MeshBasicMaterial({ color: '#fff3b0' });
-const chaserMat = new THREE.MeshStandardMaterial({ color: '#2f6fd0', flatShading: true });
-const wolfMat = new THREE.MeshStandardMaterial({ color: '#5f6266', flatShading: true });
-const eyeMat = new THREE.MeshBasicMaterial({ color: '#ffe066' });
+const cloakMat = new THREE.MeshStandardMaterial({ color: PAL.parchment, flatShading: true });
+const hoodMat = new THREE.MeshStandardMaterial({ color: PAL.ink, flatShading: true });
+const glintMat = new THREE.MeshBasicMaterial({ color: PAL.parchment });
+const chaserMat = new THREE.MeshStandardMaterial({ color: PAL.woad, flatShading: true });
+const wolfMat = new THREE.MeshStandardMaterial({ color: PAL.slate, flatShading: true });
+const eyeMat = new THREE.MeshBasicMaterial({ color: PAL.straw });
 const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
 export function Hints({ map }: { map: GameMap }) {

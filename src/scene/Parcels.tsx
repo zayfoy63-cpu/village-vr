@@ -9,15 +9,16 @@ import { Banner } from './models/Decor';
 import { Part } from './models/Part';
 import { parcelScreen } from './badgeAnchors';
 import { GEO, TILE } from './shared';
+import { PAL } from '../palette';
 
 const fogMat = new THREE.MeshStandardMaterial({
-  color: '#c3c8d2',
+  color: PAL.frost,
   transparent: true,
   opacity: 0.26,
   depthWrite: false,
   roughness: 1,
 });
-const outlineMat = new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.85, depthWrite: false });
+const outlineMat = new THREE.MeshBasicMaterial({ color: PAL.straw, transparent: true, opacity: 0.85, depthWrite: false });
 
 function rectCenter(r: ParcelRect, map: GameMap): [number, number] {
   return [((r.x0 + r.x1) / 2 - map.width / 2) * TILE, ((r.z0 + r.z1) / 2 - map.height / 2) * TILE];

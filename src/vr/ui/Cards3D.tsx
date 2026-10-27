@@ -15,6 +15,7 @@ import { boardHalf } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME, textWidth } from './kit';
 import { I } from '../../ui/icons';
+import { PAL } from '../../palette';
 
 const BTN_H = 0.062;
 const FX_SIZE = 0.022;
@@ -146,9 +147,9 @@ export function Cards3D() {
   );
 }
 
-const poleMat = new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.9, flatShading: true });
-const flagUrgent = new THREE.MeshBasicMaterial({ color: '#e23b2e' });
-const flagSoon = new THREE.MeshBasicMaterial({ color: '#e8902a' });
+const poleMat = new THREE.MeshStandardMaterial({ color: PAL.umber, roughness: 0.9, flatShading: true });
+const flagUrgent = new THREE.MeshBasicMaterial({ color: PAL.brick });
+const flagSoon = new THREE.MeshBasicMaterial({ color: PAL.ochre });
 
 const EDGE_DIR: [number, number][] = [
   [0, -1],

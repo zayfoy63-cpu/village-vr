@@ -21,6 +21,7 @@ const LEVEL_CHIMNEYS: Partial<Record<BuildingTypeId, Record<number, [number, num
 import { GEO, tileToWorld } from './shared';
 import { VR_CONFIG } from '../vr/config';
 import { useVR } from '../vr/store';
+import { PAL } from '../palette';
 
 const PUFFS = 4;
 
@@ -91,7 +92,7 @@ export function Smoke({ buildings, map }: { buildings: Building[]; map: GameMap 
 
   return (
     <instancedMesh matrixAutoUpdate={false} ref={ref} args={[GEO.ball, undefined, MAX_CHIMNEYS * PUFFS]} frustumCulled={false}>
-      <meshStandardMaterial color="#d9d4cc" flatShading transparent opacity={0.75} depthWrite={false} />
+      <meshStandardMaterial color={PAL.bone} flatShading transparent opacity={0.75} depthWrite={false} />
     </instancedMesh>
   );
 }

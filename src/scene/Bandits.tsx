@@ -9,6 +9,7 @@ import { useVR } from '../vr/store';
 import { banditScreen } from './badgeAnchors';
 import { GEO, TILE } from './shared';
 import { useSmallShadows } from './quality';
+import { PAL, TINT_BASE } from '../palette';
 
 const MAX = 40;
 const MAX_DOTS = 600;
@@ -19,16 +20,16 @@ const FALL = 0.05;
 /** Durée (jours de jeu) de la gerbe dorée à la capture */
 const BURST = 0.06;
 
-const bodyMat = new THREE.MeshStandardMaterial({ color: '#c0392b', flatShading: true });
-const hoodMat = new THREE.MeshStandardMaterial({ color: '#3a1d1a', flatShading: true });
-const sackMat = new THREE.MeshStandardMaterial({ color: '#b08a4a', flatShading: true });
+const bodyMat = new THREE.MeshStandardMaterial({ color: PAL.brick, flatShading: true });
+const hoodMat = new THREE.MeshStandardMaterial({ color: PAL.ink, flatShading: true });
+const sackMat = new THREE.MeshStandardMaterial({ color: PAL.ochre, flatShading: true });
 /** Corps des gardes : blanc, teinté par instance (bleu = garde, brun = villageois) */
-const guardBodyMat = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true });
-const GUARD_COLOR = new THREE.Color('#2f6fd0');
-const VILLAGER_COLOR = new THREE.Color('#8a6a44');
-const helmMat = new THREE.MeshStandardMaterial({ color: '#c9ccd2', flatShading: true, metalness: 0.4 });
-const dotMat = new THREE.MeshBasicMaterial({ color: '#ff4a3d', transparent: true, opacity: 0.8, depthWrite: false });
-const burstMat = new THREE.MeshBasicMaterial({ color: '#ffd23f' });
+const guardBodyMat = new THREE.MeshStandardMaterial({ color: TINT_BASE, flatShading: true });
+const GUARD_COLOR = new THREE.Color(PAL.woad);
+const VILLAGER_COLOR = new THREE.Color(PAL.wood);
+const helmMat = new THREE.MeshStandardMaterial({ color: PAL.stone, flatShading: true, metalness: 0.4 });
+const dotMat = new THREE.MeshBasicMaterial({ color: PAL.brick, transparent: true, opacity: 0.8, depthWrite: false });
+const burstMat = new THREE.MeshBasicMaterial({ color: PAL.straw });
 /** Zone de clic invisible, plus large que le personnage pour être facile à viser */
 const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 

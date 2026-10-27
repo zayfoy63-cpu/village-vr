@@ -13,9 +13,10 @@ import { VR_CONFIG } from '../vr/config';
 import { useVR } from '../vr/store';
 import { GEO, TILE, tileToWorld } from './shared';
 import { useSmallShadows } from './quality';
+import { PAL } from '../palette';
 
 const floodMat = new THREE.MeshStandardMaterial({
-  color: '#3f8fd0',
+  color: PAL.woad,
   transparent: true,
   opacity: 0.75,
   roughness: 0.25,
@@ -64,14 +65,14 @@ export function Flood({ map }: { map: GameMap }) {
 }
 
 const cloudMat = new THREE.MeshStandardMaterial({
-  color: '#5d6478',
-  emissive: new THREE.Color('#1c2233'),
+  color: PAL.slate,
+  emissive: new THREE.Color(PAL.ink),
   flatShading: true,
   roughness: 1,
 });
-const shadowMat = new THREE.MeshBasicMaterial({ color: '#0b0d18', transparent: true, opacity: 0.32, depthWrite: false });
-const rainMat = new THREE.MeshBasicMaterial({ color: '#a9c4e8', transparent: true, opacity: 0.55, depthWrite: false });
-const boltMat = new THREE.MeshBasicMaterial({ color: '#fff6b0' });
+const shadowMat = new THREE.MeshBasicMaterial({ color: PAL.ink, transparent: true, opacity: 0.32, depthWrite: false });
+const rainMat = new THREE.MeshBasicMaterial({ color: PAL.frost, transparent: true, opacity: 0.55, depthWrite: false });
+const boltMat = new THREE.MeshBasicMaterial({ color: PAL.parchment });
 const shadowGeo = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
 const MAX_RAIN = 220;
 const CLOUD_PUFFS = 11;
@@ -168,13 +169,13 @@ export function Storm({ map }: { map: GameMap }) {
       <mesh ref={shadow} geometry={shadowGeo} material={shadowMat} renderOrder={1} />
       <instancedMesh matrixAutoUpdate={false} ref={rain} args={[GEO.box, rainMat, MAX_RAIN]} frustumCulled={false} />
       <instancedMesh matrixAutoUpdate={false} ref={bolts} args={[GEO.box, boltMat, 24]} frustumCulled={false} />
-      <pointLight ref={flash} intensity={0} color="#dfe8ff" distance={14} />
+      <pointLight ref={flash} intensity={0} color={PAL.frost} distance={14} />
     </group>
   );
 }
 
-const plankMat = new THREE.MeshStandardMaterial({ color: '#8a5a33', flatShading: true });
-const ringMat = new THREE.MeshBasicMaterial({ color: '#5fb4ff', transparent: true, opacity: 0.7, depthWrite: false });
+const plankMat = new THREE.MeshStandardMaterial({ color: PAL.wood, flatShading: true });
+const ringMat = new THREE.MeshBasicMaterial({ color: PAL.woad, transparent: true, opacity: 0.7, depthWrite: false });
 const ringGeo = new THREE.RingGeometry(0.42, 0.5, 20).rotateX(-Math.PI / 2);
 
 /**
@@ -225,7 +226,7 @@ export function Reinforcements({ map }: { map: GameMap }) {
   );
 }
 
-const snowMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+const snowMat = new THREE.MeshBasicMaterial({ color: PAL.bone });
 const MAX_FLAKES = 450;
 
 /** Flocons en hiver ; beaucoup plus pendant un hiver rude (1 draw call) */
@@ -269,7 +270,7 @@ export function Snowfall({ map }: { map: GameMap }) {
 }
 
 const MAX_SHOWER = 320;
-const showerMat = new THREE.MeshBasicMaterial({ color: '#b8cbe0', transparent: true, opacity: 0.4, depthWrite: false });
+const showerMat = new THREE.MeshBasicMaterial({ color: PAL.frost, transparent: true, opacity: 0.4, depthWrite: false });
 
 /** Jour de pluie (saisons) : fine pluie sur toute la carte, sans nuage d'orage (1 draw call) */
 export function Rain({ map }: { map: GameMap }) {

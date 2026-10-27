@@ -1,12 +1,13 @@
 import { GEO } from './shared';
 import { Part } from './models/Part';
 import * as THREE from 'three';
+import { PAL } from '../palette';
 
-const tableWood = new THREE.MeshStandardMaterial({ color: '#6e4a30', flatShading: true, roughness: 0.8 });
-const tableWoodDark = new THREE.MeshStandardMaterial({ color: '#5a3b26', flatShading: true, roughness: 0.8 });
-const plateauSide = new THREE.MeshStandardMaterial({ color: '#5b4330', flatShading: true, roughness: 1 });
-const plateauRim = new THREE.MeshStandardMaterial({ color: '#7d5a3a', flatShading: true, roughness: 0.9 });
-const floor = new THREE.MeshStandardMaterial({ color: '#3b2c22', roughness: 1 });
+const tableWood = new THREE.MeshStandardMaterial({ color: PAL.umber, flatShading: true, roughness: 0.8 });
+const tableWoodDark = new THREE.MeshStandardMaterial({ color: PAL.umber, flatShading: true, roughness: 0.8 });
+const plateauSide = new THREE.MeshStandardMaterial({ color: PAL.umber, flatShading: true, roughness: 1 });
+const plateauRim = new THREE.MeshStandardMaterial({ color: PAL.wood, flatShading: true, roughness: 0.9 });
+const floor = new THREE.MeshStandardMaterial({ color: PAL.ink, roughness: 1 });
 
 /** Plateau de jeu (socle sous la carte) posé sur une table en bois */
 export function Table({ width, height, plinthOnly = false }: { width: number; height: number; plinthOnly?: boolean }) {

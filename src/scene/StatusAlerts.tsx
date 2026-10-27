@@ -7,10 +7,11 @@ import { simulateProduction } from '../game/rules';
 import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
+import { PAL } from '../palette';
 
-const inputMat = new THREE.MeshBasicMaterial({ color: '#ef4444' });
-const workersMat = new THREE.MeshBasicMaterial({ color: '#f59e0b' });
-const markMat = new THREE.MeshBasicMaterial({ color: '#1a1a1a' });
+const inputMat = new THREE.MeshBasicMaterial({ color: PAL.brick });
+const workersMat = new THREE.MeshBasicMaterial({ color: PAL.ochre });
+const markMat = new THREE.MeshBasicMaterial({ color: PAL.ink });
 
 /** Losange d'alerte "!" qui flotte et fait toujours face à la caméra */
 function Alert({ position, kind }: { position: [number, number, number]; kind: 'input' | 'workers' }) {

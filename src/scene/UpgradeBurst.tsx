@@ -2,18 +2,19 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GEO } from './shared';
+import { PAL } from '../palette';
 
 const DURATION = 1.2;
 const SPARKS = 22;
 const DUST = 12;
 
 const sparkMat = new THREE.MeshStandardMaterial({
-  color: '#ffe27a',
-  emissive: new THREE.Color('#ffb300'),
+  color: PAL.straw,
+  emissive: new THREE.Color(PAL.straw),
   emissiveIntensity: 1.8,
   flatShading: true,
 });
-const dustMat = new THREE.MeshStandardMaterial({ color: '#d9c7a3', flatShading: true, transparent: true, opacity: 0.8, depthWrite: false });
+const dustMat = new THREE.MeshStandardMaterial({ color: PAL.parchment, flatShading: true, transparent: true, opacity: 0.8, depthWrite: false });
 
 /**
  * Effet ponctuel : gerbe d'étincelles dorées (amélioration) et anneau de poussière.

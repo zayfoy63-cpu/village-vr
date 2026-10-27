@@ -15,10 +15,11 @@ import { samplePointer } from '../pointers';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME } from './kit';
 import { I } from '../../ui/icons';
+import { PAL } from '../../palette';
 
-const glass = new THREE.MeshStandardMaterial({ color: '#cfe9ff', transparent: true, opacity: 0.38, roughness: 0.1 });
-const sand = new THREE.MeshStandardMaterial({ color: '#f0c457', roughness: 0.9, flatShading: true });
-const frameMat = new THREE.MeshStandardMaterial({ color: '#7a4f2b', roughness: 0.9, flatShading: true });
+const glass = new THREE.MeshStandardMaterial({ color: PAL.frost, transparent: true, opacity: 0.38, roughness: 0.1 });
+const sand = new THREE.MeshStandardMaterial({ color: PAL.straw, roughness: 0.9, flatShading: true });
+const frameMat = new THREE.MeshStandardMaterial({ color: PAL.wood, roughness: 0.9, flatShading: true });
 
 const SPEEDS: { v: Speed; icon: string; label: string }[] = [
   { v: 0.5, icon: I.slow, label: '×½' },

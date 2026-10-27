@@ -16,14 +16,15 @@ import { BOX, boxCenter } from '../layout';
 import { useVR } from '../store';
 import { Button3D, FacePlayer, Label, Panel, THEME, textWidth } from './kit';
 import { I } from '../../ui/icons';
+import { PAL } from '../../palette';
 
 // Rugosité commune aux bâtiments : ces pièces rejoignent les mêmes regroupements d'instances
-const woodMat = new THREE.MeshStandardMaterial({ color: '#8a5d38', roughness: 0.9, flatShading: true });
-const woodDark = new THREE.MeshStandardMaterial({ color: '#5f3d24', roughness: 0.9, flatShading: true });
-const feltMat = new THREE.MeshStandardMaterial({ color: '#2f4a3a', roughness: 0.9, flatShading: true });
-const dimMat = new THREE.MeshBasicMaterial({ color: '#59606b', transparent: true, opacity: 0.42, depthWrite: false });
+const woodMat = new THREE.MeshStandardMaterial({ color: PAL.wood, roughness: 0.9, flatShading: true });
+const woodDark = new THREE.MeshStandardMaterial({ color: PAL.umber, roughness: 0.9, flatShading: true });
+const feltMat = new THREE.MeshStandardMaterial({ color: PAL.forest, roughness: 0.9, flatShading: true });
+const dimMat = new THREE.MeshBasicMaterial({ color: PAL.slate, transparent: true, opacity: 0.42, depthWrite: false });
 const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-const trashMat = new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0.35, depthWrite: false });
+const trashMat = new THREE.MeshBasicMaterial({ color: PAL.brick, transparent: true, opacity: 0.35, depthWrite: false });
 
 /** Coût en clair : « [icône] 12 Bois, [icône] 4 Pierre » */
 const costText = (c: Partial<Resources>) => (RESOURCE_KEYS.some((k) => c[k]) ? formatResources(c) : 'gratuit');

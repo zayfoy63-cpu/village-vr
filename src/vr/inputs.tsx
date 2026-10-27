@@ -8,13 +8,14 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { VR_CONFIG } from './config';
 import { useVR } from './store';
+import { PAL } from '../palette';
 
-const bodyMat = new THREE.MeshStandardMaterial({ color: '#2a2a30', roughness: 0.6, flatShading: true });
-const ringMat = new THREE.MeshStandardMaterial({ color: '#ffd166', roughness: 0.4, flatShading: true });
-const handMat = new THREE.MeshStandardMaterial({ color: '#ffe0bd', roughness: 0.7, transparent: true, opacity: 0.92, flatShading: true });
+const bodyMat = new THREE.MeshStandardMaterial({ color: PAL.ink, roughness: 0.6, flatShading: true });
+const ringMat = new THREE.MeshStandardMaterial({ color: PAL.straw, roughness: 0.4, flatShading: true });
+const handMat = new THREE.MeshStandardMaterial({ color: PAL.parchment, roughness: 0.7, transparent: true, opacity: 0.92, flatShading: true });
 
 const CLICK_MS: number = VR_CONFIG.interact.clickMs;
-const RAY = { color: '#ffffff', opacity: 0.5, maxLength: 3 };
+const RAY = { color: PAL.bone, opacity: 0.5, maxLength: 3 };
 const CURSOR = { size: 0.012, opacity: 0.9 };
 
 /** Manette : poignée, anneau et nez, très simples (reconnaissable dans le passthrough) */

@@ -13,6 +13,8 @@ import { Fields } from './Fields';
 import { UpgradeBurst } from './UpgradeBurst';
 import { MODELS } from './models';
 import { Part } from './models/Part';
+import { VariantSeed, buildingJitter } from './handmade';
+import { LifeProps } from './models/LifeProps';
 import { tileToWorld } from './shared';
 
 /** Gravats et planches cassées autour d'un bâtiment endommagé */
@@ -87,6 +89,8 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
         if (!Model) return null;
         const pos = tileToWorld(b.x, b.z, map.width, map.height, BUILDING_BY_ID[b.type].size);
         const animate = b.id >= firstNewId.current || b.level > (initialLevels.current.get(b.id) ?? 1);
+        // Fait main : chaque bâtiment penche, tourne et se teinte un peu à sa façon (stable d'une partie à l'autre)
+        const jit = buildingJitter(b.id, map.seed);
         return (
           <group
             key={b.id}
@@ -120,15 +124,29 @@ export function Buildings({ buildings, map }: { buildings: Building[]; map: Game
             <PopIn key={b.level} animate={animate}>
               {/* Endommagé : légèrement affaissé et entouré de gravats */}
               <group rotation={b.damaged ? [0.05, 0, -0.07] : [0, 0, 0]} scale={b.damaged ? [1, 0.93, 1] : 1}>
-                {b.type === 'mine' ? (
-                  <Tremor id={b.id}>
-                    <Model id={b.id} level={b.level} />
-                  </Tremor>
-                ) : (
-                  <Model id={b.id} level={b.level} />
-                )}
+                <group rotation={jit.rotation} scale={jit.scale}>
+                  <VariantSeed.Provider value={jit.seed}>
+                    {b.type === 'mine' ? (
+                      <Tremor id={b.id}>
+                        <Model id={b.id} level={b.level} />
+                      </Tremor>
+                    ) : (
+                      <Model id={b.id} level={b.level} />
+                    )}
+                  </VariantSeed.Provider>
+                </group>
               </group>
-              {b.damaged && <Rubble id={b.id} />}
+              {/* Signes de vie : bûches, tonneaux, linge, outils… (pas pendant un incendie) */}
+              {!b.fire && (
+                <VariantSeed.Provider value={jit.seed}>
+                  <LifeProps id={b.id} type={b.type} size={BUILDING_BY_ID[b.type].size} />
+                </VariantSeed.Provider>
+              )}
+              {b.damaged && (
+                <VariantSeed.Provider value={jit.seed}>
+                  <Rubble id={b.id} />
+                </VariantSeed.Provider>
+              )}
             </PopIn>
             {/* Étincelles + poussière à l'amélioration, poussière à la construction */}
             {animate && (

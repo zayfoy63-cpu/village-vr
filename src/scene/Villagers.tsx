@@ -8,12 +8,31 @@ import type { Building, GameMap } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { GEO, tileToWorld } from './shared';
 import { useSmallShadows } from './quality';
+import { PAL } from '../palette';
+import { rnd, spread } from './handmade';
+import { treadWear } from './wear';
 
 const MAX_VILLAGERS = 150;
 const WALK_SPEED = 0.55;
-const SKIN = new THREE.Color('#f0c8a0');
-const PALE = new THREE.Color('#b9c4a6');
-const TUNICS = ['#b5523b', '#3f6fb5', '#6a8f3a', '#c48a2c', '#7a4f8f', '#a33c5a', '#4f7f86'];
+const SKIN = new THREE.Color(PAL.parchment);
+const PALE = new THREE.Color(PAL.sage);
+const TUNICS = [PAL.brick, PAL.woad, PAL.moss, PAL.ochre, PAL.umber, PAL.madder, PAL.wood, PAL.slate, PAL.sage, PAL.straw];
+
+/** Allure propre à chaque villageois : taille, carrure, démarche, teinte de la tunique */
+function looks(i: number) {
+  return {
+    height: 1 + spread(i, 1, 71, 0.16),
+    width: 1 + spread(i, 2, 72, 0.18),
+    head: 1 + spread(i, 3, 73, 0.1),
+    /** Amplitude et rythme du zigzag : personne ne marche droit */
+    sway: 0.03 + rnd(i, 4, 74) * 0.05,
+    swayRate: 1.2 + rnd(i, 5, 75) * 1.6,
+    lean: spread(i, 6, 76, 0.12),
+    tunic: TUNICS[Math.floor(rnd(i, 7, 77) * TUNICS.length)],
+    shade: spread(i, 8, 78, 0.06),
+  };
+}
+const LOOKS = Array.from({ length: MAX_VILLAGERS }, (_, i) => looks(i));
 
 interface Agent {
   pos: THREE.Vector3;
@@ -68,13 +87,13 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
     const body = bodyRef.current;
     if (body) {
       const c = new THREE.Color();
-      for (let i = 0; i < MAX_VILLAGERS; i++) body.setColorAt(i, c.set(TUNICS[i % TUNICS.length]));
+      for (let i = 0; i < MAX_VILLAGERS; i++) body.setColorAt(i, c.set(LOOKS[i].tunic).offsetHSL(0, 0, LOOKS[i].shade));
       if (body.instanceColor) body.instanceColor.needsUpdate = true;
     }
   }, [count, homes]);
 
   const tmp = useMemo(
-    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), d: new THREE.Vector3() }),
+    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), d: new THREE.Vector3(), e: new THREE.Euler() }),
     [],
   );
 
@@ -97,9 +116,16 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
       tmp.d.y = 0;
       const dist = tmp.d.length();
       let moving = false;
+      const look = LOOKS[i];
       if (dist > 0.03) {
-        a.pos.addScaledVector(tmp.d.normalize(), Math.min(dist, walk * dt));
+        tmp.d.normalize();
+        // Petit zigzag : chacun flâne un peu de côté (chemins sinueux)
+        const side = Math.sin(a.phase * 0.1 * look.swayRate) * look.sway * Math.min(1, dist);
+        a.pos.addScaledVector(tmp.d, Math.min(dist, walk * dt));
+        a.pos.x += -tmp.d.z * side * dt * 2;
+        a.pos.z += tmp.d.x * side * dt * 2;
         moving = dt > 0;
+        if (moving) treadWear(a.pos.x, a.pos.z, dt);
       } else if ((a.wait -= dt) <= 0) {
         // Arrivé : on repart, vers le travail ou la maison
         a.goingHome = !a.goingHome;
@@ -112,9 +138,11 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
       a.phase += dt * 12;
       const bob = moving ? Math.abs(Math.sin(a.phase)) * 0.03 : 0;
       const sx = shiver ? Math.sin(clock.elapsedTime * 55 + i * 1.7) * 0.012 : 0;
-      tmp.m.compose(tmp.p.set(a.pos.x + sx, 0.11 + bob, a.pos.z), tmp.q, tmp.s.set(0.13, 0.22, 0.13));
+      const hh = 0.22 * look.height;
+      tmp.q.setFromEuler(tmp.e.set(look.lean * 0.3, 0, look.lean));
+      tmp.m.compose(tmp.p.set(a.pos.x + sx, hh / 2 + bob, a.pos.z), tmp.q, tmp.s.set(0.13 * look.width, hh, 0.13 * look.width));
       body.setMatrixAt(i, tmp.m);
-      tmp.m.compose(tmp.p.set(a.pos.x + sx * 1.4, 0.28 + bob, a.pos.z), tmp.q, tmp.s.setScalar(0.11));
+      tmp.m.compose(tmp.p.set(a.pos.x + sx * 1.4 + look.lean * hh, hh + 0.06 * look.head + bob, a.pos.z), tmp.q, tmp.s.setScalar(0.11 * look.head));
       head.setMatrixAt(i, tmp.m);
     });
     body.count = list.length;
@@ -129,7 +157,7 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
         <meshStandardMaterial flatShading />
       </instancedMesh>
       <instancedMesh matrixAutoUpdate={false} ref={headRef} args={[GEO.ball, undefined, MAX_VILLAGERS]} castShadow={smallShadows} frustumCulled={false}>
-        <meshStandardMaterial ref={headMat} color="#f0c8a0" flatShading />
+        <meshStandardMaterial ref={headMat} color={PAL.parchment} flatShading />
       </instancedMesh>
     </group>
   );

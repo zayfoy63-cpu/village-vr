@@ -12,9 +12,10 @@ import { pointOnHorizontalPlane, samplePointer } from '../pointers';
 import { useVR } from '../store';
 import { Button3D } from './kit';
 import { I } from '../../ui/icons';
+import { PAL } from '../../palette';
 
-const rimMat = new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0, depthWrite: false });
-const woodMat = new THREE.MeshStandardMaterial({ color: '#a8743f', roughness: 0.9, flatShading: true });
+const rimMat = new THREE.MeshBasicMaterial({ color: PAL.straw, transparent: true, opacity: 0, depthWrite: false });
+const woodMat = new THREE.MeshStandardMaterial({ color: PAL.wood, roughness: 0.9, flatShading: true });
 
 interface Grip {
   kind: 'rim' | 'handle';

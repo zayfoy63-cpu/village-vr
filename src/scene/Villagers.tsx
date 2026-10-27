@@ -165,7 +165,12 @@ export function Villagers({ buildings, map }: { buildings: Building[]; map: Game
   useLayoutEffect(() => {
     // Les villageois bougent : sphère englobante fixe (tout le plateau) pour que les rayons les trouvent
     const body = bodyRef.current;
-    if (body) body.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(map.width, map.height));
+    if (body) {
+      body.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(map.width, map.height));
+      // En VR, un rayon ou un doigt ne touche que le premier objet : les villageois s'effacent pour ne pas
+      // masquer les bâtiments et les flammes (leur nom suit alors la case visée, voir VillagerTag3D)
+      (body as unknown as { pointerEvents: string }).pointerEvents = 'none';
+    }
     return () => useVillagerHover.getState().set(null);
   }, [map]);
 

@@ -28,6 +28,8 @@ npm run build     # vérification TypeScript + build de production dans dist/
 
 ## Architecture
 
+**Règle de nommage** : jamais deux fichiers dont le nom ne diffère que par la casse (compatibilité Windows) — extension exclue : `BoardGrab.tsx` et `boardGrab.ts` entrent en collision, car `import './BoardGrab'` résout alors vers le mauvais fichier.
+
 ```
 src/
 ├─ game/            Logique pure TypeScript (aucun import React / Three)
@@ -189,7 +191,7 @@ de façon déterministe (le PRNG est dans l'état). Le rendu ne fait que lire ce
 Le plateau se manipule comme un vrai plateau de jeu de société et se pose sur une vraie table (passthrough,
 `immersive-ar`) ; tout se joue en 3D, aux mains ou aux manettes. La version PC reste inchangée (souris, interface DOM).
 
-### Le plateau en main (`vr/BoardGrab.tsx`, `vr/boardGrab.ts`)
+### Le plateau en main (`vr/BoardGrab.tsx`, `vr/boardGrabLogic.ts`)
 - **Au lancement**, le plateau apparaît devant le joueur, à hauteur de taille, légèrement incliné vers lui ; ses bords
   brillent doucement et deux mains fantômes montrent le geste. Pas de table à viser : on l'attrape et on le pose
   (« Jouer ici » le laisse où il est).
@@ -276,7 +278,7 @@ libérées) **→ 116 appels (passe d'ombre comprise) et 2 textures, stables en 
   et décors sont dessinées par quelques `InstancedMesh` partagés, un par (forme, famille de matériau, ombre). Les
   matériaux standard opaques ne diffèrent que par la couleur : un seul matériau blanc, couleur par instance. Les
   matrices sont recopiées juste avant chaque rendu (après le calcul des matrices) : animations et plateau suivent.
-- **Interface en un seul maillage** (`vr/ui/uiBatch.ts`, `vr/ui/atlas.ts`) : tous les fonds de panneaux, boutons, textes
+- **Interface en un seul maillage** (`vr/ui/uiBatchCore.ts`, `vr/ui/atlas.ts`) : tous les fonds de panneaux, boutons, textes
   et emojis de l'interface 3D sont des triangles d'un même maillage, dessinés en un appel avec **un atlas de caractères
   unique** (couleur du texte = couleur de sommet). Ordre de dessin : du plus loin au plus proche, panneau par panneau.
   Les éléments du kit (`Label`, `Plate`, `Panel`, `Button3D`) gardent la même interface : rien à changer pour s'en servir.
@@ -309,7 +311,7 @@ Rien n'est parfaitement droit, et rien ne coûte un appel de dessin ni une textu
 - **Interface « registre »** : papier, encre brune, coins inégaux, sceaux de cire pour les actions importantes ; aucune
   ombre portée ni dégradé. Polices embarquées (`@fontsource`, aucun chargement extérieur) : IM Fell English pour les
   titres (chiffres modernes pour rester lisible), Alegreya Sans pour les textes et les chiffres. En VR, elles sont dessinées
-  dans l'atlas unique, avec le grain du papier et les bords irréguliers des plaques (`atlas.ts`, `uiBatch.ts`).
+  dans l'atlas unique, avec le grain du papier et les bords irréguliers des plaques (`atlas.ts`, `uiBatchCore.ts`).
 - **Annales** (`game/annals.ts`) : les grands événements reçoivent un nom (« Le Grand Feu de l'an 2 ») dans la Chronique.
   Champ facultatif de la sauvegarde : les anciennes parties commencent avec des annales vides.
 

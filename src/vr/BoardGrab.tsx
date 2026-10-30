@@ -13,7 +13,7 @@ import { VR_CONFIG } from './config';
 import { isDragging } from './Drag';
 import { haptic, sfx } from './feedback';
 import { useVR, saveBoard, type Board, type Hand } from './store';
-import { boardOuter, boardTop, edgeNear, grabEdgeAt, overBoard, readInputs, toBoardLocal, type Edge, type GrabInput } from './boardGrab';
+import { boardOuter, boardTop, edgeNear, grabEdgeAt, overBoard, readInputs, toBoardLocal, type Edge, type GrabInput } from './boardGrabLogic';
 import { Button3D, FacePlayer, Label, Panel, THEME } from './ui/kit';
 import { GhostHand } from './ui/Tutorial3D';
 import { I } from '../ui/icons';

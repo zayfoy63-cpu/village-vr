@@ -9,7 +9,7 @@ import { feedback } from '../feedback';
 import { VR_CONFIG } from '../config';
 import { useVR } from '../store';
 import { lineWidth, type FontKind } from './atlas';
-import { Builder, addItem, removeItem, rgba, type Tris, type UIItem } from './uiBatch';
+import { Builder, addItem, removeItem, rgba, type Tris, type UIItem } from './uiBatchCore';
 import { I } from '../../ui/icons';
 import { PAL, palAlpha, palMix } from '../../palette';
 

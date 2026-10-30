@@ -3,7 +3,7 @@
 
 import { useThree } from '@react-three/fiber';
 import { useEffect } from 'react';
-import { syncUI, uiMesh } from './uiBatch';
+import { syncUI, uiMesh } from './uiBatchCore';
 
 export function UIBatch() {
   const scene = useThree((s) => s.scene);

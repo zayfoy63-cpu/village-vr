@@ -11,7 +11,7 @@ import { DIFFICULTIES, type DifficultyId } from '../src/game/config';
 import { extinguishFire, sendGuard } from '../src/game/hazards';
 import { neighbors8, tileAt } from '../src/game/mapgen';
 import { PARCEL_COUNT, canBuyParcel, parcelContents } from '../src/game/parcels';
-import { canPlace, canUpgrade, computeNet, housingCapacity, woodSafetyGain } from '../src/game/rules';
+import { canPlace, canUpgrade, computeNet, isIdle, simulateProduction, housingCapacity, woodSafetyGain } from '../src/game/rules';
 import { heatingNeed } from '../src/game/mechanics/cold';
 import { advanceTime, buyParcel, createInitialState, placeBuilding, resolveChoice, upgradeBuilding } from '../src/game/simulation';
 import { seasonOf } from '../src/game/config';
@@ -214,7 +214,7 @@ function play(seed: number, level: DifficultyId): Result {
   while (!s.gameOver && s.day <= MAX_DAYS) {
     if (s.day !== lastDay) {
       lastDay = s.day;
-      if (args.includes('--trace') && s.day % 10 === 1) console.log(`  [${level} ${seed}] j${s.day} pop ${s.population}/${housingCapacity(s)} food ${Math.round(s.resources.food)} wood ${Math.round(s.resources.wood)} stone ${Math.round(s.resources.stone)} gold ${Math.round(s.resources.gold)} morale ${Math.round(s.morale)} bld ${Object.entries(s.buildings.reduce((m: Record<string, number>, b) => ((m[b.type] = (m[b.type] ?? 0) + 1), m), {})).map(([k, v]) => k + v).join(' ')} net.food ${computeNet(s).food.toFixed(1)}`);
+      if (args.includes('--trace') && s.day % 10 === 1) console.log(`  [${level} ${seed}] j${s.day} pop ${s.population}/${housingCapacity(s)} food ${Math.round(s.resources.food)} wood ${Math.round(s.resources.wood)} stone ${Math.round(s.resources.stone)} gold ${Math.round(s.resources.gold)} morale ${Math.round(s.morale)} bld ${Object.entries(s.buildings.reduce((m: Record<string, number>, b) => ((m[b.type] = (m[b.type] ?? 0) + 1), m), {})).map(([k, v]) => k + v).join(' ')} net.food ${computeNet(s).food.toFixed(1)} mill ${(() => { const m = s.buildings.find((b) => b.type === 'mill')!; const r = simulateProduction(s).status.get(m.id); return `w${m.workers} idle${isIdle(s, m)} ${JSON.stringify(r)} flour${Math.round(s.resources.flour)} bread${Math.round(s.resources.bread)}`; })()}`);
       s = plan(s);
     }
     s = react(s);

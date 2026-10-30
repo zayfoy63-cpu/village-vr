@@ -13,6 +13,7 @@ export const RESOURCE_ICON: Record<string, IconId> = {
   ironOre: 'ironOre',
   tools: 'tools',
   weapons: 'weapons',
+  wool: 'wool',
 };
 
 export const RESOURCE_ICON_IDS = new Set<IconId>(Object.values(RESOURCE_ICON));

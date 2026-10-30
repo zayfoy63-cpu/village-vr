@@ -123,7 +123,9 @@ export const BUILDINGS: BuildingDef[] = [
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 15, stone: 5 }, workers: 1, consumes: { food: 4 }, produces: { flour: 4 }, unlock: { population: 8 } }],
-    priority: 6,
+    // Les transformateurs passent juste après les producteurs de base : sans cela, ils restaient sans
+    // travailleurs dès que les champs, bûcherons et carrières avaient pris tout le village
+    priority: 2.2,
     allowedTiles: LAND,
   },
 
@@ -256,7 +258,7 @@ export const BUILDINGS: BuildingDef[] = [
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 15, stone: 10 }, workers: 1, consumes: { flour: 3 }, produces: { bread: 3 }, unlock: { population: 10 } }],
-    priority: 7,
+    priority: 2.4,
     allowedTiles: LAND,
   },
   {
@@ -268,7 +270,7 @@ export const BUILDINGS: BuildingDef[] = [
     buildable: true,
     size: 1,
     levels: [{ cost: { wood: 20, stone: 5 }, workers: 1, consumes: { wood: 3 }, produces: { planks: 2 }, unlock: { population: 12 } }],
-    priority: 6,
+    priority: 2.3,
     allowedTiles: LAND,
   },
   {
@@ -300,7 +302,8 @@ export const BUILDINGS: BuildingDef[] = [
       { cost: { wood: 15, stone: 20, planks: 5 }, workers: 2, consumes: { ironOre: 2, wood: 1 }, produces: { tools: 1 }, unlock: { population: 20, buildings: { mine: 1 } } },
       { cost: { stone: 20, planks: 10, gold: 10 }, workers: 3, consumes: { ironOre: 4, wood: 2 }, produces: { tools: 1, weapons: 1 }, unlock: UPGRADE_LEVEL_3 },
     ],
-    priority: 7,
+    // Après la mine : le minerai du jour est déjà compté quand on affecte les forgerons
+    priority: 3.5,
     allowedTiles: LAND,
   },
   {
@@ -365,12 +368,17 @@ export const BUILDINGS: BuildingDef[] = [
     id: 'sheepfold',
     name: 'Bergerie',
     icon: I.sheep,
+    description: "De la laine à tondre, un peu de lait… et ce qu'ils laissent derrière eux. L'hiver, les moutons mangent du blé.",
     tab: 'production',
-    description: 'Quelques moutons, du lait, de la laine… et ce qu\'ils laissent derrière eux.',
     buildable: true,
     size: 1,
-    levels: [{ cost: { wood: 14 }, workers: 1, produces: { food: 1.5 } }],
-    priority: 2,
+    // Niveaux : plus de moutons (visibles), plus de laine et de lait, plus de bergers. Blé d'hiver : voir SHEEP (sheep.ts)
+    levels: [
+      { cost: { wood: 16 }, workers: 1, produces: { wool: 1, food: 0.5 } },
+      { cost: { wood: 18, stone: 6 }, workers: 2, produces: { wool: 2.5, food: 1 }, unlock: UPGRADE_LEVEL_2 },
+      { cost: { wood: 18, stone: 12, gold: 5, planks: 4 }, workers: 3, produces: { wool: 4.5, food: 1.5 }, unlock: UPGRADE_LEVEL_3 },
+    ],
+    priority: 2.1,
     allowedTiles: LAND,
   },
   {

@@ -1,54 +1,65 @@
-import { BUILDING_BY_ID, CHAINS, levelDef, maxLevel } from '../game/buildings';
+import { BUILDING_BY_ID, CHAINS, maxLevel } from '../game/buildings';
 import { DAMAGED_FACTOR, RESOURCE_META } from '../game/config';
 import {
   canAfford,
   canUpgrade,
-  conditionLabel,
   effectLabel,
-  isCapped,
-  isUnlocked,
+  chainReport,
   nominalProduction,
   repairCost,
   simulateProduction,
   statsOf,
 } from '../game/rules';
-import type { Building, Resources } from '../game/types';
+import type { Building } from '../game/types';
 import { useGame } from '../store/gameStore';
 import { CostLine } from './BuildBar';
 import { I } from './icons';
 import { Icon, RichText } from './icons/Icon';
 
-const icons = (keys: (keyof Resources)[]) => <RichText text={keys.map((k) => RESOURCE_META[k].icon).join(' ')} />;
-
-/** Transformation et équipement : entrée → sortie, blocage, stock plein, outils, marche / arrêt */
+/** Transformation et équipement : stock d'entrée, production en cours, raison exacte de l'arrêt, outils, marche / arrêt */
 function ChainStatus({ building }: { building: Building }) {
   useGame((s) => s.game.resources);
+  useGame((s) => s.game.population);
   const togglePause = useGame((s) => s.togglePause);
   const game = useGame.getState().game;
   const stats = statsOf(building);
   const run = simulateProduction(game).status.get(building.id);
-  const isProcessor = !!stats.consumes;
+  const report = chainReport(game, building, run);
   const equippable = CHAINS.tools.equips.includes(building.type);
-  const capped = isCapped(game, building);
-  const pct = run ? Math.round(run.ratio * 100) : 0;
+  const producing = !!stats.produces;
   return (
     <>
-      {building.paused ? (
-        <div className="bp-alert damaged">
-          <span><Icon id="pause" /> Mis à l'arrêt : ses travailleurs sont affectés ailleurs.</span>
+      {report.inputs.length > 0 && (
+        <div className="bp-row">
+          <span>Stock d'entrée</span>
+          <strong>
+            {report.inputs.map((i) => (
+              <span key={i.key} className={i.have < i.perDay ? 'warn' : ''}>
+                <RichText text={`${RESOURCE_META[i.key].icon} ${i.have}`} /> <em>(besoin {i.perDay}/j)</em>{' '}
+              </span>
+            ))}
+          </strong>
         </div>
-      ) : capped ? (
-        <div className="bp-note"><Icon id="box" /> Stock plein : en pause automatique (travailleurs libérés).</div>
-      ) : run?.blocked === 'input' ? (
-        <div className="bp-alert fire">
-          <span><Icon id="forbidden" /> À l'arrêt : manque de {icons(run.missing)} {run.missing.map((k) => RESOURCE_META[k].name.toLowerCase()).join(', ')}.</span>
+      )}
+      {producing && (
+        <div className="bp-row">
+          <span>Production en cours</span>
+          <strong className={report.outputs.length ? 'pos' : 'warn'}>
+            {report.outputs.length ? (
+              <RichText text={report.outputs.map((o) => `+${o.perDay} ${RESOURCE_META[o.key].icon}/j`).join('  ')} />
+            ) : (
+              'Rien'
+            )}
+          </strong>
         </div>
-      ) : isProcessor && run && run.ratio < 0.999 && run.missing.length > 0 ? (
-        <div className="bp-note warn">
-          Tourne à {pct} % : pas assez de {icons(run.missing)}.
+      )}
+      {report.stop ? (
+        <div className={report.stop.kind === 'fire' || report.stop.kind === 'input' ? 'bp-alert fire' : 'bp-alert damaged'}>
+          <span><Icon id={report.stop.kind === 'paused' ? 'pause' : report.stop.kind === 'capped' ? 'box' : report.stop.kind === 'workers' ? 'worker' : report.stop.kind === 'locked' ? 'lock' : 'forbidden'} /> {report.stop.text}</span>
         </div>
+      ) : report.slow ? (
+        <div className="bp-note warn">{report.slow}</div>
       ) : null}
-      {run?.blocked === 'workers' && !building.paused && <div className="bp-note warn"><Icon id="worker" /> Aucun travailleur : bâtiment à l'arrêt.</div>}
       {equippable && building.workers > 0 && (
         <div className={`bp-note ${run?.equipped ? 'pos-note' : ''}`}>
           <RichText
@@ -87,7 +98,6 @@ export function BuildingPanel() {
   const stats = statsOf(building);
   const max = maxLevel(building.type);
   const check = canUpgrade(game, building);
-  const locked = !isUnlocked(game, building.type, building.level);
   const current = effectLabel(stats, nominalProduction(game, building));
   const next = check.next ? effectLabel(check.next, nominalProduction(game, building, building.level + 1)) : null;
 
@@ -149,14 +159,6 @@ export function BuildingPanel() {
           <strong className={building.workers < stats.workers ? 'warn' : ''}>
             <Icon id="worker" /> {building.workers}/{stats.workers}
           </strong>
-        </div>
-      ) : null}
-      {locked ? (
-        <div className="bp-note"><Icon id="lock" /> Se mettra en marche dès que <RichText text={conditionLabel(levelDef(building.type, building.level).unlock)} />.</div>
-      ) : stats.workers && building.workers < stats.workers && !building.paused && !isCapped(game, building) ? (
-        <div className="bp-note warn">
-          Il manque {stats.workers - building.workers} {stats.workers - building.workers > 1 ? 'travailleurs' : 'travailleur'} :
-          production à {Math.round((building.workers / stats.workers) * 100)} %. Logez plus d'habitants !
         </div>
       ) : null}
       <ChainStatus building={building} />

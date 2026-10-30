@@ -1,15 +1,14 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import type * as THREE from 'three';
-import { useGame } from '../../store/gameStore';
+import { ambientRate } from '../ambient';
 import { Part } from './Part';
 
 /** Moulin à vent : tour, toit conique et pales qui tournent */
 export function Mill() {
   const blades = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
-    const speed = useGame.getState().speed;
-    if (blades.current) blades.current.rotation.z += dt * (0.4 + 0.6 * speed);
+    if (blades.current) blades.current.rotation.z += dt * ambientRate();
   });
   return (
     <group rotation={[0, Math.PI / 5, 0]}>

@@ -33,6 +33,7 @@ import {
 } from './events';
 import { difficultyOf, inGrace, rampFactor } from './difficulty';
 import { hazardsDue, updateHazards } from './hazards';
+import { feedSheep } from './sheep';
 import { emptyMech, memo } from './mechanics/common';
 import { mechanicsEndOfDay, mechanicsStartOfDay } from './mechanics';
 import { generateMap } from './mapgen';
@@ -451,6 +452,9 @@ export function advanceDay(state: GameState): GameState {
       });
     }
   }
+
+  // 2 bis. Les moutons mangent ce qu'il reste de blé (hiver) ou broutent
+  feedSheep(s);
 
   // 3 bis. Mécaniques cachées : sols, chauffage, rats, fièvre, forêt, mines…
   mechanicsEndOfDay(s, rng, s.day + 1);

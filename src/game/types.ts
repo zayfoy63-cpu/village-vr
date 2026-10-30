@@ -23,7 +23,9 @@ export type ResourceKey =
   | 'planks'
   | 'ironOre'
   | 'tools'
-  | 'weapons';
+  | 'weapons'
+  /** Laine des bergeries (future chaîne de vêtements contre le froid) */
+  | 'wool';
 export type Resources = Record<ResourceKey, number>;
 
 export type BuildingTypeId =
@@ -80,6 +82,8 @@ export interface Building {
   fatigue?: number;
   /** Mine : instabilité des galeries, 0 → 1 (effondrement) */
   instability?: number;
+  /** Bergerie : maigreur du troupeau, 0 (gras) → 1 (squelettique) ; absente = gras */
+  lean?: number;
 }
 
 /** Les temps sont en "temps de jeu" : jour + avancement (ex. 12.5 = milieu du jour 12) */

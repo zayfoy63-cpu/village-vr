@@ -152,6 +152,17 @@ export const ICON_DEFS = {
       p('12,12 10.5,15 12,18 13.5,15', K.wheat),
     ],
   },
+  wool: {
+    name: 'Laine',
+    shapes: [
+      c(12, 12.5, 8.6, K.white),
+      p('12,12.5 20.6,12.5 19.5,16.5 15,19.8 12,21', K.cream),
+      l('M5.6,10.5 C9,7.2 15,7.2 18.6,10.5', palMix('ink', 'parchment', 0.45), 1.1),
+      l('M4.2,13.2 C8.5,10 15.5,10 19.8,13.2', palMix('ink', 'parchment', 0.45), 1.1),
+      l('M5.4,16.2 C9,13.2 15,13.2 18.8,16.2', palMix('ink', 'parchment', 0.45), 1.1),
+      l('M17,18.5 C20,19.5 21,20.5 22,21.5', K.cream, 1.4),
+    ],
+  },
   bread: {
     name: 'Pain',
     shapes: [

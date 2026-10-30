@@ -9,6 +9,7 @@ Chaque partie est générée à partir d'une **seed** ; la partie se termine qua
 npm install
 npm run dev       # http://localhost:5173
 npm run build     # vérification TypeScript + build de production dans dist/
+npm test          # tests automatiques : chaînes de production, travailleurs, bergerie (scripts/tests.ts)
 npm run bot       # bot de test : 20 seeds × 4 difficultés (voir « Difficulté »)
 ```
 
@@ -87,6 +88,24 @@ Débloquées progressivement (onglet **Artisanat**, visible au premier déblocag
   quand son stock est plein (`CHAINS.stockCap`) et peut être mis à l'arrêt depuis son panneau.
 - HUD : ligne de base + ligne avancée qui n'affiche que les ressources découvertes. Icône d'alerte au-dessus d'un
   bâtiment à l'arrêt (rouge : matière première, orange : travailleurs).
+- **Panneau d'un bâtiment de production** (PC et VR, `rules.ts` → `chainReport`) : stock d'entrée et besoin par jour,
+  production en cours, et la raison exacte d'un arrêt (à l'arrêt par le joueur, en feu, pas encore en service, hors
+  saison, stock plein, aucun travailleur libre, à sec : quelle matière manque et combien il en reste).
+- **Affectation des travailleurs** (`assignWorkers`) : par priorité (champs 1, bûcherons 2, moulin 2,2, scierie 2,3,
+  boulangerie 2,4, carrières et mines 3, forge 3,5, marché 4, tours 5). Deux règles évitent que les chaînes restent muettes :
+  un champ ne garde aucun travailleur en hiver (il ne produit rien), et un transformateur à sec (moins du quart d'une journée
+  de matière, en comptant la récolte du jour) libère les siens.
+- Farine et pain se mangent le jour même (le pain d'abord) : leur stock reste souvent à 0 alors que la chaîne tourne ;
+  le panneau montre ce qui est produit chaque jour.
+
+### Bergerie (`game/sheep.ts`, coûts et production dans `buildings.ts`)
+Niveaux 1 → 3 (dès 10 puis 25 habitants), 1 / 2 / 3 bergers, **laine** (1 / 2,5 / 4,5 par jour : nouvelle ressource, réservée
+à la future chaîne de vêtements contre le froid) et un peu de lait (0,5 / 1 / 1,5 blé). Le **fumier** (mécanique des sols) a une
+portée de 2,2 cases + 0,4 par niveau et une efficacité de ×1 / ×1,4 / ×1,8 : un champ voisin récupère de l'épuisement.
+**Hiver** : le troupeau mange du blé (0,6 / 1,2 / 1,8 par jour, après les repas du village). Sans blé, les moutons maigrissent
+(+0,25 par jour, jusqu'à −70 % de laine, lait et fumier, moutons plus fins à l'écran) ; ils reprennent du poids en mangeant ou
+au pré. Visuel par niveau (`scene/models/Hidden.tsx`) : abri de chaume et 3 moutons / étable, abreuvoir et 5 moutons /
+pierre, tuiles, lanterne, meules et 8 moutons.
 
 ### Décisions
 - Pause automatique quand une carte à choix apparaît (désactivable dans Paramètres) ; reprise après la décision.
@@ -209,7 +228,7 @@ seulement des indices visuels, et des descriptions de bâtiments volontairement 
 | Mécanique | Condition | Indice visuel | Effet | Solution |
 | --- | --- | --- | --- | --- |
 | Crue (`flood.ts`) | jours de pluie : rivière +0,34 / jour de pluie, −0,15 / jour sec ; crue à 1 | rivière plus sombre et plus haute | bâtiments collés à l'eau détruits / abîmés | **Digue** (protège à 2,6 cases) ou ne pas bâtir collé à l'eau ; compromis : champ au bord de l'eau x1,3 |
-| Épuisement des sols (`soil.ts`) | champ cultivé : +0,02 / jour | cultures qui jaunissent | jusqu'à −50 % de production | **jachère** (mettre le champ à l'arrêt : −0,1 / jour) ou **Bergerie** à moins de 2 cases (fumier) |
+| Épuisement des sols (`soil.ts`) | champ cultivé : +0,02 / jour | cultures qui jaunissent | jusqu'à −50 % de production | **jachère** (mettre le champ à l'arrêt : −0,1 / jour) ou **Bergerie** à portée (fumier, voir « Bergerie ») |
 | Froid (`cold.ts`) | hiver : bois par habitation (château 0,6, cabane 0,3, maison 0,45…) | cheminées sans fumée, villageois qui tremblent | 3 jours sans bois : 15 % de malades ; 6 jours : morts | **stocker du bois** à l'automne |
 | Propagation du feu (`fire.ts`) | maisons collées ; l'été, quartier entassé (≥ 2 voisins) : 5 % / jour | escarbilles au-dessus des maisons entassées l'été | feu en chaîne | **espacer**, ou **Puits** à moins de 3 cases (propagation x0,3, extinction 2x plus rapide) |
 | Rats (`rats.ts`) | plus de 40 blé hors des greniers | petits points gris autour du château | après 5 jours : 20 % de l'excédent dévoré (+5 %/sévérité) | **Grenier** assez grand |
@@ -337,6 +356,11 @@ libérées) **→ 116 appels (passe d'ombre comprise) et 2 textures, stables en 
 - **Divers** : rendu fovéal fixe (`perf.foveation`), résolution `perf.frameBufferScaling`, `matrixAutoUpdate = false`
   sur les objets immobiles, aucun objet ni matériau recréé à chaque image (textures et géométries stables en jeu).
 - **Compteur** (Paramètres → « Compteur de perf. ») : FPS, appels de dessin, triangles et textures, sur le présentoir.
+
+### Vitesse du jeu et effets d'ambiance (`scene/ambient.ts`)
+À x0,5 / x1 / x2, seul le gameplay change de rythme : villageois, bandits, cycle jour/nuit, production. Fumée, pluie, neige,
+flammes, étincelles, pales du moulin, roues et scies gardent une vitesse naturelle : leurs animations lisent `clock.elapsedTime`
+ou `ambientRate()` (1 en marche, 0 en pause), jamais la vitesse du jeu.
 
 ### Style « fait main » (`src/palette.ts`, `scene/handmade.ts`, `scene/wear.ts`)
 Rien n'est parfaitement droit, et rien ne coûte un appel de dessin ni une texture de plus :

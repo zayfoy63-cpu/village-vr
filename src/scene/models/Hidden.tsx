@@ -4,6 +4,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import type * as THREE from 'three';
+import { SHEEP } from '../../game/sheep';
 import { useGame } from '../../store/gameStore';
 import { Fence, Torch } from './Decor';
 import { Part } from './Part';
@@ -50,42 +51,99 @@ export function Herbalist() {
   );
 }
 
-/** Un mouton qui broute (petite oscillation) */
-function Sheep({ p, phase }: { p: [number, number, number]; phase: number }) {
+/** Un mouton qui broute (petite oscillation) ; maigre, il est plus fin et plus bas */
+function Sheep({ p, phase, thin }: { p: [number, number, number]; phase: number; thin: boolean }) {
   const ref = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.elapsedTime * 0.6 + phase;
-    ref.current.position.x = p[0] + Math.sin(t) * 0.06;
+    ref.current.position.x = p[0] + Math.sin(t) * 0.05;
     ref.current.rotation.y = Math.cos(t) * 0.8 + phase;
   });
+  const k = thin ? 0.72 : 1;
   return (
     <group ref={ref} position={p}>
-      <Part g="ball" m="clothWhite" p={[0, 0.08, 0]} s={[0.14, 0.1, 0.1]} />
-      <Part g="ball" m="ironDark" p={[0.08, 0.09, 0]} s={0.05} shadow={false} />
+      <Part g="ball" m={thin ? 'wall' : 'clothWhite'} p={[0, 0.08 * k, 0]} s={[0.14 * k, 0.1 * k, 0.1 * k]} />
+      <Part g="ball" m="ironDark" p={[0.08 * k, 0.09 * k, 0]} s={0.05} shadow={false} />
     </group>
   );
 }
 
-/** Bergerie : abri en bois, enclos et quelques moutons (moins nombreux si elle a été attaquée) */
-export function Sheepfold({ id }: { id: number }) {
+/** Emplacements des moutons dans l'enclos : les premiers sont toujours occupés, les suivants s'ajoutent avec le niveau */
+const FLOCK: [number, number, number][] = [
+  [0.15, 0, 0.1],
+  [-0.1, 0, 0.22],
+  [0.27, 0, -0.18],
+  [0.0, 0, -0.05],
+  [0.3, 0, 0.3],
+  [-0.32, 0, 0.3],
+  [0.12, 0, -0.32],
+  [-0.05, 0, 0.36],
+];
+/** Troupeau visible par niveau */
+const FLOCK_SIZE = [0, 3, 5, 8];
+
+/** Abreuvoir et balle de foin communs aux niveaux */
+function Trough({ p }: { p: [number, number, number] }) {
+  return (
+    <group position={p}>
+      <Part g="box" m="woodRaw" p={[0, 0.04, 0]} s={[0.2, 0.07, 0.07]} />
+      <Part g="box" m="water" p={[0, 0.075, 0]} s={[0.17, 0.01, 0.045]} shadow={false} />
+    </group>
+  );
+}
+
+/**
+ * Bergerie, un aspect par niveau : 1 petit abri de chaume et 3 moutons ; 2 étable de bois à toit de bardeaux,
+ * abreuvoir et 5 moutons ; 3 bergerie à soubassement de pierre, toit de tuiles, lanterne, meules et 8 moutons.
+ * Moins de moutons si elle a été attaquée, des moutons plus fins si le troupeau maigrit (blé manquant l'hiver).
+ */
+export function Sheepfold({ id, level = 1 }: { id: number; level?: number }) {
   const damaged = useGame((s) => !!s.game.buildings.find((b) => b.id === id)?.damaged);
-  const flock = damaged ? 1 : 3;
+  const thin = useGame((s) => (s.game.buildings.find((b) => b.id === id)?.lean ?? 0) >= SHEEP.thinFrom);
+  const lvl = Math.max(1, Math.min(3, level));
+  const flock = damaged ? Math.max(1, Math.ceil(FLOCK_SIZE[lvl] / 3)) : FLOCK_SIZE[lvl];
   return (
     <group>
-      <Fence w={0.9} d={0.86} m="woodRaw" />
-      <Part g="box" m="woodRaw" p={[-0.18, 0.16, -0.22]} s={[0.4, 0.32, 0.3]} />
-      <Part g="gable" m="thatch" p={[-0.18, 0.32, -0.22]} s={[0.46, 0.2, 0.38]} r={[0, Math.PI / 2, 0]} />
-      {[
-        [0.15, 0, 0.1],
-        [-0.1, 0, 0.22],
-        [0.25, 0, -0.2],
-      ]
-        .slice(0, flock)
-        .map((p, i) => (
-          <Sheep key={i} p={p as [number, number, number]} phase={i * 2.1} />
-        ))}
-      <Part g="ball" m="hay" p={[0.3, 0.06, 0.28]} s={[0.12, 0.1, 0.12]} />
+      <Fence w={0.92} d={0.88} m={lvl === 1 ? 'woodRaw' : lvl === 2 ? 'woodLight' : 'timber'} />
+      {lvl === 1 && (
+        <>
+          <Part g="box" m="woodRaw" p={[-0.18, 0.16, -0.22]} s={[0.4, 0.32, 0.3]} />
+          <Part g="gable" m="thatch" p={[-0.18, 0.32, -0.22]} s={[0.46, 0.2, 0.38]} r={[0, Math.PI / 2, 0]} />
+          <Part g="ball" m="hay" p={[0.3, 0.06, 0.28]} s={[0.12, 0.1, 0.12]} />
+        </>
+      )}
+      {lvl === 2 && (
+        <>
+          <Part g="box" m="timber" p={[-0.2, 0.0, -0.2]} s={[0.46, 0.02, 0.36]} shadow={false} />
+          <Part g="box" m="woodLight" p={[-0.2, 0.2, -0.2]} s={[0.46, 0.4, 0.34]} />
+          <Part g="box" m="door" p={[-0.2, 0.13, -0.025]} s={[0.14, 0.26, 0.01]} shadow={false} />
+          <Part g="gable" m="roofBrown" p={[-0.2, 0.4, -0.2]} s={[0.54, 0.24, 0.44]} r={[0, Math.PI / 2, 0]} />
+          <Part g="ball" m="hay" p={[0.3, 0.07, -0.3]} s={[0.14, 0.12, 0.14]} />
+          <Part g="ball" m="hay" p={[0.38, 0.06, -0.18]} s={[0.1, 0.09, 0.1]} />
+          <Trough p={[0.12, 0, 0.34]} />
+        </>
+      )}
+      {lvl === 3 && (
+        <>
+          <Part g="box" m="stoneLight" p={[-0.2, 0.1, -0.2]} s={[0.52, 0.2, 0.4]} />
+          <Part g="box" m="plaster" p={[-0.2, 0.3, -0.2]} s={[0.48, 0.2, 0.36]} />
+          <Part g="box" m="timber" p={[-0.2, 0.3, -0.015]} s={[0.48, 0.02, 0.02]} shadow={false} />
+          <Part g="box" m="door" p={[-0.2, 0.14, -0.0]} s={[0.15, 0.26, 0.01]} shadow={false} />
+          <Part g="gable" m="roofRed" p={[-0.2, 0.4, -0.2]} s={[0.6, 0.3, 0.5]} r={[0, Math.PI / 2, 0]} />
+          {/* Lanterne à la porte */}
+          <Part g="box" m="ironDark" p={[-0.07, 0.3, 0.0]} s={[0.012, 0.1, 0.012]} shadow={false} />
+          <Part g="ball" m="paintYellow" p={[-0.07, 0.34, 0.0]} s={0.04} shadow={false} />
+          {/* Meules et abreuvoir, parc séparé au fond */}
+          <Part g="cylinderLow" m="hay" p={[0.34, 0.1, -0.3]} s={[0.17, 0.2, 0.17]} />
+          <Part g="cylinderLow" m="hay" p={[0.36, 0.07, -0.1]} s={[0.12, 0.14, 0.12]} />
+          <Part g="box" m="timber" p={[0.12, 0.07, -0.02]} s={[0.4, 0.02, 0.012]} shadow={false} />
+          <Trough p={[-0.12, 0, 0.36]} />
+        </>
+      )}
+      {FLOCK.slice(0, flock).map((p, i) => (
+        <Sheep key={i} p={p} phase={i * 2.1} thin={thin} />
+      ))}
     </group>
   );
 }

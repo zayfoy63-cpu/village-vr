@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "esbuild scripts/tests.ts --bundle --platform=node --format=esm --log-level=error --outfile=.bot/tests.mjs && node .bot/tests.mjs",
     "bot": "esbuild scripts/bot.ts --bundle --platform=node --format=esm --log-level=error --outfile=.bot/bot.mjs && node .bot/bot.mjs"
   },
   "dependencies": {

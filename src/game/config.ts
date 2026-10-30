@@ -47,7 +47,7 @@ export interface DifficultyDef {
 }
 
 const startRes = (r: Partial<Resources>): Resources => ({
-  food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0, ...r,
+  food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0, wool: 0, ...r,
 });
 
 export const DIFFICULTIES: DifficultyDef[] = [
@@ -213,10 +213,11 @@ export const RESOURCE_META: Record<keyof Resources, { name: string; short: strin
   ironOre: { name: 'Minerai de fer', short: 'Minerai', icon: I.ironOre },
   tools: { name: 'Outils', short: 'Outils', icon: I.tools },
   weapons: { name: 'Armes', short: 'Armes', icon: I.weapons },
+  wool: { name: 'Laine', short: 'Laine', icon: I.wool },
 };
 
 /** Ligne de base du HUD (toujours visible) */
 export const BASE_RESOURCES: (keyof Resources)[] = ['food', 'wood', 'stone', 'gold'];
 /** Ligne avancée du HUD (chaque ressource n'apparaît qu'une fois découverte) */
-export const ADVANCED_RESOURCES: (keyof Resources)[] = ['flour', 'bread', 'planks', 'ironOre', 'tools', 'weapons'];
+export const ADVANCED_RESOURCES: (keyof Resources)[] = ['flour', 'bread', 'planks', 'ironOre', 'tools', 'weapons', 'wool'];
 export const RESOURCE_KEYS: (keyof Resources)[] = [...BASE_RESOURCES, ...ADVANCED_RESOURCES];

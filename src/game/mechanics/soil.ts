@@ -4,8 +4,9 @@
 
 import { seasonOf } from '../config';
 import { mechIntensity } from '../difficulty';
+import { manureRadius, manureStrength } from '../sheep';
 import type { Building, GameState } from '../types';
-import { type Mechanic, center, memo, solve, strike, within } from './common';
+import { type Mechanic, center, dist, memo, solve, strike } from './common';
 import { I } from '../../ui/icons';
 
 export const SOIL = {
@@ -28,10 +29,9 @@ export const SOIL = {
     fallowRecovery: 0.1,
     /** Récupération naturelle en hiver */
     winterRecovery: 0.02,
-    /** Fumier d'une bergerie en service à moins de X cases : épuisement réduit + récupération */
-    manureRadius: 2.2,
+    /** Fumier d'une bergerie en service (portée et efficacité selon son niveau : voir sheep.ts) : épuisement réduit + récupération */
     manureGain: 0.35,
-    manureRecovery: 0.015,
+    manureRecovery: 0.03,
     /** Jours de culture fumée qui complètent la page */
     manureDays: 12,
     /** Un champ épuisé (≥ from) qui redescend à `to` complète la page */
@@ -44,8 +44,14 @@ export function soilFactor(b: Building): number {
   return 1 - SOIL.effect.maxLoss * Math.min(1, b.fatigue ?? 0);
 }
 
-function manured(state: GameState, b: Building): boolean {
-  return within(state, center(b), ['sheepfold'], SOIL.solution.manureRadius).some((s) => s.workers > 0 && !s.damaged);
+/** Efficacité du fumier reçu par un champ (0 = aucune bergerie en service à portée) : la meilleure bergerie compte */
+function manured(state: GameState, b: Building): number {
+  let best = 0;
+  for (const s of state.buildings) {
+    if (s.type !== 'sheepfold' || dist(center(s), center(b)) > manureRadius(s)) continue;
+    best = Math.max(best, manureStrength(s));
+  }
+  return best;
 }
 
 export const soil: Mechanic<typeof SOIL> = {
@@ -62,7 +68,8 @@ export const soil: Mechanic<typeof SOIL> = {
     for (const b of state.buildings) {
       if (b.type !== 'field') continue;
       const before = b.fatigue ?? 0;
-      const dung = manured(state, b);
+      const manure = manured(state, b);
+      const dung = manure > 0;
       let f = before;
       if (b.paused) f -= S.solution.fallowRecovery;
       else if (winter) f -= S.solution.winterRecovery;
@@ -70,7 +77,7 @@ export const soil: Mechanic<typeof SOIL> = {
         f += S.conditions.gainPerDay * mechIntensity(state) * (dung ? S.solution.manureGain : 1);
         if (dung) manureWorked = true;
       }
-      if (dung) f -= S.solution.manureRecovery;
+      if (dung) f -= S.solution.manureRecovery * manure;
       f = Math.max(0, Math.min(1, f));
       b.fatigue = Math.round(f * 1000) / 1000;
       if (f >= S.effect.strikeAt) strike(state, 'soil');

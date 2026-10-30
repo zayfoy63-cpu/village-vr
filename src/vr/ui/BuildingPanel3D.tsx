@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type * as THREE from 'three';
 import { BUILDING_BY_ID } from '../../game/buildings';
 import { DAMAGED_FACTOR, RESOURCE_KEYS, RESOURCE_META } from '../../game/config';
-import { canAfford, canUpgrade, effectLabel, isCapped, nominalProduction, repairCost, simulateProduction, statsOf } from '../../game/rules';
+import { canAfford, canUpgrade, chainReport, effectLabel, nominalProduction, repairCost, simulateProduction, statsOf } from '../../game/rules';
 import type { Building, Resources } from '../../game/types';
 import { useGame } from '../../store/gameStore';
 import { feedback } from '../feedback';
@@ -54,14 +54,22 @@ function Content({ building: b }: { building: Building }) {
   const hasUpgrade = !!check.next;
   const rc = repairCost(b);
 
-  // Ligne d'état : feu, dégâts, arrêt, manque de matière ou de travailleurs
+  // Ligne d'état : feu, dégâts, puis la raison exacte de l'arrêt ou de la marche réduite
+  const report = chainReport(game, b, run);
   let status: { text: string; color: string } | null = null;
   if (b.fire) status = { text: `${I.fire} En feu ! Tapotez les flammes`, color: THEME.bad };
   else if (b.damaged) status = { text: `${I.hammer} Endommagé (production x${DAMAGED_FACTOR})`, color: THEME.warn };
-  else if (b.paused) status = { text: `${I.pause} À l'arrêt`, color: THEME.dim };
-  else if (isCapped(game, b)) status = { text: `${I.box} Stock plein : en pause`, color: THEME.dim };
-  else if (run?.blocked === 'input') status = { text: `${I.forbidden} Manque ${run.missing.map((k) => RESOURCE_META[k].icon).join(' ')}`, color: THEME.bad };
-  else if (stats.workers && b.workers < stats.workers) status = { text: `${I.worker} Il manque ${stats.workers - b.workers} travailleur(s)`, color: THEME.warn };
+  else if (report.stop) {
+    const bad = report.stop.kind === 'input' || report.stop.kind === 'workers';
+    status = { text: `${I.forbidden} ${report.stop.text}`, color: bad ? THEME.bad : THEME.dim };
+  } else if (report.slow) status = { text: `${I.worker} ${report.slow}`, color: THEME.warn };
+  // Stock d'entrée et production en cours (transformateurs et producteurs)
+  const flow = [
+    report.inputs.length ? `Entrée ${report.inputs.map((i) => `${RESOURCE_META[i.key].icon} ${i.have} (${i.perDay}/j)`).join(' ')}` : '',
+    stats.produces ? (report.outputs.length ? `En cours ${report.outputs.map((o) => `+${o.perDay} ${RESOURCE_META[o.key].icon}/j`).join(' ')}` : 'En cours : rien') : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const buttons: React.ReactNode[] = [];
   if (b.fire && b.fire.extinguishEnd === undefined)
@@ -97,15 +105,18 @@ function Content({ building: b }: { building: Building }) {
   const lines = (text: string, size: number) => Math.max(1, Math.ceil(textWidth(text, size) / (w - 0.05)));
   const curLines = lines(current, 0.026);
   const stLines = status ? lines(status.text, 0.024) : 0;
+  const flowLines = flow ? lines(flow, 0.022) : 0;
   const extraCur = (curLines - 1) * 0.032;
-  const h = 0.2 + extraCur + (status ? 0.045 + (stLines - 1) * 0.029 : 0);
+  const flowH = flow ? 0.04 + (flowLines - 1) * 0.026 : 0;
+  const h = 0.2 + extraCur + flowH + (status ? 0.045 + (stLines - 1) * 0.029 : 0);
   return (
     <Panel width={w} height={h}>
       <Label title text={title} size={0.036} position={[0, h / 2 - 0.035, 0]} />
       <Label text={current} size={0.026} color={THEME.accent} position={[0, h / 2 - 0.075 - extraCur / 2, 0]} maxWidth={w - 0.05} />
       {stats.workers ? <Label text={`${I.worker} ${b.workers}/${stats.workers}`} size={0.026} position={[w / 2 - 0.06, h / 2 - 0.035, 0]} /> : null}
+      {flow && <Label text={flow} size={0.022} weight={600} color={THEME.text} position={[0, h / 2 - 0.108 - extraCur - ((flowLines - 1) * 0.026) / 2, 0]} maxWidth={w - 0.05} />}
       {status && (
-        <Label text={status.text} size={0.024} color={status.color} position={[0, h / 2 - 0.112 - extraCur - ((stLines - 1) * 0.029) / 2, 0]} maxWidth={w - 0.05} />
+        <Label text={status.text} size={0.024} color={status.color} position={[0, h / 2 - 0.112 - extraCur - flowH - ((stLines - 1) * 0.029) / 2, 0]} maxWidth={w - 0.05} />
       )}
       <group position={[0, -h / 2 + 0.05, 0.004]}>
         {buttons.map((btn, i) => (

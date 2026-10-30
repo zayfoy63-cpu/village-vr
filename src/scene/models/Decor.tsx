@@ -4,7 +4,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import type * as THREE from 'three';
-import { useGame } from '../../store/gameStore';
+import { ambientRate } from '../ambient';
 import type { MAT } from '../shared';
 import { Part } from './Part';
 
@@ -90,12 +90,11 @@ export function Fence({ w, d, p = [0, 0, 0], m = 'woodLight', gap = 'front' }: {
   );
 }
 
-/** Groupe qui tourne en continu (roue, scie, poulie) ; s'arrête quand le jeu est en pause */
+/** Groupe qui tourne en continu (roue, scie, poulie) ; s'arrête en pause, mais garde sa vitesse naturelle en x2 */
 export function Spinner({ p, axis = 'x', speed = 1.5, children }: { p: V3; axis?: 'x' | 'y' | 'z'; speed?: number; children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
-    const s = useGame.getState().speed;
-    if (ref.current) ref.current.rotation[axis] += dt * speed * (s === 0 ? 0 : s);
+    if (ref.current) ref.current.rotation[axis] += dt * speed * ambientRate();
   });
   return (
     <group position={p}>

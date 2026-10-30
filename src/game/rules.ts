@@ -20,7 +20,8 @@ import { isForest, lumberForestFactor } from './mechanics/deforestation';
 import { diseaseFactor } from './mechanics/disease';
 import { riversideFactor } from './mechanics/flood';
 import { soilFactor } from './mechanics/soil';
-import { seasonFactor } from './seasons';
+import { seasonEffect, seasonFactor } from './seasons';
+import { feedNeed, leanFactor, sheepFeedNeed, SHEEP } from './sheep';
 import { featureAt, ownsTile } from './parcels';
 import type {
   Building,
@@ -33,7 +34,7 @@ import type {
 import { I } from '../ui/icons';
 
 export function emptyResources(): Resources {
-  return { food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0 };
+  return { food: 0, wood: 0, stone: 0, gold: 0, flour: 0, bread: 0, planks: 0, ironOre: 0, tools: 0, weapons: 0, wool: 0 };
 }
 
 export function hasModifier(state: GameState, id: ModifierId): boolean {
@@ -248,7 +249,20 @@ export function isCapped(state: GameState, b: Building): boolean {
  * avant 8 habitants). Il n'emploie personne et ne produit rien.
  */
 export function isIdle(state: GameState, b: Building): boolean {
-  return !!b.paused || !!b.moving || isCapped(state, b) || !isUnlocked(state, b.type, b.level);
+  return !!b.paused || !!b.moving || isDormant(state, b) || isCapped(state, b) || !isUnlocked(state, b.type, b.level);
+}
+
+/** Bâtiment saisonnier hors saison (champ en hiver) : il ne produit rien et ne garde personne */
+export function isDormant(state: GameState, b: Building): boolean {
+  return !!BUILDING_BY_ID[b.type].seasonal && seasonEffect(state).crops <= 0;
+}
+
+/** Part d'une journée de matières premières en dessous de laquelle un transformateur est « à sec » */
+const STARVED_BELOW = 0.25;
+
+/** Matières premières manquantes d'un transformateur pour tourner à plein (stock en dessous du quart d'une journée) */
+export function inputShortage(stock: Resources, lvl: LevelDef): (keyof Resources)[] {
+  return RESOURCE_KEYS.filter((k) => (lvl.consumes?.[k] ?? 0) > 0 && (stock[k] ?? 0) < (lvl.consumes![k] ?? 0) * STARVED_BELOW);
 }
 
 /** Répartit la population sur les bâtiments selon leur priorité (mutation) */
@@ -257,10 +271,19 @@ export function assignWorkers(state: GameState): void {
   const sorted = [...state.buildings].sort(
     (a, b) => BUILDING_BY_ID[a.type].priority - BUILDING_BY_ID[b.type].priority || a.id - b.id,
   );
+  // Prévision des stocks de la journée : les producteurs servis avant un transformateur lui fournissent sa matière
+  const supply: Resources = { ...emptyResources(), ...state.resources };
   for (const b of sorted) {
-    const n = isIdle(state, b) ? 0 : Math.min(statsOf(b).workers ?? 0, free);
+    const stats = statsOf(b);
+    let n = isIdle(state, b) ? 0 : Math.min(stats.workers ?? 0, free);
+    // Un transformateur à sec ne garde pas de travailleurs : ils vont là où ils servent
+    if (n > 0 && stats.consumes && inputShortage(supply, stats).length) n = 0;
     b.workers = n;
     free -= n;
+    if (n > 0 && stats.workers) {
+      const f = (n / stats.workers) * seasonFactor(state, b, !!BUILDING_BY_ID[b.type].seasonal);
+      for (const k of RESOURCE_KEYS) supply[k] += ((stats.produces?.[k] ?? 0) - (stats.consumes?.[k] ?? 0)) * f;
+    }
   }
 }
 
@@ -284,6 +307,9 @@ export interface BuildingRun {
   missing: (keyof Resources)[];
   /** Équipé d'outils aujourd'hui */
   equipped: boolean;
+  /** Matières consommées et produites aujourd'hui par ce bâtiment */
+  used: Partial<Resources>;
+  made: Partial<Resources>;
 }
 
 export interface ProductionReport {
@@ -325,6 +351,7 @@ export function simulateProduction(state: GameState): ProductionReport {
     f *= seasonFactor(state, b, !!def.seasonal);
     if (b.type === 'field') f *= soilFactor(b) * riversideFactor(state, b);
     if (b.type === 'lumber') f *= lumberForestFactor(state, b);
+    if (b.type === 'sheepfold') f *= leanFactor(b);
     if (def.seasonal && drought) f *= 0.5;
     if (def.seasonal && harvest) f *= 1.5;
     if (def.seasonal && blight) f *= 0.4;
@@ -340,16 +367,20 @@ export function simulateProduction(state: GameState): ProductionReport {
     const stats = statsOf(b);
     const equipped = T.equips.includes(b.type) && b.workers > 0 && toolsRatio > 0;
     const f = baseFactor(b, stats) * (equipped ? 1 + T.bonus * toolsRatio : 1);
+    const made: Partial<Resources> = {};
     for (const k of RESOURCE_KEYS) {
       const q = (stats.produces![k] ?? 0) * f;
       produced[k] += q;
       stock[k] += q;
+      if (q > 0) made[k] = q;
     }
     status.set(b.id, {
       ratio: f > 0 ? 1 : 0,
       blocked: stats.workers && b.workers === 0 && !isIdle(state, b) ? 'workers' : null,
       missing: [],
       equipped,
+      used: {},
+      made,
     });
   }
 
@@ -365,6 +396,8 @@ export function simulateProduction(state: GameState): ProductionReport {
       if (r < 1) missing.push(k);
       ratio = Math.min(ratio, r);
     }
+    const used: Partial<Resources> = {};
+    const made: Partial<Resources> = {};
     for (const k of RESOURCE_KEYS) {
       const use = (stats.consumes![k] ?? 0) * f * ratio;
       consumed[k] += use;
@@ -372,17 +405,82 @@ export function simulateProduction(state: GameState): ProductionReport {
       const out = (stats.produces![k] ?? 0) * f * ratio;
       produced[k] += out;
       stock[k] += out;
+      if (use > 0) used[k] = use;
+      if (out > 0) made[k] = out;
     }
+    // Sans travailleur, on distingue « personne » de « à sec » (les travailleurs quittent un transformateur sans matière)
     const noWorkers = !!stats.workers && b.workers === 0 && !isIdle(state, b);
+    const dry = noWorkers ? inputShortage(stock, stats) : [];
     status.set(b.id, {
       ratio: f > 0 ? ratio : 0,
-      blocked: noWorkers ? 'workers' : f > 0 && ratio <= 0.001 ? 'input' : null,
-      missing,
+      blocked: dry.length ? 'input' : noWorkers ? 'workers' : f > 0 && ratio <= 0.001 ? 'input' : null,
+      missing: dry.length ? dry : missing,
       equipped: false,
+      used,
+      made,
     });
   }
   produced.wood += woodSafetyGain(state);
   return { produced, consumed, status };
+}
+
+export type StopKind = 'paused' | 'moving' | 'locked' | 'season' | 'capped' | 'fire' | 'workers' | 'input';
+
+/** Ce que le joueur doit savoir d'un bâtiment de production ou de transformation : entrées, sorties, raison d'arrêt */
+export interface ChainReport {
+  /** Transformateur : stock d'entrée et besoin par jour à plein effectif */
+  inputs: { key: keyof Resources; have: number; perDay: number }[];
+  /** Production d'aujourd'hui, par jour, au rythme actuel */
+  outputs: { key: keyof Resources; perDay: number }[];
+  /** Part de la production nominale réellement atteinte */
+  ratio: number;
+  /** Arrêt complet et sa raison exacte (texte à afficher) */
+  stop: { kind: StopKind; text: string } | null;
+  /** Marche réduite : pourquoi */
+  slow: string | null;
+}
+
+const resName = (k: keyof Resources) => RESOURCE_META[k].short.toLowerCase();
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+export function chainReport(state: GameState, b: Building, run = simulateProduction(state).status.get(b.id)): ChainReport {
+  const stats = statsOf(b);
+  const stock = state.resources;
+  const inputs = RESOURCE_KEYS.filter((k) => stats.consumes?.[k]).map((k) => ({ key: k, have: Math.floor(stock[k] ?? 0), perDay: stats.consumes![k]! }));
+  // Bergerie : en hiver, le troupeau mange du blé (comptée comme entrée)
+  const feed = feedNeed(state, b);
+  if (feed > 0) inputs.push({ key: 'food', have: Math.floor(stock.food ?? 0), perDay: feed });
+  const outputs = RESOURCE_KEYS.filter((k) => run?.made[k]).map((k) => ({ key: k, perDay: round1(run!.made[k]!) }));
+  const ratio = run?.ratio ?? 0;
+  const out: ChainReport = { inputs, outputs, ratio, stop: null, slow: null };
+  const stop = (kind: StopKind, text: string) => {
+    out.stop = { kind, text };
+    return out;
+  };
+  if (b.fire) return stop('fire', "En feu : ne produit plus rien tant que le feu n'est pas éteint.");
+  if (b.moving) return stop('moving', "Soulevé : en pause jusqu'à ce qu'on le repose.");
+  if (b.paused) return stop('paused', "Mis à l'arrêt : ses travailleurs sont affectés ailleurs.");
+  if (!isUnlocked(state, b.type, b.level)) {
+    return stop('locked', `Pas encore en service : il faut ${conditionLabel(levelDef(b.type, b.level).unlock)} (le village en compte ${state.population}).`);
+  }
+  if (isDormant(state, b)) return stop('season', 'Hors saison : rien ne pousse en hiver. Le bâtiment dort et libère ses travailleurs.');
+  if (isCapped(state, b)) {
+    const full = RESOURCE_KEYS.filter((k) => stats.produces?.[k]).map((k) => `${Math.floor(stock[k] ?? 0)} ${resName(k)}`).join(', ');
+    return stop('capped', `Stock plein (${full}) : pause automatique, travailleurs libérés.`);
+  }
+  if (stats.workers && b.workers === 0) {
+    if (run?.blocked === 'input') {
+      return stop('input', `À sec : il manque ${run.missing.map(resName).join(', ')} (réserve ${run.missing.map((k) => Math.floor(stock[k] ?? 0)).join(', ')} ; il en faut ${run.missing.map((k) => stats.consumes![k]).join(', ')} par jour). Les travailleurs sont partis ailleurs.`);
+    }
+    return stop('workers', `Aucun travailleur : les ${state.population} habitants sont tous déjà employés par des bâtiments prioritaires. Logez plus d'habitants.`);
+  }
+  if (run?.blocked === 'input') {
+    return stop('input', `À l'arrêt : il manque ${run.missing.map(resName).join(', ')} (réserve ${run.missing.map((k) => Math.floor(stock[k] ?? 0)).join(', ')} ; il en faut ${run.missing.map((k) => round1((stats.consumes![k] ?? 0) * (b.workers / (stats.workers || 1)))).join(', ')} par jour).`);
+  }
+  if (b.type === 'sheepfold' && (b.lean ?? 0) >= 0.05) out.slow = `Troupeau ${(b.lean ?? 0) >= SHEEP.thinFrom ? 'maigre' : 'amaigri'} faute de blé : production à ${Math.round(leanFactor(b) * 100)} %.`;
+  else if (stats.consumes && ratio < 0.999 && run?.missing.length) out.slow = `Tourne à ${Math.round(ratio * 100)} % : pas assez de ${run.missing.map(resName).join(', ')}.`;
+  else if (stats.workers && b.workers < stats.workers) out.slow = `Tourne à ${Math.round((b.workers / stats.workers) * 100)} % : il manque ${stats.workers - b.workers} ${stats.workers - b.workers > 1 ? 'travailleurs' : 'travailleur'}.`;
+  return out;
 }
 
 /** Variation des stocks due aux bâtiments (production − matières premières − usure des outils) */
@@ -427,6 +525,8 @@ export function computeNet(state: GameState): Resources {
   for (const k of RESOURCE_KEYS) net[k] -= eaten[k];
   // Bois de chauffage (hiver)
   net.wood -= heatingNeed(state);
+  // Blé des moutons (hiver)
+  net.food -= sheepFeedNeed(state);
   return net;
 }
 

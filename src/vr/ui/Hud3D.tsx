@@ -84,7 +84,7 @@ export function Hud3D({ z }: { z: number }) {
           <Chip x={-half + 0.31} icon={I.worker} value={`${h.working}/${h.jobs}`} />
           {h.injured > 0 && <Chip x={-half + 0.4} icon={I.injured} value={String(h.injured)} color={THEME.warn} />}
           <Label text={`${h.seasonIcon} ${h.seasonName} ${h.dayInSeason}/${h.daysPerSeason}`} size={TXT * 0.72} align="right" position={[half - 0.02, 0.014, 0]} />
-          <Label text={`Jour ${h.day}`} size={TXT * 0.62} align="right" color={THEME.dim} position={[half - 0.02, -0.014, 0]} />
+          <Label text={`Jour ${h.day} · ${h.difficultyIcon} ${h.difficultyName}`} size={TXT * 0.62} align="right" color={THEME.dim} position={[half - 0.02, -0.014, 0]} />
         </group>
         {showFps && (
           <Label

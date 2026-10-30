@@ -13,6 +13,7 @@ import { SettingsButton } from './ui/Settings';
 import { ThreatList } from './ui/ThreatList';
 import { EventCards } from './ui/EventCards';
 import { GameOver } from './ui/GameOver';
+import { NewGameMenu } from './ui/NewGameMenu';
 import { HUD } from './ui/HUD';
 import { TimeControls } from './ui/TimeControls';
 import { VRButton } from './ui/VRButton';
@@ -21,17 +22,11 @@ import { VillagerTip } from './ui/VillagerTip';
 
 function SeedPanel() {
   const seed = useGame((s) => s.game.seed);
-  const newGame = useGame((s) => s.newGame);
+  const openMenu = useGame((s) => s.openMenu);
   return (
     <div className="seed-panel">
       <span title="Chaque seed génère une carte unique"><Icon id="dice" /> Seed : {seed}</span>
-      <button
-        onClick={() => {
-          if (confirm('Abandonner cette partie et en commencer une nouvelle ?')) newGame();
-        }}
-      >
-        Nouvelle partie
-      </button>
+      <button onClick={() => openMenu('new')}>Nouvelle partie</button>
       <ChronicleButton />
       <SettingsButton />
       <VRButton />
@@ -66,6 +61,7 @@ export function App() {
         <FeaturePanel />
         <div className="help"><Icon id="mouse" /> Glisser : tourner · Molette : zoom · Clic sur un bâtiment : détails · 1-6 : construire · Tab : onglet · Espace : pause · Clic sur un bandit : envoyer les gardes</div>
         <GameOver />
+        <NewGameMenu />
       </div>
     </div>
   );

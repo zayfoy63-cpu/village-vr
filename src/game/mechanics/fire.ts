@@ -4,6 +4,7 @@
 // Solution (jamais dite) : espacer les maisons, ou un puits à proximité.
 
 import { seasonOf } from '../config';
+import { mechIntensity } from '../difficulty';
 import { TUNING, startFire } from '../events';
 import { pushNotice } from '../stateUtils';
 import type { Building, GameState } from '../types';
@@ -43,7 +44,7 @@ export function crowdedHouses(state: GameState): Building[] {
 
 /** Chance qu'un feu gagne un voisin à chaque tentative */
 export function spreadChance(state: GameState, b: Building): number {
-  return TUNING.fire.spreadChance * (wellNear(state, b) ? FIRE.solution.wellSpread : 1);
+  return Math.min(0.95, TUNING.fire.spreadChance * mechIntensity(state)) * (wellNear(state, b) ? FIRE.solution.wellSpread : 1);
 }
 
 /** Durée d'extinction (facteur) */
@@ -75,7 +76,7 @@ export const fire: Mechanic<typeof FIRE> = {
     const crowded = crowdedHouses(state).filter((b) => !b.fire);
     if (!crowded.length) return;
     const target = rng.pick(crowded);
-    const chance = FIRE.effect.summerIgnite * (wellNear(state, target) ? FIRE.solution.wellIgnite : 1);
+    const chance = FIRE.effect.summerIgnite * mechIntensity(state) * (wellNear(state, target) ? FIRE.solution.wellIgnite : 1);
     if (!rng.chance(chance)) return;
     startFire(state, target, now);
     pushNotice(state, { kind: 'bad', icon: I.fire, title: 'Incendie !', text: 'La chaleur, une escarbille… une maison prend feu.' });

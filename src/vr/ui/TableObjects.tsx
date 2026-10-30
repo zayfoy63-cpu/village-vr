@@ -6,7 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { MECHANICS } from '../../game/mechanics';
 import { Part } from '../../scene/models/Part';
-import { score } from '../../game/rules';
+import { DIFFICULTIES, type DifficultyId } from '../../game/config';
+import { difficultyOf } from '../../game/difficulty';
+import { baseScore, score } from '../../game/rules';
 import { useGame, type Speed } from '../../store/gameStore';
 import { VR_CONFIG } from '../config';
 import { feedback } from '../feedback';
@@ -248,13 +250,7 @@ export function Settings3D({ z }: { z: number }) {
   const setPrefs = useVR((s) => s.setPrefs);
   const autoPause = useGame((s) => s.settings.autoPause);
   const setSettings = useGame((s) => s.setSettings);
-  const newGame = useGame((s) => s.newGame);
-  const [confirm, setConfirm] = useState(false);
-  useEffect(() => {
-    if (!confirm) return;
-    const t = setTimeout(() => setConfirm(false), 4000);
-    return () => clearTimeout(t);
-  }, [confirm]);
+  const openMenu = useGame((s) => s.openMenu);
   if (panel !== 'settings') return null;
   const w = 0.62;
   const h = 0.5;
@@ -289,7 +285,7 @@ export function Settings3D({ z }: { z: number }) {
           <group position={[0, -h / 2 + 0.05, 0.004]}>
             <Button3D width={0.17} height={0.07} icon={I.pin} label="Recentrer" sub="devant moi" position={[-0.2, 0, 0]} onActivate={() => { setPanel(null); useVR.getState().recenter(); }} />
             <Button3D width={0.17} height={0.07} icon={I.hand} label="Revoir" position={[0, 0, 0]} onActivate={() => { setPrefs({ tutorialDone: false }); useVR.setState({ tutorialStep: 0 }); setPanel(null); }} />
-            <Button3D width={0.2} height={0.07} icon={I.newGame} label={confirm ? 'Retapez !' : 'Nouvelle'} danger={confirm} position={[0.2, 0, 0]} onActivate={() => { if (confirm) { newGame(); setPanel(null); setConfirm(false); } else setConfirm(true); }} />
+            <Button3D width={0.2} height={0.07} icon={I.newGame} label="Nouvelle" position={[0.2, 0, 0]} onActivate={() => { setPanel(null); openMenu('new'); }} />
           </group>
           <Button3D width={0.05} height={0.05} icon={I.close} position={[w / 2 - 0.035, h / 2 - 0.035, 0.004]} onActivate={() => setPanel(null)} />
         </Panel>
@@ -301,8 +297,10 @@ export function Settings3D({ z }: { z: number }) {
 /** Fin de partie : récapitulatif sur le plateau, un seul bouton */
 export function GameOver3D() {
   const game = useGame((s) => (s.game.gameOver ? s.game : null));
-  const newGame = useGame((s) => s.newGame);
-  if (!game) return null;
+  const openMenu = useGame((s) => s.openMenu);
+  const menu = useGame((s) => s.menu);
+  if (!game || menu) return null;
+  const diff = difficultyOf(game);
   const w = 0.6;
   const h = 0.4;
   const stat = (icon: string, v: string | number, label: string, i: number) => (
@@ -315,9 +313,58 @@ export function GameOver3D() {
     <FacePlayer position={[0, 0.3, 0]} tilt={0.25}>
       <Panel width={w} height={h} border={THEME.bad}>
         <Label title text="Le village est désert…" size={0.048} position={[0, h / 2 - 0.05, 0]} />
-        <Label text="Le dernier habitant a quitté les lieux." size={0.024} color={THEME.dim} position={[0, h / 2 - 0.095, 0]} />
-        {[stat(I.calendar, game.day - 1, 'jours', 0), stat(I.people, game.stats.maxPopulation, 'population max', 1), stat(I.crane, game.stats.buildingsBuilt, 'bâtiments', 2), stat(I.dagger, game.stats.banditsKilled, 'bandits', 3), stat(I.extinguisher, game.stats.firesPutOut, 'feux éteints', 4), stat(I.star, score(game), 'score', 5)]}
-        <Button3D width={0.3} height={0.075} icon={I.newGame} label="Nouvelle partie" seal position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => newGame()} />
+        <Label text={`Le dernier habitant a quitté les lieux. ${diff.icon} ${diff.name}`} size={0.024} color={THEME.dim} position={[0, h / 2 - 0.095, 0]} />
+        {[stat(I.calendar, game.day - 1, 'jours', 0), stat(I.people, game.stats.maxPopulation, 'population max', 1), stat(I.crane, game.stats.buildingsBuilt, 'bâtiments', 2), stat(I.dagger, game.stats.banditsKilled, 'bandits', 3), stat(I.extinguisher, game.stats.firesPutOut, 'feux éteints', 4), stat(I.star, score(game), `score (${baseScore(game)} × ${String(diff.scoreMult).replace('.', ',')})`, 5)]}
+        <Button3D width={0.3} height={0.075} icon={I.newGame} label="Nouvelle partie" seal position={[0, -h / 2 + 0.05, 0.004]} onActivate={() => openMenu('new')} />
+      </Panel>
+    </FacePlayer>
+  );
+}
+
+/** Choix de la difficulté d'une nouvelle partie (premier lancement, paramètres, fin de partie) */
+export function NewGameMenu3D() {
+  const menu = useGame((s) => s.menu);
+  const inProgress = useGame((s) => !s.game.gameOver);
+  const remembered = useGame((s) => s.settings.difficulty);
+  const newGame = useGame((s) => s.newGame);
+  const closeMenu = useGame((s) => s.closeMenu);
+  const [picked, setPicked] = useState<DifficultyId>(remembered);
+  useEffect(() => {
+    if (menu) setPicked(remembered);
+  }, [menu, remembered]);
+  if (!menu) return null;
+  const cancelable = menu === 'new' && inProgress;
+  const w = 0.7;
+  const h = 0.52;
+  const cur = DIFFICULTIES.find((d) => d.id === picked)!;
+  return (
+    <FacePlayer position={[0, 0.3, 0.01]} tilt={0.25}>
+      <Panel width={w} height={h}>
+        <Label title text="Nouvelle partie" size={0.044} position={[0, h / 2 - 0.045, 0]} />
+        <Label text={cancelable ? 'La partie en cours sera abandonnée.' : 'Choisissez la difficulté de votre village.'} size={0.022} color={THEME.dim} position={[0, h / 2 - 0.09, 0]} />
+        {DIFFICULTIES.map((d, i) => (
+          <Button3D
+            key={d.id}
+            width={0.155}
+            height={0.1}
+            icon={d.icon}
+            label={d.name}
+            active={picked === d.id}
+            position={[(i - 1.5) * 0.165, h / 2 - 0.17, 0.004]}
+            onActivate={() => setPicked(d.id)}
+          />
+        ))}
+        <Label text={cur.blurb} size={0.021} weight={600} maxWidth={w - 0.1} position={[0, 0.0, 0]} />
+        <Label
+          text={`${cur.graceDays > 0 ? `Répit : ${cur.graceDays} j` : 'Aucun répit'} · score ×${String(cur.scoreMult).replace('.', ',')}`}
+          size={0.021}
+          color={THEME.dim}
+          position={[0, -0.06, 0]}
+        />
+        <group position={[0, -h / 2 + 0.05, 0.004]}>
+          {cancelable && <Button3D width={0.2} height={0.075} icon={I.close} label="Annuler" position={[-0.17, 0, 0]} onActivate={closeMenu} />}
+          <Button3D width={0.3} height={0.075} icon={I.newGame} label="Commencer" seal position={[cancelable ? 0.1 : 0, 0, 0]} onActivate={() => newGame(undefined, picked)} />
+        </group>
       </Panel>
     </FacePlayer>
   );
@@ -353,6 +400,7 @@ export function TableObjects() {
       <Settings3D z={hd + 0.34} />
       <HandsLost z={hd + 0.2} />
       <GameOver3D />
+      <NewGameMenu3D />
     </group>
   );
 }

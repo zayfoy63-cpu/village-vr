@@ -4,6 +4,7 @@
 // Solution (jamais dite) : rentrer du bois avant l'hiver.
 
 import { seasonOf } from '../config';
+import { mechIntensity } from '../difficulty';
 import { addMorale, loseVillagers } from '../events';
 import { pushNotice } from '../stateUtils';
 import type { BuildingTypeId, GameState } from '../types';
@@ -63,9 +64,9 @@ export const cold: Mechanic<typeof COLD> = {
       state.resources.wood = 0;
       m.cold++;
       m.coldThisWinter++;
-      addMorale(state, C.effect.moralePerDay);
+      addMorale(state, C.effect.moralePerDay * mechIntensity(state));
       if (m.cold >= C.effect.sickAfter && state.population > 1) {
-        const sick = Math.max(1, Math.ceil(state.population * C.effect.sickRatio));
+        const sick = Math.max(1, Math.ceil(state.population * C.effect.sickRatio * mechIntensity(state)));
         state.injuries.push({ count: sick, untilDay: state.day + C.effect.sickDays });
         let dead = 0;
         if (m.cold >= C.effect.deadlyAfter) dead = loseVillagers(state, rng.chance(0.6) ? 1 : 0, 1);

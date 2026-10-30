@@ -10,6 +10,7 @@ import {
   DAYS_PER_SEASON,
 } from '../game/config';
 import type { Resources } from '../game/types';
+import { difficultyOf } from '../game/difficulty';
 import { severity } from '../game/events';
 import { computeNet, hasModifier, injuredCount, housingCapacity, jobsCapacity, moraleFactor } from '../game/rules';
 import { useGame } from '../store/gameStore';
@@ -95,6 +96,8 @@ export function HUD() {
   const season = seasonOf(data.day);
   const capacity = housingCapacity(game);
   const jobs = jobsCapacity(game);
+  const difficulty = difficultyOf(game);
+  const graceLeft = Math.max(0, difficulty.graceDays - data.day + 1);
   const advanced = ADVANCED_RESOURCES.filter((k) => data.discovered.includes(k));
 
   return (
@@ -132,8 +135,11 @@ export function HUD() {
             {season.name} {dayInSeason(data.day)}/{DAYS_PER_SEASON}
           </span>
         </div>
-        <div className="hud-item" title={`Danger : x${severity(data.day).toFixed(2)} (augmente à chaque saison)`}>
+        <div className="hud-item" title={`Danger : x${severity(game).toFixed(2)} (augmente à chaque saison)
+Difficulté : ${difficulty.name} (score x${difficulty.scoreMult})${graceLeft > 0 ? `
+Période de grâce : encore ${graceLeft} j` : ''}`}>
           <span className="hud-value">Jour {data.day}</span>
+          <span className="hud-difficulty"><RichText text={difficulty.icon} /> {difficulty.name}{graceLeft > 0 ? ` · grâce ${graceLeft} j` : ''}</span>
           <div className="day-bar">
             <div className="day-bar-fill" style={{ width: `${progress * 100}%` }} />
           </div>

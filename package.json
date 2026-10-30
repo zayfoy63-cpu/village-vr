@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bot": "esbuild scripts/bot.ts --bundle --platform=node --format=esm --log-level=error --outfile=.bot/bot.mjs && node .bot/bot.mjs"
   },
   "dependencies": {
     "@fontsource/alegreya-sans": "^5.3.0",

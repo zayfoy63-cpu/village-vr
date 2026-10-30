@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { loadChronicle, mergeChronicle, saveChronicle, type Chronicle } from './chronicle';
 import { loadSettings, saveSettings, type Settings } from './settings';
-import { DAY_DURATION_SEC } from '../game/config';
+import { DAY_DURATION_SEC, type DifficultyId } from '../game/config';
 import { randomSeed } from '../game/rng';
 import { clearSave, loadGame, saveGame } from '../game/save';
 import { beginMove, cancelMove, demolishBuilding, moveBuilding, undoAction, type UndoRecord } from '../game/moves';
@@ -80,7 +80,13 @@ interface GameStore {
   drop: (buildingId: number, x: number, z: number) => boolean;
   cancelLift: (buildingId: number) => void;
   demolish: (buildingId: number) => boolean;
-  newGame: (seed?: number) => void;
+  /** Menu de nouvelle partie (choix de la difficulté) : 'start' au tout premier lancement, 'new' ensuite */
+  menu: 'start' | 'new' | null;
+  /** Vitesse à reprendre si le menu est refermé sans lancer de partie */
+  menuSpeed: Speed;
+  openMenu: (kind?: 'start' | 'new') => void;
+  closeMenu: () => void;
+  newGame: (seed?: number, difficulty?: DifficultyId) => void;
 }
 
 /** Identifiants des cartes à choix encore sans réponse */
@@ -94,7 +100,8 @@ function hasNewChoice(before: GameState, after: GameState): boolean {
   return openChoiceIds(after).some((id) => !old.has(id));
 }
 
-const initial = loadGame() ?? createInitialState(randomSeed());
+const saved = loadGame();
+const initial = saved ?? createInitialState(randomSeed(), loadSettings().difficulty);
 // Sauvegarde immédiate : un rechargement de page retrouve la même carte
 saveGame(initial);
 
@@ -108,7 +115,10 @@ export const useGame = create<GameStore>((set, get) => {
   };
   return {
     game: initial,
-    speed: 1,
+    // Premier lancement : la partie attend le choix de la difficulté
+    speed: saved ? 1 : 0,
+    menu: saved ? null : 'start',
+    menuSpeed: 1,
     settings: loadSettings(),
     chronicle: loadChronicle(),
     resumeSpeed: null,
@@ -258,11 +268,26 @@ export const useGame = create<GameStore>((set, get) => {
     toast: null,
     showToast: (text) => set({ toast: { text, at: Date.now() } }),
 
-    newGame: (seed) => {
+    openMenu: (kind = 'new') => {
+      const { speed, menu } = get();
+      if (menu) return;
+      set({ menu: kind, menuSpeed: speed === 0 ? 1 : speed, speed: 0, resumeSpeed: null });
+    },
+    closeMenu: () => {
+      const { menu, game, menuSpeed } = get();
+      // Au premier lancement, la partie ne démarre qu'après le choix
+      if (menu === 'start' || game.gameOver) return;
+      set({ menu: null, speed: menuSpeed });
+    },
+
+    newGame: (seed, difficulty) => {
+      const chosen = difficulty ?? get().settings.difficulty;
+      if (chosen !== get().settings.difficulty) get().setSettings({ difficulty: chosen });
       clearSave();
-      const game = createInitialState(seed ?? randomSeed());
+      const game = createInitialState(seed ?? randomSeed(), chosen);
       saveGame(game);
       set({
+        menu: null,
         game,
         selected: null,
         hover: null,

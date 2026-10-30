@@ -3,6 +3,7 @@
 // Effet : au bout de quelques jours, une partie de la nourriture disparaît.
 // Solution (jamais dite) : un grenier assez grand pour les réserves.
 
+import { mechIntensity } from '../difficulty';
 import { addMorale, severity } from '../events';
 import { storageCapacity } from '../rules';
 import { pushNotice } from '../stateUtils';
@@ -53,7 +54,7 @@ export const rats: Mechanic<typeof RATS> = {
     if (excess > R.conditions.excess) m.rats++;
     else m.rats = Math.max(0, m.rats - 2);
     if (m.rats >= R.effect.daysBeforeLoss) {
-      const ratio = Math.min(R.effect.maxLoss, R.effect.lossRatio + R.effect.lossPerSeverity * (severity(state.day) - 1));
+      const ratio = Math.min(R.effect.maxLoss, (R.effect.lossRatio + R.effect.lossPerSeverity * (severity(state) - 1)) * mechIntensity(state));
       const lost = Math.floor(excess * ratio);
       state.resources.food -= lost;
       addMorale(state, R.effect.morale);

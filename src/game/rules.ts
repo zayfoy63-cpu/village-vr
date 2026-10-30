@@ -12,6 +12,7 @@ import {
   type UnlockCondition,
 } from './buildings';
 import { DAMAGED_FACTOR, FOOD_PER_VILLAGER, MORALE, REPAIR_COST_RATIO, RESOURCE_KEYS, RESOURCE_META } from './config';
+import { difficultyOf } from './difficulty';
 import { TUNING } from './events';
 import { neighbors8, tileAt } from './mapgen';
 import { heatingNeed } from './mechanics/cold';
@@ -167,6 +168,36 @@ export function busyCrew(state: GameState): number {
 /** Villageois blessés (ne travaillent pas en attendant de guérir) */
 export function injuredCount(state: GameState): number {
   return (state.injuries ?? []).reduce((n, i) => n + (i.untilDay >= state.day ? i.count : 0), 0);
+}
+
+/** Filet de sécurité du bois : sans bûcheron possible, les villageois sans travail ramassent du bois mort */
+export const WOOD_SAFETY = {
+  /** Bois par jour et par villageois (lent : il faut des jours pour retrouver de quoi bâtir) */
+  perVillager: 0.5,
+  /** Villageois mobilisés au plus */
+  maxGatherers: 3,
+};
+
+/**
+ * Le joueur a-t-il encore un moyen d'obtenir du bois ? Oui s'il a un bûcheron au travail devant une
+ * forêt vivante, ou s'il peut en construire un (assez de bois et une case qui touche une forêt).
+ */
+export function hasWoodSource(state: GameState): boolean {
+  if (state.buildings.some((b) => b.type === 'lumber' && b.workers > 0 && !b.fire && !b.paused && lumberForestFactor(state, b) > 0)) return true;
+  if ((state.resources.wood ?? 0) < (buildCost('lumber').wood ?? 0)) return false;
+  for (let z = 0; z < state.map.height; z++)
+    for (let x = 0; x < state.map.width; x++) if (canPlace(state, 'lumber', x, z).ok) return true;
+  return false;
+}
+
+/** Bois ramassé aujourd'hui par le filet de sécurité (0 si le joueur a d'autres moyens) */
+export function woodSafetyGain(state: GameState): number {
+  if (state.population <= 0 || hasWoodSource(state)) return 0;
+  const working = state.buildings.reduce((n, b) => n + b.workers, 0);
+  const idle = Math.max(0, state.population - busyCrew(state) - working);
+  // Même sans villageois libre, un travailleur quitte son poste le temps de ramasser du bois mort
+  const gatherers = Math.min(WOOD_SAFETY.maxGatherers, Math.max(1, idle));
+  return gatherers * WOOD_SAFETY.perVillager;
 }
 
 /** Facteur d'état d'un bâtiment : endommagé ou en feu = production réduite */
@@ -350,6 +381,7 @@ export function simulateProduction(state: GameState): ProductionReport {
       equipped: false,
     });
   }
+  produced.wood += woodSafetyGain(state);
   return { produced, consumed, status };
 }
 
@@ -437,7 +469,8 @@ export function workersLabel(lvl: LevelDef): string {
   return `${I.worker} ${lvl.workers} ${lvl.workers > 1 ? 'travailleurs' : 'travailleur'}`;
 }
 
-export function score(state: GameState): number {
+/** Score brut, avant le multiplicateur de difficulté */
+export function baseScore(state: GameState): number {
   const builtValue = state.buildings.filter((b) => BUILDING_BY_ID[b.type].buildable).length;
   return Math.round(
     (state.day - 1) * 10 +
@@ -447,4 +480,9 @@ export function score(state: GameState): number {
       state.stats.eventsSurvived * 8 +
       state.resources.gold,
   );
+}
+
+/** Score affiché : multiplié selon la difficulté (Paisible ×0,6 … Cauchemar ×2,2) */
+export function score(state: GameState): number {
+  return Math.round(baseScore(state) * difficultyOf(state).scoreMult);
 }

@@ -3,6 +3,7 @@
 // Solution (jamais dite) : le laisser en jachère (mis à l'arrêt), ou une bergerie juste à côté (fumier).
 
 import { seasonOf } from '../config';
+import { mechIntensity } from '../difficulty';
 import type { Building, GameState } from '../types';
 import { type Mechanic, center, memo, solve, strike, within } from './common';
 import { I } from '../../ui/icons';
@@ -66,7 +67,7 @@ export const soil: Mechanic<typeof SOIL> = {
       if (b.paused) f -= S.solution.fallowRecovery;
       else if (winter) f -= S.solution.winterRecovery;
       else if (b.workers > 0) {
-        f += S.conditions.gainPerDay * (dung ? S.solution.manureGain : 1);
+        f += S.conditions.gainPerDay * mechIntensity(state) * (dung ? S.solution.manureGain : 1);
         if (dung) manureWorked = true;
       }
       if (dung) f -= S.solution.manureRecovery;

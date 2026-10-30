@@ -9,6 +9,7 @@ Chaque partie est générée à partir d'une **seed** ; la partie se termine qua
 npm install
 npm run dev       # http://localhost:5173
 npm run build     # vérification TypeScript + build de production dans dist/
+npm run bot       # bot de test : 20 seeds × 4 difficultés (voir « Difficulté »)
 ```
 
 ## Contrôles (PC)
@@ -34,7 +35,8 @@ npm run build     # vérification TypeScript + build de production dans dist/
 src/
 ├─ game/            Logique pure TypeScript (aucun import React / Three)
 │  ├─ types.ts        Types partagés
-│  ├─ config.ts       Constantes (durée du jour, saisons, ressources de départ…)
+│  ├─ config.ts       * Constantes (durée du jour, saisons…) et niveaux de difficulté (DIFFICULTIES)
+│  ├─ difficulty.ts   Lecture des coefficients d'une partie : grâce, montée en puissance, intensité cachée
 │  ├─ buildings.ts    * Tableau de configuration des bâtiments
 │  ├─ events.ts       * Tableau de configuration des événements
 │  ├─ mapgen.ts       Génération de carte à partir d'une seed
@@ -98,10 +100,55 @@ Débloquées progressivement (onglet **Artisanat**, visible au premier déblocag
 - Dangers générés avec la seed : **camp de bandits** (attaques plus fréquentes tant qu'il existe, à détruire au combat
   pour un butin) et **ruines** (bloquent 2 cases, à déblayer contre du bois : trésor, risque d'éboulement).
 
+### Difficulté et début de partie (`game/config.ts` → `DIFFICULTIES`, `game/difficulty.ts`)
+**Choix au lancement** : à chaque nouvelle partie (premier lancement, bouton « Nouvelle partie », fin de partie), un
+menu propose les quatre niveaux — DOM sur PC (`ui/NewGameMenu.tsx`), panneau parchemin 3D en VR (`NewGameMenu3D` dans
+`vr/ui/TableObjects.tsx`, même état `menu` du store). Le dernier choix est mémorisé (`Settings.difficulty`) et le niveau
+est affiché dans le HUD (PC et VR) et sur l'écran de fin, avec le score multiplié (`score` = `baseScore` × `scoreMult`).
+Les anciennes sauvegardes (sans niveau, `SAVE_VERSION` 8) passent en **Normal**.
+
+Chaque niveau est **un jeu de coefficients** dans `DIFFICULTIES` (Normal = l'équilibrage de référence) :
+
+| | Paisible | Normal | Difficile | Cauchemar |
+|---|---|---|---|---|
+| Ressources de départ (blé / bois / pierre / or) | 20 / 50 / 8 / 12 | 12 / 30 / 2 / 0 | 10 / 28 / 0 / 0 | 8 / 27 / 0 / 0 |
+| Période de grâce (`graceDays`) | 14 j | 8 j | 4 j | aucune |
+| Montée en puissance (`rampDays`) | 40 j | 30 j | 16 j | aucune |
+| Fréquence des événements (`eventFreq`) | ×0,55 | ×1 | ×1,3 | ×1,5 |
+| Force des événements (`eventStrength`) | ×0,7 | ×1 | ×1,3 | ×1,6 |
+| Part d'événements favorables (`goodShareShift`) | +25 pts | 0 | −8 pts | −15 pts |
+| Crises superposées (dès la saison, chance ×) | 4, ×0,3 | 2, ×1 | 1, ×1,5 | 0, ×2,2 |
+| Mécaniques cachées (`mechanics`) | ×0,5 | ×1 | ×1,25 | ×1,6 |
+| Prix des parcelles | ×0,7 | ×1 | ×1,25 | ×1,5 |
+| Score | ×0,6 | ×1 | ×1,5 | ×2,2 |
+
+Les ressources de départ couvrent au minimum **1 cabane de bûcheron + 1 champ + 1 maison** (27 bois) à tous les niveaux.
+
+- **Période de grâce** : tant que `jour ≤ graceDays` (`inGrace`), `pickEvent` n'écarte que les événements négatifs
+  (positifs et marchands restent), aucun 2e événement n'est tiré, l'hiver rude et les grands événements d'année sont
+  repoussés, et `mechanics/index.ts` ne lance aucune mécanique cachée (ni leur accumulation).
+- **Montée en puissance** (`rampFactor`, 0 → 1 après la grâce) : les premiers événements sont petits. Tant qu'elle n'est
+  pas finie, la n-ième bande de bandits compte au plus n + 1 bandits (`raidSize`), l'orage touche moins et les
+  événements sont plus rares ; la sévérité monte ensuite à chaque saison (`severity(state)`).
+- **Intensité des mécaniques cachées** (`mechIntensity`) : multiplie la vitesse ou la gravité de chaque mécanique (froid,
+  fièvre, rats, feu d'été, crue, sols, forêt, loups, mines) sans en changer les solutions.
+- **Début de partie sûr** : `mapgen.ts` (étape 7) garantit, pour toute seed, dans la zone de départ de l'herbe ou de la
+  terre libre qui touche une forêt (bûcheron), des rochers (carrière) et au moins 4 cases fertiles. Ancien générateur :
+  184 cartes sur 3 000 n'avaient pas toutes ces ressources ; nouveau : 0 sur 3 000.
+- **Filet de sécurité du bois** (`rules.ts`, `hasWoodSource` / `woodSafetyGain`) : sans bûcheron au travail devant une forêt
+  vivante, et sans pouvoir en construire un (bois ou case manquants), les villageois sans travail (au moins un) ramassent
+  0,5 bois/jour chacun (3 au plus), annoncé par une notification « Bois mort ». Une partie ne peut donc pas se bloquer.
+
+**Bot de test** (`scripts/bot.ts`, `npm run bot -- --seeds 20 --days 300 --levels normal,hard`) : joue des parties
+complètes sans interface (construction près du château, améliorations, stocks d'hiver, réponses aux cartes, gardes,
+feux). Il vérifie sur 3 000 cartes que le trio de départ est constructible, sur chaque seed que la grâce est respectée
+(aucun événement négatif, aucune page de Chronique), et donne le jour de fin de partie par niveau. Le bot est
+volontairement prudent mais sans finesse : comparer les niveaux entre eux, pas à un joueur humain.
+
 ### Sauvegardes
 `game/save.ts` migre les anciennes sauvegardes (`migrate`) : la v1 reçoit les niveaux (1), les déblocages
 correspondant à la situation actuelle et les nouveaux compteurs ; la v3 reçoit les parcelles (toute la carte possédée,
-sans danger) ; la v6 reçoit une forêt intacte, des sols neufs et une météo vide ; la v5 abandonne l'ancien format d'attaque et reçoit orage, crue et blessés vides. Une sauvegarde illisible est ignorée sans planter.
+sans danger) ; la v6 reçoit une forêt intacte, des sols neufs et une météo vide ; la v7 reçoit la difficulté Normal ; la v5 abandonne l'ancien format d'attaque et reçoit orage, crue et blessés vides. Une sauvegarde illisible est ignorée sans planter.
 
 ### Ajouter un bâtiment
 1. Ajouter l'id dans `BuildingTypeId` (`game/types.ts`).

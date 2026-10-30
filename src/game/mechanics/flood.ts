@@ -4,6 +4,7 @@
 // Solution (jamais dite) : une digue au bord de l'eau, ou ne pas bâtir collé à la rivière.
 // Une vallée déboisée (voir deforestation.ts) déborde plus vite et plus loin.
 
+import { mechIntensity } from '../difficulty';
 import { neighbors8, tileAt } from '../mapgen';
 import { playerBuildings } from '../events';
 import { startFlood } from '../realtime';
@@ -86,7 +87,7 @@ export const flood: Mechanic<typeof FLOOD> = {
   startOfDay: ({ state, rng, now }) => {
     const F = FLOOD;
     const m = state.mech;
-    const swell = F.conditions.swellPerRain * (deforestedRatio(state) >= DEFORESTATION.effect.floodRatio ? F.conditions.deforestedSwell : 1);
+    const swell = F.conditions.swellPerRain * mechIntensity(state) * (deforestedRatio(state) >= DEFORESTATION.effect.floodRatio ? F.conditions.deforestedSwell : 1);
     m.river = Math.max(0, Math.min(1, m.river + (m.rain ? swell : -F.conditions.dryRecovery)));
     if (m.river < 1 || state.flood) return;
     m.river = F.effect.after;

@@ -4,6 +4,7 @@
 // Solution (jamais dite) : avoir des planches en stock (la mine les prend d'elle-même).
 
 import { BUILDING_BY_ID } from '../buildings';
+import { mechIntensity } from '../difficulty';
 import { addMorale, loseVillagers, TUNING } from '../events';
 import { pushNotice } from '../stateUtils';
 import { type Mechanic, memo, solve, strike } from './common';
@@ -56,7 +57,7 @@ export const mine: Mechanic<typeof MINE> = {
         continue;
       }
       memo(state, key, 0);
-      b.instability = Math.round(Math.min(1, (b.instability ?? 0) + M.effect.gain[lvl]) * 1000) / 1000;
+      b.instability = Math.round(Math.min(1, (b.instability ?? 0) + M.effect.gain[lvl] * mechIntensity(state)) * 1000) / 1000;
       if (b.instability < 1) continue;
       // Effondrement : la mine est perdue, des mineurs y restent
       state.buildings = state.buildings.filter((x) => x.id !== b.id);

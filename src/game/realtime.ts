@@ -5,6 +5,7 @@
 
 import { BUILDING_BY_ID } from './buildings';
 import { RESOURCE_KEYS } from './config';
+import { rampFactor } from './difficulty';
 import {
   TUNING,
   addMorale,
@@ -122,8 +123,9 @@ function edgePoint(state: GameState, edge: number, along: number, out: number): 
 
 /** Lance une attaque : la bande apparaît hors de la carte et court vers ses cibles */
 export function startRaid(state: GameState, count: number, edge: number, now: number, rng: Rng): Raid {
+  state.mech.memo.raids = (state.mech.memo.raids ?? 0) + 1;
   const R = TUNING.raid;
-  const sev = severity(state.day);
+  const sev = severity(state);
   const v = banditSpeed(sev);
   const castle = state.buildings.find((b) => b.type === 'castle');
   const castlePoint = castle ? buildingCenter(castle) : { x: state.map.width / 2, z: state.map.height / 2 };
@@ -260,7 +262,7 @@ function catchBandit(state: GameState, b: Bandit, g: Guard, at: number, rng: Rng
   // Butin rendu + petite récompense
   for (const k of RESOURCE_KEYS) state.resources[k] += b.loot[k] ?? 0;
   addTo(raid.report.recovered, b.loot);
-  const reward = Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state.day) - 1));
+  const reward = Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state) - 1));
   state.resources.gold += reward;
   raid.report.reward += reward;
   raid.report.caught++;
@@ -366,7 +368,7 @@ export function updateRaid(state: GameState, t: number, rng: Rng) {
 export function raidTurnBack(state: GameState, t: number) {
   const raid = state.raid;
   if (!raid) return;
-  const v = banditSpeed(severity(state.day));
+  const v = banditSpeed(severity(state));
   for (const b of raid.bandits) {
     if (b.status !== 'active') continue;
     const p = banditAt(b, t).p;
@@ -436,7 +438,7 @@ export function updateStorm(state: GameState, t: number, rng: Rng) {
   const storm = state.storm;
   if (!storm) return;
   const S = TUNING.storm;
-  const sev = severity(state.day);
+  const sev = severity(state);
   const hits = storm.hits;
   while (storm.nextCheckT <= Math.min(t, storm.endT)) {
     const at = storm.nextCheckT;
@@ -448,7 +450,7 @@ export function updateStorm(state: GameState, t: number, rng: Rng) {
       if (storm.rolled.includes(b.id) || dist(buildingCenter(b), c) > storm.radius) continue;
       storm.rolled.push(b.id);
       if (b.reinforced || (b.type === 'field' && storm.cropsProtected)) continue;
-      if (rng.chance(S.hitChance + S.hitPerSeverity * Math.max(0, sev - 1))) {
+      if (rng.chance(S.hitChance * (0.4 + 0.6 * rampFactor(state)) + S.hitPerSeverity * Math.max(0, sev - 1))) {
         hits.push(damageBuilding(state, b));
         if (!storm.shelter && statsOf(b).housing && rng.chance(S.injureChance)) {
           state.injuries.push({ count: 1, untilDay: state.day + TUNING.raid.injuryDays });

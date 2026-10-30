@@ -7,8 +7,9 @@ import {
   MORALE,
   RESOURCE_KEYS,
   SAVE_VERSION,
+  DEFAULT_DIFFICULTY,
+  type DifficultyId,
   START_POPULATION,
-  START_RESOURCES,
   dayInSeason,
   seasonIndex,
   seasonOf,
@@ -30,8 +31,9 @@ import {
   severity,
   startEvent,
 } from './events';
+import { difficultyOf, inGrace, rampFactor } from './difficulty';
 import { hazardsDue, updateHazards } from './hazards';
-import { emptyMech } from './mechanics/common';
+import { emptyMech, memo } from './mechanics/common';
 import { mechanicsEndOfDay, mechanicsStartOfDay } from './mechanics';
 import { generateMap } from './mapgen';
 import {
@@ -55,6 +57,7 @@ import {
   foodReserve,
   mealPlan,
   statsOf,
+  woodSafetyGain,
   housingCapacity,
   isUnlocked,
   repairCost,
@@ -71,14 +74,15 @@ const SEASON_TEXT: Record<SeasonId, string> = {
   winter: 'Le froid tombe sur la vallée. Les nuits s\'allongent.',
 };
 
-export function createInitialState(seed: number): GameState {
+export function createInitialState(seed: number, difficulty: DifficultyId = DEFAULT_DIFFICULTY): GameState {
   const { map, castle, mill } = generateMap(seed);
   const state: GameState = {
     version: SAVE_VERSION,
     seed,
+    difficulty,
     rngState: (seed * 7919 + 12345) >>> 0,
     map,
-    resources: { ...START_RESOURCES },
+    resources: { ...difficultyOf({ difficulty }).start },
     population: START_POPULATION,
     buildings: [
       { id: 1, type: 'castle', x: castle.x, z: castle.z, level: 1, workers: 0, builtDay: 0 },
@@ -261,7 +265,7 @@ export function clearRuins(state: GameState, featureId: number): GameState | nul
 
 /** Force contre laquelle il faut se battre pour détruire un camp (augmente avec les saisons) */
 export function campStrength(state: GameState, strength: number): number {
-  return Math.round(strength * severity(state.day) * 0.6);
+  return Math.round(strength * severity(state) * 0.6);
 }
 
 /** Attaque un camp de bandits (parcelle possédée) : victoire = butin, défaite = pertes */
@@ -402,6 +406,20 @@ export function advanceDay(state: GameState): GameState {
   assignWorkers(s);
   const prod = computeProduction(s);
   for (const k of RESOURCE_KEYS) s.resources[k] = Math.max(0, s.resources[k] + prod[k]);
+  // Filet de sécurité : plus aucun moyen d'obtenir du bois, les villageois sans travail en ramassent
+  if (woodSafetyGain(s) > 0) {
+    if (!memo(s, 'woodNet')) {
+      pushNotice(s, {
+        kind: 'info',
+        icon: I.wood,
+        title: 'Bois mort',
+        text: "Faute de bûcherons, les villageois sans travail ramassent le bois mort. C'est lent, mais de quoi rebâtir viendra.",
+      });
+    }
+    memo(s, 'woodNet', 1);
+  } else {
+    memo(s, 'woodNet', 0);
+  }
 
   // 2. Repas : pain (3 rations), farine, puis blé
   const meal = mealPlan(s, s.resources);
@@ -462,27 +480,33 @@ export function advanceDay(state: GameState): GameState {
 
     // 7. Événements programmés : hiver rude (fin d'automne), grand événement de fin d'année
     const year = Math.floor((s.day - 1) / (DAYS_PER_SEASON * 4));
-    if (seasonOf(s.day).id === 'autumn' && dayInSeason(s.day) === DAYS_PER_SEASON - 2) {
+    const grace = inGrace(s);
+    if (!grace && seasonOf(s.day).id === 'autumn' && dayInSeason(s.day) === DAYS_PER_SEASON - 2) {
       const hw = TUNING.harshWinter;
       if (rng.chance(hw.chance + hw.perYear * year)) scheduleEvent(s, EVENT_BY_ID.harshWinter, 3, {}, rng, now);
     }
     const ye = TUNING.yearEnd;
-    if ((s.day + ye.announceDays) % ye.every === 0) {
+    if (!grace && (s.day + ye.announceDays) % ye.every === 0) {
       const major = rng.pick(EVENTS.filter((e) => e.major));
       const ctx = { state: s, rng, severity: 1 + TUNING.severityPerSeason * seasonIndex(s.day + ye.announceDays), now };
       scheduleEvent(s, major, ye.announceDays, major.roll?.(ctx) ?? {}, rng, now);
       s.stats.eventsSurvived++;
     }
 
-    // 8. Imprévus aléatoires (de plus en plus fréquents, parfois superposés)
+    // 8. Imprévus aléatoires (de plus en plus fréquents, parfois superposés). Pendant la période de grâce,
+    //    seuls des événements positifs ou neutres sont tirés (voir pickEvent) et jamais deux à la fois.
     if (s.day >= TUNING.firstEventDay) {
+      const diff = difficultyOf(s);
       const season = seasonIndex(s.day);
       const d = TUNING.dailyChance;
-      if (rng.chance(Math.min(d.max, d.base + d.perSeason * season))) {
+      // Montée en puissance : les premiers jours après la grâce sont plus calmes
+      const calm = 0.6 + 0.4 * rampFactor(s);
+      if (rng.chance(Math.min(d.max, (d.base + d.perSeason * season) * diff.eventFreq * calm))) {
         const ev = pickEvent(s, rng);
         if (ev) startEvent(s, ev, rng, now);
         const se = TUNING.secondEvent;
-        if (season >= se.fromSeason && rng.chance(Math.min(se.max, se.base + se.perSeason * (season - se.fromSeason)))) {
+        const from = diff.secondFromSeason;
+        if (!grace && season >= from && rng.chance(Math.min(se.max, (se.base + se.perSeason * (season - from)) * diff.secondChance))) {
           const ev2 = pickEvent(s, rng);
           if (ev2) startEvent(s, ev2, rng, now);
         }

@@ -3,6 +3,7 @@
 // Solution (jamais dite) : des torches ou une palissade près de ce qui est exposé.
 
 import { seasonOf } from '../config';
+import { mechIntensity } from '../difficulty';
 import { loseVillagers, playerBuildings } from '../events';
 import { NIGHT } from '../seasons';
 import { pushNotice } from '../stateUtils';
@@ -77,7 +78,7 @@ export const wolves: Mechanic<typeof WOLVES> = {
     const W = WOLVES;
     if (seasonOf(state.day).id !== 'winter' || state.day < W.conditions.fromDay || state.mech.wolves) return;
     const year = Math.floor((state.day - 1) / 40);
-    if (!rng.chance(W.conditions.chance + W.conditions.perYear * year)) return;
+    if (!rng.chance((W.conditions.chance + W.conditions.perYear * year) * mechIntensity(state))) return;
     const exposed = exposedBuildings(state);
     if (!exposed.length) return;
     const target = rng.weighted(exposed, (b) => (b.type === 'sheepfold' ? W.effect.sheepWeight : 1))!;
@@ -120,7 +121,7 @@ export const wolves: Mechanic<typeof WOLVES> = {
           target.damaged = true;
           pushNotice(state, { kind: 'bad', icon: I.wolf, title: 'La bergerie', text: 'Au matin, l\'enclos est éventré : il manque des bêtes.' });
         } else if (state.population > 1) {
-          const dead = rng.chance(W.effect.killChance) ? loseVillagers(state, 1, 1) : 0;
+          const dead = rng.chance(Math.min(0.9, W.effect.killChance * mechIntensity(state))) ? loseVillagers(state, 1, 1) : 0;
           if (!dead) state.injuries.push({ count: 1, untilDay: state.day + W.effect.injuryDays });
           pushNotice(state, {
             kind: 'bad',

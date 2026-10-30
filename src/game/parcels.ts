@@ -1,6 +1,7 @@
 // Parcelles : découpage de la carte, achat, contenu et dangers (camps de bandits, ruines).
 // Tous les réglages sont dans PARCELS.
 
+import { difficultyOf } from './difficulty';
 import { Rng } from './rng';
 import type { GameMap, GameState, ParcelFeature, Resources, TileType } from './types';
 import { I } from '../ui/icons';
@@ -89,7 +90,7 @@ export function isAdjacentToOwned(state: GameState, id: number): boolean {
 }
 
 export function parcelPrice(state: GameState): number {
-  return Math.round(PARCELS.priceBase * PARCELS.priceGrowth ** state.parcels.bought);
+  return Math.round(PARCELS.priceBase * PARCELS.priceGrowth ** state.parcels.bought * difficultyOf(state).parcelPrice);
 }
 
 export function parcelMinPopulation(state: GameState): number {

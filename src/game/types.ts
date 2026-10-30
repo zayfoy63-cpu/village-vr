@@ -1,5 +1,7 @@
 // Types partagés par toute la logique de jeu (aucune dépendance React / Three).
 
+import type { DifficultyId } from './config';
+
 export type TileType = 'grass' | 'fertile' | 'forest' | 'rock' | 'water';
 
 export interface GameMap {
@@ -351,6 +353,8 @@ export interface GameStats {
 export interface GameState {
   version: number;
   seed: number;
+  /** Niveau de difficulté choisi au lancement (les anciennes parties sont en Normal) */
+  difficulty: DifficultyId;
   /** État interne du PRNG, sauvegardé pour rester déterministe */
   rngState: number;
   map: GameMap;

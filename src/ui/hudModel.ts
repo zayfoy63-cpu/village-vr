@@ -10,6 +10,7 @@ import {
   dayInSeason,
   seasonOf,
 } from '../game/config';
+import { difficultyOf } from '../game/difficulty';
 import { computeNet, housingCapacity, injuredCount, jobsCapacity } from '../game/rules';
 import type { ResourceKey } from '../game/types';
 import { useGame } from '../store/gameStore';
@@ -38,6 +39,9 @@ export interface HudModel {
   dayInSeason: number;
   daysPerSeason: number;
   day: number;
+  /** Difficulté de la partie (icône + nom) */
+  difficultyIcon: string;
+  difficultyName: string;
 }
 
 export function moraleIcon(m: number): string {
@@ -56,6 +60,7 @@ export function useHudModel(): HudModel {
   const chip = (k: ResourceKey): ResourceChip => ({ key: k, icon: RESOURCE_META[k].icon, name: RESOURCE_META[k].name, value: Math.floor(data.resources[k]), net: net[k] });
   const season = seasonOf(data.day);
   const jobs = jobsCapacity(game);
+  const difficulty = difficultyOf(game);
   return {
     base: BASE_RESOURCES.map(chip),
     advanced: ADVANCED_RESOURCES.filter((k) => data.discovered.includes(k)).map(chip),
@@ -71,6 +76,8 @@ export function useHudModel(): HudModel {
     dayInSeason: dayInSeason(data.day),
     daysPerSeason: DAYS_PER_SEASON,
     day: data.day,
+    difficultyIcon: difficulty.icon,
+    difficultyName: difficulty.name,
   };
 }
 

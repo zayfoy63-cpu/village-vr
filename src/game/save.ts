@@ -2,7 +2,7 @@
 
 import { BUILDING_BY_ID, maxLevel, unlockKey } from './buildings';
 import { ALL_PARCELS } from './parcels';
-import { BASE_RESOURCES, MORALE, RESOURCE_KEYS, SAVE_KEY, SAVE_VERSION, START_RESOURCES } from './config';
+import { BASE_RESOURCES, DEFAULT_DIFFICULTY, DIFFICULTY_BY_ID, MORALE, RESOURCE_KEYS, SAVE_KEY, SAVE_VERSION, START_RESOURCES, type DifficultyId } from './config';
 import { emptyMech } from './mechanics/common';
 import { applyUnlocks } from './simulation';
 import type { GameState } from './types';
@@ -28,6 +28,7 @@ export function saveGame(state: GameState): void {
  * v4 → v5 : chaînes de production (farine, pain, planches, minerai, outils, armes).
  * v5 → v6 : bandits / orage / crue en temps réel, blessés.
  * v6 → v7 : saisons, météo et mécaniques cachées (forêt intacte, sols neufs, aucune page de Chronique).
+ * v7 → v8 : niveaux de difficulté (les anciennes parties passent en Normal).
  * Renvoie null si la sauvegarde est inutilisable.
  */
 export function migrate(data: GameState): GameState | null {
@@ -65,6 +66,8 @@ export function migrate(data: GameState): GameState | null {
   // Annales (ajout du style « chronique ») : absentes des anciennes parties
   s.annals = Array.isArray(data.annals) ? data.annals.filter((a) => a && typeof a.name === 'string') : [];
   s.floodUntil = Number(data.floodUntil) || 0;
+  // v7 → v8 : niveau de difficulté
+  s.difficulty = DIFFICULTY_BY_ID[data.difficulty as DifficultyId] ? data.difficulty : DEFAULT_DIFFICULTY;
   // v6 → v7 : mécaniques cachées
   const fresh = emptyMech(data.map.tiles.length);
   const old = (data.mech ?? {}) as Partial<GameState['mech']>;

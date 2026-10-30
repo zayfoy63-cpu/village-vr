@@ -10,6 +10,7 @@
 import { recordAnnal } from './annals';
 import { BUILDING_BY_ID, CHAINS } from './buildings';
 import { RESOURCE_KEYS, RESOURCE_META, seasonIndex, seasonOf } from './config';
+import { difficultyOf, inGrace, rampFactor } from './difficulty';
 import { PARCELS, activeCamps } from './parcels';
 import { raidTurnBack, startRaid, startStorm } from './realtime';
 import type { Rng } from './rng';
@@ -166,9 +167,9 @@ export const TUNING = {
   harshWinter: { chance: 0.2, perYear: 0.25 },
 };
 
-/** Sévérité qui monte nettement à chaque saison */
-export function severity(day: number): number {
-  return 1 + TUNING.severityPerSeason * seasonIndex(day);
+/** Sévérité qui monte nettement à chaque saison (plus ou moins vite selon la difficulté) */
+export function severity(state: Pick<GameState, 'day' | 'difficulty'>): number {
+  return 1 + TUNING.severityPerSeason * seasonIndex(state.day) * difficultyOf(state).eventStrength;
 }
 
 // ============================================================================
@@ -316,13 +317,18 @@ export function startFire(state: GameState, b: Building, now: number) {
 
 export function raidSize(state: GameState, sev: number, mult = 1): number {
   const r = TUNING.raid;
-  return Math.max(2, Math.round((r.base + r.perSeverity * sev + state.population / r.popDivisor) * mult));
+  const ramp = rampFactor(state);
+  // Montée en puissance : les premières bandes sont minuscules (1-2 bandits), puis grossissent
+  const size = (r.base + r.perSeverity * sev + state.population / r.popDivisor) * mult * (0.3 + 0.7 * ramp) * difficultyOf(state).eventStrength;
+  // Crescendo : tant que la montée en puissance n'est pas finie, la n-ième bande compte au plus n + 1 bandits
+  const cap = ramp < 1 ? 2 + (state.mech?.memo?.raids ?? 0) : Infinity;
+  return Math.max(ramp < 0.5 ? 1 : 2, Math.min(cap, Math.round(size)));
 }
 
 
 /** Fait planifier un événement annoncé (compte à rebours + carte menace) */
 export function scheduleEvent(state: GameState, ev: EventDef, days: number, params: EventParams, rng: Rng, now: number) {
-  const ctx: EventContext = { state, rng, severity: severity(state.day), now };
+  const ctx: EventContext = { state, rng, severity: severity(state), now };
   const arriveDay = state.day + days;
   const pendingId = state.nextPendingId++;
   const prep = ev.announce?.prepare?.(ctx, params);
@@ -375,7 +381,7 @@ function banditChoice(state: GameState, count: number, ransom: number): ChoiceSp
         detail: 'Cliquez sur un bandit : un garde sort d\'une tour pour l\'attraper (sinon des villageois, qui peuvent être blessés).',
         effects: [
           fx(I.shield, guards ? `${guards} garde(s) disponible(s)` : 'aucune tour : villageois', guards ? 'good' : 'bad'),
-          fxRes('gold', Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state.day) - 1)), 'good', 'par bandit attrapé'),
+          fxRes('gold', Math.round(TUNING.raid.rewardGold + TUNING.raid.rewardPerSeverity * (severity(state) - 1)), 'good', 'par bandit attrapé'),
         ],
       },
       {
@@ -816,7 +822,7 @@ export const EVENT_BY_ID: Record<string, EventDef> = Object.fromEntries(EVENTS.m
 export function pickEvent(state: GameState, rng: Rng): EventDef | undefined {
   const season = seasonIndex(state.day);
   const g = TUNING.goodShare;
-  const wantGood = rng.chance(Math.max(g.min, g.start + g.perSeason * season));
+  const wantGood = rng.chance(Math.max(g.min, g.start + g.perSeason * season + difficultyOf(state).goodShareShift));
   const busy = new Set(state.pending.map((p) => p.eventId));
   if (state.raid) {
     busy.add('bandits');
@@ -824,7 +830,9 @@ export function pickEvent(state: GameState, rng: Rng): EventDef | undefined {
   }
   if (state.storm) busy.add('storm');
   if (state.flood) busy.add('flood');
-  const pool = EVENTS.filter((e) => !e.major && !e.scheduled && !busy.has(e.id));
+  // Période de grâce : seulement des événements positifs ou neutres
+  const grace = inGrace(state);
+  const pool = EVENTS.filter((e) => !e.major && !e.scheduled && !busy.has(e.id) && !(grace && e.kind === 'bad'));
   const side = pool.filter((e) => (e.kind !== 'bad') === wantGood);
   // Les saisons pèsent sur le tirage (sécheresse l'été, marchands l'automne, bandits rares l'hiver…)
   const w = (e: EventDef) => e.weight(state) * seasonEventWeight(state, e.id);
@@ -833,7 +841,7 @@ export function pickEvent(state: GameState, rng: Rng): EventDef | undefined {
 
 /** Déclenche un événement : annonce (compte à rebours) ou effet immédiat */
 export function startEvent(state: GameState, ev: EventDef, rng: Rng, now: number) {
-  const ctx: EventContext = { state, rng, severity: severity(state.day), now };
+  const ctx: EventContext = { state, rng, severity: severity(state), now };
   const params = ev.roll?.(ctx) ?? {};
   if (ev.announce) {
     const [a, b] = ev.announce.days;
@@ -853,7 +861,7 @@ export function arriveEvent(state: GameState, pendingId: number, rng: Rng, now: 
   if (notice?.threat) notice.threat.done = true;
   const ev = EVENT_BY_ID[p.eventId];
   if (!ev) return;
-  const ctx: EventContext = { state, rng, severity: severity(state.day), now };
+  const ctx: EventContext = { state, rng, severity: severity(state), now };
   showOutcome(state, ev, ev.trigger(ctx, p.params), p.params, now);
 }
 
@@ -897,7 +905,7 @@ export function applyChoice(state: GameState, notice: Notice, optionId: string, 
   choice.picked = opt.id;
   const ev = EVENT_BY_ID[choice.eventId];
   if (!ev) return true;
-  const ctx: EventContext = { state, rng, severity: severity(state.day), now };
+  const ctx: EventContext = { state, rng, severity: severity(state), now };
   const prefix = auto ? 'Sans réponse : ' : '';
   // Choix de préparation d'un événement annoncé
   if (choice.params.pendingId !== undefined) {

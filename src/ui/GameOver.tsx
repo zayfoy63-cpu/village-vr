@@ -1,12 +1,15 @@
-import { score } from '../game/rules';
+import { difficultyOf } from '../game/difficulty';
+import { baseScore, score } from '../game/rules';
 import { useGame } from '../store/gameStore';
-import { Icon } from './icons/Icon';
+import { Icon, RichText } from './icons/Icon';
 
 /** Écran récapitulatif de fin de partie */
 export function GameOver() {
   const game = useGame((s) => (s.game.gameOver ? s.game : null));
-  const newGame = useGame((s) => s.newGame);
-  if (!game) return null;
+  const openMenu = useGame((s) => s.openMenu);
+  const menu = useGame((s) => s.menu);
+  if (!game || menu) return null;
+  const diff = difficultyOf(game);
   return (
     <div className="overlay">
       <div className="gameover">
@@ -41,11 +44,11 @@ export function GameOver() {
           <div>
             <span><Icon id="star" /></span>
             <strong>{score(game)}</strong>
-            <em>score</em>
+            <em>score ({baseScore(game)} × {String(diff.scoreMult).replace('.', ',')})</em>
           </div>
         </div>
-        <p className="seed-note">Seed : {game.seed}</p>
-        <button className="primary" onClick={() => newGame()}>
+        <p className="seed-note"><RichText text={diff.icon} /> {diff.name} · Seed : {game.seed}</p>
+        <button className="primary" onClick={() => openMenu('new')}>
           Nouvelle partie
         </button>
       </div>

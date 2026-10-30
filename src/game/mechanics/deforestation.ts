@@ -2,6 +2,7 @@
 // et une vallée sans arbres laisse la rivière déborder plus fort.
 // Indice : les arbres se clairsèment et rapetissent, puis il ne reste que des souches.
 
+import { mechIntensity } from '../difficulty';
 import { tileAt, neighbors8 } from '../mapgen';
 import { statsOf } from '../rules';
 import type { Building, GameState } from '../types';
@@ -81,7 +82,7 @@ export const deforestation: Mechanic<typeof DEFORESTATION> = {
       const wood = (stats.produces?.wood ?? 0) * (b.workers / (stats.workers ?? 1));
       const spots = neighbors8(b.x, b.z).filter(([x, z]) => isForest(state, x, z));
       if (!spots.length) continue;
-      const cut = (wood * C.conditions.cutPerWood) / spots.length;
+      const cut = (wood * C.conditions.cutPerWood * mechIntensity(state)) / spots.length;
       for (const [x, z] of spots) {
         const i = idx(state, x, z);
         forest[i] = Math.max(0, forest[i] - cut);

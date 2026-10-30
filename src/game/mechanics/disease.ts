@@ -4,6 +4,7 @@
 // Solution (jamais dite) : une herboriste, de la place, et l'eau loin des tombes.
 // Le cimetière apparaît de lui-même après les premiers décès.
 
+import { mechIntensity } from '../difficulty';
 import { loseVillagers } from '../events';
 import { tileAt } from '../mapgen';
 import { featureAt, ownsTile } from '../parcels';
@@ -91,13 +92,14 @@ export const disease: Mechanic<typeof DISEASE> = {
     for (const grave of state.buildings.filter((b) => b.type === 'cemetery')) {
       gain += within(state, center(grave), ['well'], D.conditions.wellNearGrave.radius).length * D.conditions.wellNearGrave.gain;
     }
+    gain *= mechIntensity(state);
     const herbalist = state.buildings.some((b) => b.type === 'herbalist' && b.workers > 0 && !b.fire);
     if (herbalist) gain *= D.solution.herbalistGain;
     const decay = D.solution.decay + (herbalist ? D.solution.herbalistDecay : 0);
     m.sickness = Math.max(0, Math.min(1, m.sickness + gain - decay));
     m.sickness = Math.round(m.sickness * 1000) / 1000;
     if (m.sickness >= 1 && state.population > 1) {
-      const lost = loseVillagers(state, Math.max(1, Math.ceil(state.population * D.effect.deathRatio)), 1);
+      const lost = loseVillagers(state, Math.max(1, Math.ceil(state.population * D.effect.deathRatio * mechIntensity(state))), 1);
       m.sickness = D.effect.after;
       strike(state, 'disease');
       pushNotice(state, {

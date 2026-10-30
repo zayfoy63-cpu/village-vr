@@ -1,6 +1,7 @@
 // Registre des mécaniques cachées et crochets appelés par la simulation.
 // Pour ajouter une mécanique : un fichier dans ce dossier + son id dans MechanicId (types.ts) + une ligne ici.
 
+import { inGrace } from '../difficulty';
 import type { Rng } from '../rng';
 import { rollWeather } from '../seasons';
 import type { GameState, MechanicId } from '../types';
@@ -22,6 +23,8 @@ export const MECHANIC_BY_ID = Object.fromEntries(MECHANICS.map((m) => [m.id, m])
 
 /** Fin de journée : effets de la journée écoulée (mutation) */
 export function mechanicsEndOfDay(state: GameState, rng: Rng, now: number) {
+  // Période de grâce : aucune mécanique cachée ne frappe (ni ne s'accumule)
+  if (inGrace(state)) return;
   const ctx: MechanicContext = { state, rng, now };
   for (const m of MECHANICS) m.endOfDay?.(ctx);
 }
@@ -29,6 +32,7 @@ export function mechanicsEndOfDay(state: GameState, rng: Rng, now: number) {
 /** Début de journée : météo, puis ce qui se prépare (mutation) */
 export function mechanicsStartOfDay(state: GameState, rng: Rng, now: number) {
   rollWeather(state, rng);
+  if (inGrace(state)) return;
   const ctx: MechanicContext = { state, rng, now };
   for (const m of MECHANICS) m.startOfDay?.(ctx);
 }

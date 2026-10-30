@@ -197,5 +197,43 @@ export function generateMap(seed: number): GeneratedMap {
   ensure('forest', 5, 3);
   ensure('rock', 3, 2);
 
+  // 7. Garantie de début de partie : quelle que soit la seed, la zone de départ contient une forêt, des
+  //    rochers et de la terre fertile, avec une case libre pour poser la cabane de bûcheron et la carrière
+  //    (elles doivent toucher leur terrain). Ne consomme le hasard que si l'un des trois manque.
+  const zoneTiles: [number, number][] = [];
+  for (let z = zone.z0; z < zone.z1; z++) for (let x = zone.x0; x < zone.x1; x++) zoneTiles.push([x, z]);
+  const occupied = (x: number, z: number) =>
+    (x >= castle.x && x <= castle.x + 1 && z >= castle.z && z <= castle.z + 1) || (x === mill.x && z === mill.z);
+  const isLand = (x: number, z: number) => tiles[idx(x, z)] === 'grass' || tiles[idx(x, z)] === 'fertile';
+  const usable = (t: TileType) => zoneTiles.filter(([x, z]) => !reserved(x, z) && tiles[idx(x, z)] === t).length;
+  const hasSpot = (t: TileType) =>
+    zoneTiles.some(
+      ([x, z]) =>
+        !occupied(x, z) &&
+        isLand(x, z) &&
+        neighbors8(x, z).some(([nx, nz]) => nx >= 0 && nz >= 0 && nx < w && nz < h && tiles[idx(nx, nz)] === t),
+    );
+  const guarantee = (t: TileType, min: number, cluster: number, needSpot: boolean) => {
+    for (let tries = 0; tries < 200 && (usable(t) < min || (needSpot && !hasSpot(t))); tries++) {
+      const free = zoneTiles.filter(([x, z]) => !reserved(x, z) && isLand(x, z));
+      if (!free.length) return;
+      const [cx, cz] = rng.pick(free);
+      let placed = 0;
+      for (const [nx, nz] of [[cx, cz], ...neighbors8(cx, cz)]) {
+        if (placed >= cluster) break;
+        if (nx < zone.x0 || nx >= zone.x1 || nz < zone.z0 || nz >= zone.z1) continue;
+        if (reserved(nx, nz) || !isLand(nx, nz)) continue;
+        tiles[idx(nx, nz)] = t;
+        placed++;
+      }
+    }
+  };
+  // Plusieurs passes : poser les rochers peut grignoter la case libre qui touchait la forêt
+  for (let pass = 0; pass < 3; pass++) {
+    guarantee('forest', 4, 3, true);
+    guarantee('rock', 3, 2, true);
+    guarantee('fertile', 4, 4, false);
+  }
+
   return { map: { seed, width: w, height: h, tiles }, castle, mill };
 }
